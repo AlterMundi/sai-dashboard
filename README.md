@@ -1,6 +1,6 @@
 # SAI Image Analysis Dashboard
 
-**Focused MVP for visual management of SAI's primary n8n workflow**
+**Streamlined visual interface for monitoring SAI's primary n8n workflow**
 
 ## 🎯 Project Overview
 
@@ -14,31 +14,36 @@ The native n8n UI is inefficient for daily operational tasks related to image pr
 - ❌ No quick way to identify pattern failures
 - ❌ Difficult to track analysis quality over time
 
-### Solution: Visual Workflow Dashboard
-✅ **Image Gallery View**: See actual processed images with results at a glance  
-✅ **Quick Failure ID**: Instantly spot and retry failed analyses  
-✅ **Analysis Tracking**: Monitor Ollama's risk assessment patterns  
-✅ **Delivery Status**: Confirm Telegram notifications were sent  
-✅ **Payload Inspector**: Full-size image viewer with analysis overlay  
+### Solution: Focused Visual Dashboard
+✅ **Image Gallery View**: Browse processed images with results  
+✅ **Real-time Updates**: Server-Sent Events for new executions  
+✅ **Efficient Caching**: Filesystem-based image cache at `/mnt/raid1/n8n/backup/images/`  
+✅ **Simple Authentication**: Password-protected for public access  
+✅ **Performance Optimized**: Handles base64 images from database efficiently  
 
 ## 🏗️ Architecture
 
 ```
-SAI Dashboard (Read-Only Consumer)
+SAI Dashboard (Autonomous Read-Only Consumer)
 ├── Frontend (React SPA)
-│   ├── Image Gallery Component
-│   ├── Execution Detail Viewer  
-│   ├── Filter & Search Interface
-│   └── Analysis Overlay Display
-├── Backend API (Node.js)
-│   ├── PostgreSQL Queries (Read-Only)
-│   ├── Image Data Extraction
-│   ├── Execution Status Tracking
-│   └── Ollama Results Parsing
+│   ├── Image Gallery with Lazy Loading
+│   ├── Authentication Layer  
+│   ├── Server-Sent Events Client
+│   └── Responsive Grid Layout
+├── Backend API (Node.js/Express)
+│   ├── Simple Password Authentication
+│   ├── PostgreSQL Read-Only Access
+│   ├── Filesystem Image Cache
+│   ├── SSE Event Stream
+│   └── Rate Limiting & Security
+├── Cache Layer
+│   ├── Filesystem: /mnt/raid1/n8n/backup/images/
+│   ├── Structure: by-date, by-execution, by-status
+│   └── Future: Redis for hot data
 └── Database Integration
-    ├── Direct connection to n8n PostgreSQL
-    ├── Focus on execution_entity + execution_data
-    └── No write operations (safety first)
+    ├── Read-only PostgreSQL user
+    ├── Restricted views for security
+    └── Two-phase query pattern
 ```
 
 ## 📊 Data Sources & Context
@@ -64,26 +69,29 @@ SAI Dashboard (Read-Only Consumer)
 
 ## 🚀 Implementation Phases
 
-### Phase 1: MVP Core (Week 1-2)
-- [ ] Basic image gallery with execution status
-- [ ] Direct PostgreSQL integration (read-only)
-- [ ] Image extraction from execution payloads
-- [ ] Simple filtering (date, status)
-- [ ] Responsive grid layout
+### Phase 1: MVP Core (Days 1-5)
+- [ ] Simple password authentication system
+- [ ] PostgreSQL read-only connection with pooling
+- [ ] Filesystem cache implementation at `/mnt/raid1/n8n/backup/images/`
+- [ ] Basic image gallery with lazy loading
+- [ ] Image extraction and caching algorithm
+- [ ] Server-Sent Events for real-time updates
 
-### Phase 2: Enhanced Details (Week 3-4)  
+### Phase 2: Enhanced Features (Days 6-10)  
+- [ ] Thumbnail generation and caching
+- [ ] Advanced filtering (date, status, risk level)
 - [ ] Full-screen image viewer with analysis overlay
-- [ ] Ollama confidence scores and reasoning display
-- [ ] Telegram delivery confirmation tracking
-- [ ] Execution timing and performance metrics
-- [ ] Error details and retry functionality
+- [ ] Execution details modal
+- [ ] Error pattern detection
+- [ ] Basic export functionality
 
-### Phase 3: Pattern Recognition (Future)
-- [ ] Risk level filtering and analysis
-- [ ] Similar image detection
-- [ ] Analysis quality trending
-- [ ] Automated anomaly detection
-- [ ] Advanced search capabilities
+### Phase 3: Production Hardening (Days 11-14)
+- [ ] HTTPS/SSL configuration
+- [ ] Rate limiting and security headers
+- [ ] Session management improvements
+- [ ] Database query optimization
+- [ ] Monitoring and health endpoints
+- [ ] Documentation and deployment guides
 
 ## 🛠️ Technology Stack
 
@@ -98,20 +106,24 @@ SAI Dashboard (Read-Only Consumer)
 - **Node.js** with Express
 - **TypeScript** for type safety
 - **PostgreSQL client** (pg) for database access
-- **CORS** enabled for development
+- **Sharp** for image processing and thumbnails
+- **Express Rate Limit** for API protection
 - **Helmet** for security headers
+- **bcrypt** for password hashing
 
 ### Database
-- **Read-only access** to existing n8n PostgreSQL 17.5
-- **Connection pooling** for performance
-- **Query optimization** for image data extraction
-- **No modifications** to existing schema
+- **Read-only user** with restricted views
+- **Connection pooling** (5-10 connections)
+- **Two-phase queries** to avoid memory issues
+- **No modifications** to n8n schema
+- **Parameterized queries** for security
 
 ### Deployment
-- **Docker** containers for consistency
-- **Environment-based** configuration
-- **Reverse proxy** integration ready
-- **Health checks** and monitoring
+- **Docker** containers with Linux networking fixes
+- **HTTPS required** for public access
+- **Nginx reverse proxy** with SSL termination
+- **Health checks** at `/api/health`
+- **Filesystem cache** persisted on RAID
 
 ## 🔐 Security Considerations
 
@@ -122,16 +134,18 @@ SAI Dashboard (Read-Only Consumer)
 - **Query timeout limits** for safety
 
 ### API Security  
-- **CORS** configuration for domain restrictions
-- **Rate limiting** on API endpoints
-- **Input validation** and sanitization
-- **Error handling** without data exposure
+- **Password authentication** for browser access
+- **Rate limiting**: 60 req/min general, 5 login attempts/15min
+- **Input validation** with parameterized queries
+- **Session management** with token expiration
+- **HTTPS enforced** for production
 
 ### Image Handling
-- **Base64 extraction** from JSON payloads
-- **Size limits** for image processing
-- **Memory management** for large datasets
-- **Secure image serving** with proper headers
+- **Base64 extraction** from n8n database (already stored)
+- **Filesystem caching** to avoid repeated extraction
+- **Thumbnail generation** for gallery performance
+- **Lazy loading** to manage memory usage
+- **Direct image URLs** instead of JSON embedding
 
 ## 📁 Project Structure
 
@@ -162,7 +176,8 @@ sai-dashboard/
 │   └── test-data.json
 └── docs/
     ├── API.md
-    ├── DEPLOYMENT.md
+    ├── ARCHITECTURE_ANALYSIS.md
+    ├── DECISIONS.md
     └── DEVELOPMENT.md
 ```
 
@@ -215,5 +230,6 @@ sai-dashboard/
 ---
 
 *Project Initialized: August 28, 2025*  
-*Target MVP: September 15, 2025*  
-*Focus: SAI Image Analysis Workflow Management*
+*Target MVP: September 7, 2025 (10 days)*  
+*Production Ready: September 14, 2025*  
+*Focus: Efficient visual monitoring with public access capability*

@@ -391,10 +391,191 @@ Webhook → Transform → Ollama → Condition → Telegram
 - **Google Services**: Sheets, Drive for data storage
 - **Webhook Endpoint**: HTTPS proxy through ai.altermundi.net
 
-This schema analysis provides the foundation for efficient, safe, and performant data extraction for the SAI Image Analysis Dashboard.
+## Dashboard Security Implementation
+
+### Read-Only User Setup
+
+**Create dedicated dashboard user** with minimal privileges:
+
+```sql
+-- Create read-only user for SAI Dashboard
+CREATE USER sai_dashboard_readonly WITH PASSWORD 'CHANGE_THIS_SECURE_PASSWORD';
+
+-- Grant connection to n8n database
+GRANT CONNECT ON DATABASE n8n TO sai_dashboard_readonly;
+GRANT USAGE ON SCHEMA public TO sai_dashboard_readonly;
+
+-- Grant SELECT only on required tables
+GRANT SELECT ON execution_entity TO sai_dashboard_readonly;
+GRANT SELECT ON execution_data TO sai_dashboard_readonly; 
+GRANT SELECT ON workflow_entity TO sai_dashboard_readonly;
+GRANT SELECT ON webhook_entity TO sai_dashboard_readonly;
+
+-- NO write permissions granted
+```
+
+### Security Views
+
+**Create restricted views** for additional security layer:
+
+```sql
+-- View: SAI executions only (not all workflows)
+CREATE VIEW sai_executions AS 
+  SELECT 
+    e.id,
+    e.workflowId,
+    e.status,
+    e.mode,
+    e.startedAt,
+    e.stoppedAt,
+    e.finished,
+    e.createdAt
+  FROM execution_entity e
+  JOIN workflow_entity w ON e.workflowId = w.id
+  WHERE w.name = 'Sai-webhook-upload-image+Ollama-analisys+telegram-sendphoto'
+    AND e.deletedAt IS NULL;
+
+-- Grant access to view instead of direct table access
+GRANT SELECT ON sai_executions TO sai_dashboard_readonly;
+
+-- View: Execution data with size limits (prevent memory bombs)
+CREATE VIEW sai_execution_data AS
+  SELECT 
+    ed.executionId,
+    CASE 
+      WHEN length(ed.data) > 1048576 THEN  -- 1MB limit
+        JSON_BUILD_OBJECT('error', 'Payload too large', 'size', length(ed.data))::text
+      ELSE ed.data
+    END as data
+  FROM execution_data ed
+  WHERE ed.executionId IN (
+    SELECT id FROM sai_executions WHERE status = 'success'
+  );
+
+GRANT SELECT ON sai_execution_data TO sai_dashboard_readonly;
+```
+
+### Filesystem Cache Integration
+
+**SQL functions** to work with filesystem cache:
+
+```sql
+-- Function to check if image is cached (returns boolean)
+CREATE OR REPLACE FUNCTION is_image_cached(execution_id integer)
+RETURNS boolean AS $$
+BEGIN
+  -- This would be called from application, not SQL
+  -- Just placeholder for documentation
+  RETURN false;
+END;
+$$ LANGUAGE plpgsql;
+
+-- View: Execution list optimized for dashboard
+CREATE VIEW sai_dashboard_executions AS
+  SELECT 
+    e.id,
+    e.status,
+    e.startedAt,
+    e.stoppedAt,
+    EXTRACT(EPOCH FROM (e.stoppedAt - e.startedAt)) as duration_seconds,
+    -- Image URL (served by filesystem cache)
+    CASE 
+      WHEN e.status = 'success' THEN '/api/executions/' || e.id || '/image'
+      ELSE NULL
+    END as imageUrl,
+    -- Thumbnail URL
+    CASE 
+      WHEN e.status = 'success' THEN '/api/executions/' || e.id || '/image?size=thumbnail'
+      ELSE NULL
+    END as thumbnailUrl,
+    -- Priority for real-time updates (errors first, then recent)
+    CASE 
+      WHEN e.status = 'error' THEN 1
+      WHEN e.startedAt > NOW() - INTERVAL '1 hour' THEN 2
+      ELSE 3
+    END as priority
+  FROM sai_executions e
+  ORDER BY priority ASC, e.startedAt DESC;
+
+GRANT SELECT ON sai_dashboard_executions TO sai_dashboard_readonly;
+```
+
+### Query Performance Optimization
+
+**Additional indexes** for dashboard queries:
+
+```sql
+-- Index for dashboard filtering and pagination
+CREATE INDEX IF NOT EXISTS idx_sai_dashboard_filtering 
+  ON execution_entity (workflowId, status, startedAt DESC, id DESC)
+  WHERE deletedAt IS NULL;
+
+-- Index for SSE real-time queries (recent executions)
+CREATE INDEX IF NOT EXISTS idx_sai_dashboard_realtime
+  ON execution_entity (startedAt DESC, status)
+  WHERE workflowId = 'yDbfhooKemfhMIkC' 
+    AND startedAt > NOW() - INTERVAL '1 day'
+    AND deletedAt IS NULL;
+
+-- Partial index for error analysis
+CREATE INDEX IF NOT EXISTS idx_sai_dashboard_errors
+  ON execution_entity (startedAt DESC, id)
+  WHERE workflowId = 'yDbfhooKemfhMIkC'
+    AND status = 'error'
+    AND deletedAt IS NULL;
+```
+
+### Security Best Practices Implementation
+
+**Connection security**:
+```sql
+-- Row Level Security (optional additional layer)
+ALTER TABLE execution_entity ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY sai_dashboard_policy ON execution_entity
+  FOR SELECT TO sai_dashboard_readonly
+  USING (
+    workflowId = 'yDbfhooKemfhMIkC' AND
+    deletedAt IS NULL
+  );
+
+-- Revoke public access
+REVOKE ALL ON execution_entity FROM PUBLIC;
+REVOKE ALL ON execution_data FROM PUBLIC;
+```
+
+**Monitoring dashboard access**:
+```sql
+-- Log table for dashboard access (optional)
+CREATE TABLE IF NOT EXISTS sai_dashboard_access_log (
+  id SERIAL PRIMARY KEY,
+  session_token VARCHAR(255),
+  ip_address INET,
+  endpoint VARCHAR(255),
+  query_duration_ms INTEGER,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Function to log slow queries (called from application)
+CREATE OR REPLACE FUNCTION log_dashboard_query(
+  token VARCHAR(255),
+  ip INET,
+  endpoint VARCHAR(255), 
+  duration INTEGER
+) RETURNS void AS $$
+BEGIN
+  INSERT INTO sai_dashboard_access_log 
+    (session_token, ip_address, endpoint, query_duration_ms)
+  VALUES (token, ip, endpoint, duration);
+END;
+$$ LANGUAGE plpgsql;
+```
+
+This security implementation ensures the dashboard operates safely within the n8n database environment while providing necessary data access for monitoring and visualization.
 
 ---
 
-*Schema Analysis Version: 1.0*  
+*Schema Analysis Version: 1.1*  
 *Database: n8n PostgreSQL 17.5*  
+*Security: Read-only user with restricted views*  
 *Target: SAI Image Workflow Dashboard*
