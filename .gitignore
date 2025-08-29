@@ -1,0 +1,449 @@
+# ===============================================
+# SAI Dashboard - Comprehensive .gitignore
+# ===============================================
+
+# =======================
+# Operating System Files
+# =======================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# =======================
+# Node.js Dependencies
+# =======================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# Package managers
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# =======================
+# Environment Variables
+# =======================
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.*.local
+
+# Backup environment files
+.env.backup
+.env.orig
+.env.save
+
+# =======================
+# Build Outputs
+# =======================
+dist/
+build/
+out/
+.output/
+.vite/
+.next/
+.nuxt/
+coverage/
+*.tgz
+*.tar.gz
+
+# Frontend build artifacts
+frontend/dist/
+frontend/build/
+frontend/.vite/
+
+# Backend build artifacts
+backend/dist/
+backend/build/
+
+# =======================
+# Testing & Coverage
+# =======================
+coverage/
+.nyc_output/
+junit.xml
+test-results/
+test-report.html
+.coverage
+htmlcov/
+
+# Jest cache
+.jest-cache/
+
+# =======================
+# Development Tools
+# =======================
+# IDE configurations
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Editor temp files
+.tmp
+.temp
+
+# =======================
+# TypeScript
+# =======================
+*.tsbuildinfo
+.tsc/
+
+# =======================
+# Logs
+# =======================
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# =======================
+# Cache Directories
+# =======================
+.npm
+.eslintcache
+.parcel-cache
+.cache/
+.rpt2_cache/
+.rts2_cache_cjs/
+.rts2_cache_es/
+.rts2_cache_umd/
+
+# Vite cache
+.vite/
+
+# =======================
+# Database
+# =======================
+*.sqlite
+*.db
+*.sqlite3
+*.db3
+
+# Database backups
+*.sql.backup
+*.dump
+
+# =======================
+# Docker
+# =======================
+.dockerignore
+
+# =======================
+# SSL/Security
+# =======================
+*.pem
+*.p12
+*.key
+*.crt
+*.csr
+*.cert
+ssl/
+certs/
+
+# =======================
+# SAI Dashboard Specific
+# =======================
+
+# Image cache directory (development)
+/mnt/raid1/n8n/backup/images/
+cache/
+images/
+thumbnails/
+
+# API documentation
+api-docs/
+swagger-ui/
+
+# Temporary files
+tmp/
+temp/
+.tmp/
+
+# Backup files
+*.backup
+*.bak
+*.orig
+
+# =======================
+# Docker Compose Overrides
+# =======================
+docker-compose.override.yml
+docker-compose.local.yml
+
+# =======================
+# Monitoring & Analytics
+# =======================
+.sentry-cli.log
+.sentry/
+
+# =======================
+# Performance Testing
+# =======================
+benchmark-results/
+load-test-results/
+
+# =======================
+# Documentation Builds
+# =======================
+docs/_build/
+docs/.doctrees/
+
+# =======================
+# Deployment Artifacts
+# =======================
+deploy/
+deployment/
+release/
+
+# Terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+
+# Kubernetes
+*.kubeconfig
+
+# =======================
+# Local Development
+# =======================
+.local/
+local/
+dev-data/
+test-data/
+
+# Development databases
+dev.db
+test.db
+
+# =======================
+# Archives & Compressed
+# =======================
+*.7z
+*.dmg
+*.gz
+*.iso
+*.jar
+*.rar
+*.tar
+*.zip
+
+# =======================
+# Dependency Directories
+# =======================
+jspm_packages/
+
+# TypeScript cache
+*.tsbuildinfo
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Microbundle cache
+.rpt2_cache/
+.rts2_cache_cjs/
+.rts2_cache_es/
+.rts2_cache_umd/
+
+# Optional REPL history
+.node_repl_history
+
+# Output of 'npm pack'
+*.tgz
+
+# Yarn Integrity file
+.yarn-integrity
+
+# parcel-bundler cache (https://parceljs.org/)
+.cache
+.parcel-cache
+
+# Next.js build output
+.next
+
+# Nuxt.js build / generate output
+.nuxt
+dist
+
+# Gatsby files
+.cache/
+public
+
+# Storybook build outputs
+.out
+.storybook-out
+
+# Temporary folders
+node_modules/
+.tmp/
+
+# =======================
+# Security & Secrets
+# =======================
+secrets/
+.secrets/
+*.secret
+auth.json
+credentials.json
+
+# JWT secrets
+jwt-secret*
+session-secret*
+
+# Database credentials
+db-credentials*
+database-url*
+
+# API keys
+api-keys*
+*.api-key
+
+# =======================
+# Performance Monitoring
+# =======================
+*.cpuprofile
+*.heapsnapshot
+.clinic/
+
+# =======================
+# Git Hooks
+# =======================
+.git/hooks/pre-commit.local
+.git/hooks/pre-push.local
+
+# =======================
+# Miscellaneous
+# =======================
+*.pid
+*.seed
+*.pid.lock
+
+# Directory for instrumented libs generated by jscoverage/JSCover
+lib-cov
+
+# Coverage directory used by tools like istanbul
+coverage
+
+# Grunt intermediate storage (https://gruntjs.com/creating-plugins#storing-task-files)
+.grunt
+
+# Bower dependency directory (https://bower.io/)
+bower_components
+
+# node-waf configuration
+.lock-wscript
+
+# Compiled binary addons (https://nodejs.org/api/addons.html)
+build/Release
+
+# =======================
+# Development Notes
+# =======================
+# Keep personal development notes out of repo
+NOTES.md
+TODO-personal.md
+SCRATCH.md
+notes/
+todo/
+
+# =======================
+# Git Insights & Analysis
+# =======================
+# Files for tracking development metrics
+.git-insights/
+metrics/
+git-stats/
+commit-analysis/
+
+# Development tracking
+development-log.md
+progress-tracking.md
+time-tracking.csv
+
+# =======================
+# IDE & Editor Specific
+# =======================
+# VSCode
+.vscode/settings.json
+.vscode/launch.json
+.vscode/extensions.json
+!.vscode/tasks.json
+!.vscode/settings.template.json
+
+# IntelliJ/WebStorm
+.idea/workspace.xml
+.idea/tasks.xml
+.idea/dictionaries
+.idea/shelf
+.idea/usage.statistics.xml
+.idea/misc.xml
+!.idea/codeStyles/
+!.idea/inspectionProfiles/
+!.idea/runConfigurations/
+
+# Sublime Text
+*.sublime-workspace
+*.sublime-project
+
+# Vim
+*.swp
+*.swo
+Session.vim
+.netrwhist
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+
+# =======================
+# Performance Monitoring
+# =======================
+performance-logs/
+profiling-results/
+memory-snapshots/
+cpu-profiles/
+
+# =======================
+# Testing Artifacts
+# =======================
+test-screenshots/
+visual-diffs/
+e2e-results/
+integration-test-data/
+
+# =======================
+# Local Configuration
+# =======================
+local-config/
+user-preferences/
+personal-settings/

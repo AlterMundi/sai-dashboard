@@ -1,0 +1,225 @@
+# ===============================================
+# SAI Dashboard - Git Attributes Configuration
+# For better git insights and file handling
+# ===============================================
+
+# =======================
+# Text Files - Normalize line endings
+# =======================
+* text=auto eol=lf
+
+# Source code files
+*.js text eol=lf
+*.jsx text eol=lf
+*.ts text eol=lf
+*.tsx text eol=lf
+*.json text eol=lf
+*.css text eol=lf
+*.scss text eol=lf
+*.html text eol=lf
+*.xml text eol=lf
+*.svg text eol=lf
+*.md text eol=lf
+*.txt text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.sql text eol=lf
+
+# Configuration files
+*.conf text eol=lf
+*.config text eol=lf
+*.ini text eol=lf
+*.env text eol=lf
+.env* text eol=lf
+.gitignore text eol=lf
+.gitattributes text eol=lf
+Dockerfile text eol=lf
+docker-compose*.yml text eol=lf
+
+# Documentation
+README* text eol=lf
+CHANGELOG* text eol=lf
+LICENSE* text eol=lf
+CONTRIBUTING* text eol=lf
+CLAUDE.md text eol=lf
+
+# =======================
+# Binary Files - Prevent text processing
+# =======================
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.svg binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
+*.otf binary
+*.pdf binary
+*.zip binary
+*.tar binary
+*.gz binary
+*.7z binary
+*.rar binary
+*.mp4 binary
+*.mp3 binary
+*.wav binary
+
+# =======================
+# Language-specific attributes for git stats
+# =======================
+*.ts linguist-language=TypeScript
+*.tsx linguist-language=TypeScript
+*.js linguist-language=JavaScript
+*.jsx linguist-language=JavaScript
+*.css linguist-language=CSS
+*.scss linguist-language=SCSS
+*.html linguist-language=HTML
+*.sql linguist-language=SQL
+*.md linguist-language=Markdown
+
+# =======================
+# Files to exclude from language statistics
+# =======================
+# Generated files
+package-lock.json linguist-generated=true
+yarn.lock linguist-generated=true
+*.min.js linguist-generated=true
+*.min.css linguist-generated=true
+dist/* linguist-generated=true
+build/* linguist-generated=true
+coverage/* linguist-generated=true
+
+# Documentation that shouldn't count as code
+docs/* linguist-documentation=true
+*.md linguist-documentation=true
+README* linguist-documentation=true
+CHANGELOG* linguist-documentation=true
+
+# Configuration files
+*.json linguist-language=JSON
+tsconfig*.json linguist-language=JSON
+jest.config.js linguist-language=JavaScript
+vite.config.ts linguist-language=TypeScript
+tailwind.config.js linguist-language=JavaScript
+postcss.config.js linguist-language=JavaScript
+eslint.config.js linguist-language=JavaScript
+
+# =======================
+# Diff and merge attributes
+# =======================
+# Binary files that should not be diffed
+*.png diff=astextplain
+*.jpg diff=astextplain
+*.jpeg diff=astextplain
+*.gif diff=astextplain
+*.ico diff=astextplain
+*.pdf diff=astextplain
+*.zip diff=astextplain
+
+# Package files that should use custom diff
+package.json diff=json
+package-lock.json -diff
+yarn.lock -diff
+
+# =======================
+# Export ignore (for git archive)
+# =======================
+# Files to exclude from git archive/export
+.gitignore export-ignore
+.gitattributes export-ignore
+.github/ export-ignore
+tests/ export-ignore
+test/ export-ignore
+coverage/ export-ignore
+docs/ export-ignore
+*.test.js export-ignore
+*.test.ts export-ignore
+*.spec.js export-ignore
+*.spec.ts export-ignore
+jest.config.js export-ignore
+.eslintrc* export-ignore
+.prettierrc* export-ignore
+CLAUDE.md export-ignore
+
+# =======================
+# File-specific handling
+# =======================
+# Treat these as text files even without extension
+Dockerfile text
+Makefile text
+LICENSE text
+CHANGELOG text
+AUTHORS text
+CONTRIBUTORS text
+
+# =======================
+# Large file handling
+# =======================
+# Mark files that might be large
+*.sql filter=lfs diff=lfs merge=lfs -text
+*.dump filter=lfs diff=lfs merge=lfs -text
+
+# =======================
+# Security-sensitive files
+# =======================
+# Mark sensitive files (they should be in .gitignore anyway)
+*.pem diff=astextplain
+*.key diff=astextplain
+*.p12 diff=astextplain
+*.crt diff=astextplain
+*.cert diff=astextplain
+
+# =======================
+# Frontend-specific
+# =======================
+# Node.js and package manager files
+package.json text eol=lf
+package-lock.json text eol=lf linguist-generated=true
+yarn.lock text eol=lf linguist-generated=true
+
+# Frontend build tools
+webpack.config.js text eol=lf
+vite.config.ts text eol=lf
+tsconfig.json text eol=lf
+jsconfig.json text eol=lf
+
+# =======================
+# Backend-specific
+# =======================
+# API documentation
+*.api text eol=lf
+*.swagger text eol=lf
+openapi.yml text eol=lf
+swagger.yml text eol=lf
+
+# Database files
+*.sql text eol=lf
+migrations/*.sql text eol=lf
+seeds/*.sql text eol=lf
+
+# =======================
+# Docker-specific
+# =======================
+Dockerfile* text eol=lf
+docker-compose*.yml text eol=lf
+*.dockerignore text eol=lf
+
+# =======================
+# CI/CD files
+# =======================
+.github/* text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+Jenkinsfile text eol=lf
+.gitlab-ci.yml text eol=lf
+
+# =======================
+# IDE configuration files
+# =======================
+.vscode/* text eol=lf
+.idea/* text eol=lf linguist-generated=true
+*.iml text eol=lf linguist-generated=true
