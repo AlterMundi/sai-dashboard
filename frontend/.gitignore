@@ -1,0 +1,18 @@
+# Frontend-specific ignores
+
+# Build output
+dist/
+build/
+
+# Vite cache
+.vite/
+
+# Development environment
+.env.development
+.env.test
+
+# Static assets cache
+public/cache/
+
+# Storybook
+storybook-static/

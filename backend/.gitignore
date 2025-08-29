@@ -1,0 +1,27 @@
+# Backend-specific ignores
+
+# Build output
+dist/
+build/
+
+# TypeScript build info
+*.tsbuildinfo
+
+# Test coverage
+coverage/
+
+# Logs
+logs/
+*.log
+
+# Development environment
+.env.development
+.env.test
+
+# Database files
+*.sqlite
+*.db
+
+# Temporary files
+tmp/
+temp/
