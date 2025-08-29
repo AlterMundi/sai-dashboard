@@ -8,10 +8,11 @@
 
 ### Base Information
 - **Base URL**: `http://localhost:3001/api` (development)
-- **Production URL**: `https://sai-dashboard.local/api`
+- **Production URL**: `https://sai-dashboard.altermundi.net/api`
 - **API Version**: v1
 - **Content Type**: `application/json`
-- **Authentication**: Optional (Bearer token or API key)
+- **Authentication**: Required (password-based session tokens)
+- **Real-time**: Server-Sent Events at `/api/events`
 
 ### Response Format
 All API responses follow this standard format:
@@ -29,7 +30,81 @@ All API responses follow this standard format:
 
 ---
 
+## 🔐 Authentication Endpoints
+
+### POST /api/auth/login
+Authenticate with dashboard password and receive session token.
+
+**Request Body:**
+```json
+{
+  "password": "your-dashboard-password"
+}
+```
+
+**Example Request:**
+```bash
+curl -X POST "http://localhost:3001/api/auth/login" \
+  -H "Content-Type: application/json" \
+  -d '{"password": "your-secure-password"}'
+```
+
+**Response:**
+```json
+{
+  "data": {
+    "token": "a1b2c3d4e5f6...",
+    "expiresIn": 86400,
+    "expiresAt": "2025-08-29T15:30:00Z"
+  },
+  "meta": {
+    "timestamp": "2025-08-28T15:30:00Z"
+  }
+}
+```
+
+**Status Codes:**
+- `200 OK`: Authentication successful
+- `401 Unauthorized`: Invalid password
+- `429 Too Many Requests`: Rate limit exceeded (5 attempts per 15 minutes)
+
+### POST /api/auth/logout
+Invalidate current session token.
+
+**Headers:**
+- `Authorization: Bearer <token>`
+
+**Response:**
+```json
+{
+  "data": {
+    "message": "Logged out successfully"
+  }
+}
+```
+
+### GET /api/auth/verify
+Verify current session token validity.
+
+**Headers:**
+- `Authorization: Bearer <token>`
+
+**Response:**
+```json
+{
+  "data": {
+    "valid": true,
+    "expiresAt": "2025-08-29T15:30:00Z",
+    "remainingTime": 82800
+  }
+}
+```
+
+---
+
 ## 🔍 Execution Endpoints
+
+**Authentication Required**: All endpoints require valid session token in `Authorization: Bearer <token>` header.
 
 ### GET /api/executions
 Retrieve paginated list of workflow executions.
@@ -619,8 +694,9 @@ executions = client.get_executions(limit=20, status='success')
 
 The API implements rate limiting to ensure fair usage:
 
-- **Default Limit**: 100 requests per minute per IP
-- **Burst Limit**: 20 requests per 10 seconds  
+- **Default Limit**: 60 requests per minute per IP
+- **Burst Limit**: 10 requests per 10 seconds
+- **Login Limit**: 5 attempts per 15 minutes  
 - **Headers**: Rate limit information in response headers
   - `X-RateLimit-Limit`: Requests allowed per window
   - `X-RateLimit-Remaining`: Requests remaining in window
@@ -639,27 +715,68 @@ When rate limit is exceeded:
 
 ---
 
-## 🔄 WebSocket Support (Future)
+## 🔄 Server-Sent Events (Real-time Updates)
 
-For real-time updates, WebSocket support will be added:
+For real-time updates, the API provides Server-Sent Events:
 
-**Connection**: `ws://localhost:3001/ws/executions`
+### GET /api/events
+Establish SSE connection for live execution updates.
 
-**Events**:
+**Headers:**
+- `Authorization: Bearer <token>`
+- `Accept: text/event-stream`
+
+**Connection:**
 ```javascript
-// Subscribe to execution updates
-ws.send(JSON.stringify({
-  type: 'subscribe',
-  channel: 'executions',
-  filters: { status: ['error'] }
-}));
+// Establish SSE connection
+const eventSource = new EventSource('/api/events', {
+  headers: {
+    'Authorization': `Bearer ${token}`
+  }
+});
 
-// Receive real-time updates
-ws.onmessage = (event) => {
-  const data = JSON.parse(event.data);
-  console.log('New execution:', data.execution);
+// Handle different event types
+eventSource.addEventListener('execution:new', (event) => {
+  const execution = JSON.parse(event.data);
+  console.log('New execution:', execution);
+  addToGallery(execution);
+});
+
+eventSource.addEventListener('execution:error', (event) => {
+  const execution = JSON.parse(event.data);
+  console.log('Failed execution:', execution);
+  showErrorNotification(execution);
+});
+
+eventSource.addEventListener('heartbeat', (event) => {
+  console.log('Connection alive:', event.data);
+});
+
+// Handle connection errors
+eventSource.onerror = (event) => {
+  console.error('SSE connection error:', event);
 };
 ```
+
+**Event Types:**
+- `execution:new` - New successful execution
+- `execution:error` - Failed execution  
+- `execution:update` - Status change for existing execution
+- `heartbeat` - Keep-alive message (every 30 seconds)
+
+**Event Format:**
+```
+event: execution:new
+data: {"id":4894,"status":"success","startedAt":"2025-08-28T16:30:00Z","imageUrl":"/api/executions/4894/image"}
+
+event: heartbeat  
+data: {"timestamp":"2025-08-28T16:30:30Z","connectedClients":5}
+```
+
+**Rate Limits:**
+- Maximum 100 concurrent SSE connections
+- Connection timeout: 5 minutes of inactivity
+- Automatic reconnection with exponential backoff recommended
 
 ---
 

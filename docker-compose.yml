@@ -16,7 +16,7 @@ services:
     container_name: sai-dashboard-api
     
     ports:
-      - "${API_PORT:-3001}:3001"
+      - "0.0.0.0:${API_PORT:-3001}:3001"  # Development: accessible from network
     
     environment:
       # Application settings
@@ -35,19 +35,34 @@ services:
       - DEFAULT_PAGE_SIZE=${DEFAULT_PAGE_SIZE:-50}
       - MAX_IMAGE_SIZE=${MAX_IMAGE_SIZE:-5242880}
       
-      # Security
-      - API_KEY=${API_KEY}
-      - RATE_LIMIT_MAX_REQUESTS=${RATE_LIMIT_MAX_REQUESTS:-100}
+      # Security (updated for password authentication)
+      - DASHBOARD_PASSWORD=${DASHBOARD_PASSWORD}
+      - SESSION_SECRET=${SESSION_SECRET}
+      - RATE_LIMIT_MAX_REQUESTS=${RATE_LIMIT_MAX_REQUESTS:-60}
+      - ENFORCE_HTTPS=${ENFORCE_HTTPS:-false}
       - TRUST_PROXY=true
       
-      # Caching
-      - CACHE_TTL=${CACHE_TTL:-300}
-      - REDIS_URL=redis://sai-dashboard-redis:6379
+      # Filesystem cache configuration
+      - CACHE_PATH=/cache
+      - ENABLE_THUMBNAIL_GENERATION=${ENABLE_THUMBNAIL_GENERATION:-true}
       
-    depends_on:
-      - sai-dashboard-redis
+      # SSE Configuration
+      - SSE_HEARTBEAT_INTERVAL=${SSE_HEARTBEAT_INTERVAL:-30000}
+      - SSE_MAX_CLIENTS=${SSE_MAX_CLIENTS:-100}
+      
+    volumes:
+      # Mount filesystem cache
+      - /mnt/raid1/n8n/backup/images:/cache
+      
+    # Remove Redis dependency for now
+    # depends_on:
+    #   - sai-dashboard-redis
       
     restart: unless-stopped
+    
+    # Fix for Linux Docker networking
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3001/api/health"]
@@ -75,7 +90,7 @@ services:
     container_name: sai-dashboard-ui
     
     ports:
-      - "${FRONTEND_PORT:-3000}:80"
+      - "0.0.0.0:${FRONTEND_PORT:-3000}:80"  # Development: accessible from network
     
     environment:
       - NGINX_HOST=localhost
@@ -97,30 +112,33 @@ services:
       - "com.sai.version=1.0.0"
 
   # =================================================================
-  # Redis Cache (for API response caching)
+  # Redis Cache (FUTURE USE - currently using filesystem cache)
   # =================================================================
-  sai-dashboard-redis:
-    image: redis:7-alpine
-    container_name: sai-dashboard-redis
-    
-    ports:
-      - "${REDIS_PORT:-6379}:6379"
-    
-    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
-    
-    volumes:
-      - sai_redis_data:/data
-    
-    restart: unless-stopped
-    
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 3s
-      retries: 3
-    
-    labels:
-      - "com.sai.service=cache"
+  # sai-dashboard-redis:
+  #   image: redis:7-alpine
+  #   container_name: sai-dashboard-redis
+  #   
+  #   ports:
+  #     - "${REDIS_PORT:-6379}:6379"
+  #   
+  #   command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+  #   
+  #   volumes:
+  #     - sai_redis_data:/data
+  #   
+  #   restart: unless-stopped
+  #   
+  #   healthcheck:
+  #     test: ["CMD", "redis-cli", "ping"]
+  #     interval: 10s
+  #     timeout: 3s
+  #     retries: 3
+  #   
+  #   labels:
+  #     - "com.sai.service=cache"
+  #   
+  #   profiles:
+  #     - redis
 
   # =================================================================
   # Reverse Proxy (Nginx) - Optional
@@ -195,7 +213,7 @@ services:
     container_name: sai-dashboard-grafana
     
     ports:
-      - "${GRAFANA_PORT:-3001}:3000"
+      - "${GRAFANA_PORT:-3002}:3000"
     
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
