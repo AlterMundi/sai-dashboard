@@ -1,0 +1,42 @@
+[Unit]
+Description=SAI Dashboard SSH Reverse Tunnel Services
+Documentation=https://sai.altermundi.net/dashboard/
+After=network.target sai-dashboard-api.service nginx.service
+Wants=sai-dashboard-api.service nginx.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=true
+User=root
+Group=root
+
+# Enable and start the existing tunnel services
+ExecStart=/bin/systemctl enable tunnel-dashboard.service
+ExecStart=/bin/systemctl start tunnel-dashboard.service
+ExecStart=/bin/systemctl enable tunnel-dashboard-api.service  
+ExecStart=/bin/systemctl start tunnel-dashboard-api.service
+
+# Stop services on service stop
+ExecStop=/bin/systemctl stop tunnel-dashboard.service
+ExecStop=/bin/systemctl stop tunnel-dashboard-api.service
+
+# Restart configuration
+Restart=always
+RestartSec=10
+StartLimitInterval=300
+StartLimitBurst=5
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+
+# Environment
+Environment="SSH_AUTH_SOCK="
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=sai-dashboard-tunnel
+
+[Install]
+WantedBy=multi-user.target
