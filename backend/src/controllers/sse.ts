@@ -47,7 +47,7 @@ class SSEManager {
     const client = this.clients.get(clientId);
     if (client) {
       try {
-        client.response.end();
+        (client.response as any).end();
       } catch (error) {
         // Client might already be disconnected
       }
@@ -69,7 +69,7 @@ class SSEManager {
 
     try {
       const sseMessage = this.formatSSEMessage(message);
-      client.response.write(sseMessage);
+      (client.response as any).write(sseMessage);
       client.lastPing = new Date();
       return true;
 

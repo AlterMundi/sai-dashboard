@@ -51,10 +51,11 @@ docker-compose up -d
 
 ### Critical Production Configuration
 
-**Server Status (Verified Working):**
-- Frontend: Port 3000 with `VITE_BASE_PATH=/dashboard/` and `VITE_API_URL=/dashboard/api`
-- Backend: Port 3001 with `CORS_ORIGIN=https://n8n.altermundi.net`
+**Server Status (Reverse Tunnel Architecture):**
+- Frontend: nginx port 80 (tunneled via remote port 3000 to sai.altermundi.net)
+- Backend: API port 3001 (tunneled via remote port 3001 to sai.altermundi.net)  
 - Database: 7,721+ SAI workflow executions successfully connected
+- Tunnels: tunnel-dashboard.service and tunnel-dashboard-api.service (active)
 
 **nginx Configuration Requirements:**
 The following locations must be added to the existing n8n.altermundi.net server block:
@@ -78,7 +79,7 @@ location /dashboard/api/ {
 
 # Dashboard Assets - Must come BEFORE general static assets location
 location ~* ^/dashboard/.*\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
-    proxy_pass http://127.0.0.1:3000;
+    proxy_pass http://127.0.0.1:3000;  # Remote port via reverse tunnel
     proxy_http_version 1.1;
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
@@ -86,9 +87,9 @@ location ~* ^/dashboard/.*\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)
     add_header Cache-Control "no-cache, no-store, must-revalidate";
 }
 
-# Dashboard Frontend - All other dashboard routes
+# Dashboard Frontend - All other dashboard routes  
 location /dashboard/ {
-    proxy_pass http://127.0.0.1:3000;
+    proxy_pass http://127.0.0.1:3000/dashboard/;  # Remote port via reverse tunnel
     proxy_http_version 1.1;
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
@@ -314,31 +315,39 @@ VITE_API_URL=/dashboard/api
 
 ### Production Deployment Lessons (BATTLE-TESTED)
 
-**Self-Contained Architecture (BATTLE-TESTED):**
+**SSH Reverse Tunnel Architecture (CORRECTED):**
 ```bash
+# Existing reverse tunnel services (already running):
+tunnel-dashboard.service: ssh -R 3000:localhost:80 user@sai.altermundi.net
+tunnel-dashboard-api.service: ssh -R 3001:localhost:3001 user@sai.altermundi.net
+
+# This creates remote bindings on public proxy (sai.altermundi.net):
+# - localhost:3000 (on proxy) -> localhost:80 (on local server)
+# - localhost:3001 (on proxy) -> localhost:3001 (on local server)
+
 # Backend: Self-contained under /dashboard/api/*
 app.use('/dashboard/api', apiRoutes);  # No URL rewriting needed
 
 # Frontend Environment Variables:
 VITE_BASE_PATH=/dashboard/
 VITE_API_URL=/dashboard/api
-
-# Start command that WORKS:
-VITE_BASE_PATH=/dashboard/ VITE_API_URL=/dashboard/api npm run dev
 ```
 
-**nginx Self-Contained Approach:**
+**nginx Public Proxy Configuration (CORRECTED):**
 ```nginx
-# ✅ SELF-CONTAINED: One location handles everything under /dashboard/
+# ✅ REVERSE TUNNEL: Uses remote port bindings created by local services
 location /dashboard/ {
-    # API requests go to backend (handles /dashboard/api/* internally)
-    if ($request_uri ~ ^/dashboard/api/) {
-        proxy_pass http://127.0.0.1:3001;
-        break;
-    }
-    
-    # Frontend requests go to Vite server
-    proxy_pass http://127.0.0.1:3000;
+    proxy_pass http://127.0.0.1:3000/dashboard/;  # Remote port 3000 -> local port 80
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_buffering off;
+}
+
+location /dashboard/api/ {
+    proxy_pass http://127.0.0.1:3001;  # Remote port 3001 -> local port 3001
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_buffering off;
 }
 
 # ❌ OLD APPROACH: Complex URL rewriting (avoid this)

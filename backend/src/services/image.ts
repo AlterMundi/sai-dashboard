@@ -30,19 +30,24 @@ export class ImageService {
     }
   }
 
-  private getCacheFilePath(executionId: string, isThumbnail = false): string {
-    const suffix = isThumbnail ? '_thumb' : '';
-    const filename = sanitizeFilename(`${executionId}${suffix}.jpg`);
-    return join(this.cachePath, 'by-execution', executionId, filename);
+  private getCacheFilePath(executionId: string, isThumbnail = false, date?: Date): string {
+    // Scalable hierarchical structure: /YYYY/MM/DD/executionId/image.jpg
+    // Full execution ID used as directory name for uniqueness
+    const suffix = isThumbnail ? '_thumb' : 'image';
+    const filename = `${suffix}.jpg`;
+    
+    // Use provided date or current date
+    const cacheDate = date || new Date();
+    const year = cacheDate.getFullYear();
+    const month = String(cacheDate.getMonth() + 1).padStart(2, '0');
+    const day = String(cacheDate.getDate()).padStart(2, '0');
+    
+    // Full execution ID as directory ensures uniqueness
+    const sanitizedId = sanitizeFilename(executionId);
+    
+    return join(this.cachePath, year.toString(), month, day, sanitizedId, filename);
   }
 
-  private getByDateCachePath(executionId: string, date: Date): string {
-    const year = date.getFullYear();
-    const month = (date.getMonth() + 1).toString().padStart(2, '0');
-    const day = date.getDate().toString().padStart(2, '0');
-    const filename = sanitizeFilename(`${executionId}.jpg`);
-    return join(this.cachePath, 'by-date', year.toString(), month, day, filename);
-  }
 
   async extractImageFromDatabase(executionId: string): Promise<{
     buffer: Buffer;
@@ -50,52 +55,63 @@ export class ImageService {
     mimeType: string;
   } | null> {
     try {
-      // Query execution data for image payload
+      // Query execution data from n8n database - search for base64 image data
       const query = `
-        SELECT ed.data, ed.node_id
-        FROM sai_execution_data ed
-        WHERE ed.execution_id = $1
-          AND ed.data::jsonb ? 'main'
-          AND ed.data::jsonb -> 'main' -> 0 -> 'binary' ? 'data'
-        ORDER BY 
-          CASE WHEN ed.node_id = 'Webhook' THEN 1 ELSE 2 END,
-          ed.created_at DESC
+        SELECT ed.data
+        FROM execution_data ed
+        WHERE ed."executionId" = $1
+          AND ed.data::text ~ 'data:image'
         LIMIT 1
       `;
 
       const results = await db.query(query, [executionId]);
 
       if (results.length === 0) {
-        logger.warn('No image data found for execution:', executionId);
+        logger.warn('No webhook image data found for execution:', executionId);
         return null;
       }
 
       const executionData = results[0];
       const jsonData = executionData.data;
 
-      // Extract base64 image data
+      // Extract base64 image data from n8n structure
       let base64Data: string;
       let mimeType = 'image/jpeg'; // default
 
       try {
         const parsed = typeof jsonData === 'string' ? JSON.parse(jsonData) : jsonData;
-        const binaryData = parsed?.main?.[0]?.binary;
-
-        if (!binaryData || !binaryData.data) {
-          logger.warn('Invalid image data structure for execution:', executionId);
+        
+        // Search through the n8n execution data array for image data
+        let imageDataUrl: string | null = null;
+        
+        if (Array.isArray(parsed)) {
+          for (const item of parsed) {
+            const dataStr = JSON.stringify(item);
+            if (dataStr.includes('data:image')) {
+              // Extract the data URL from the JSON string
+              const match = dataStr.match(/"data:image\/[^"]*;base64,[^"]+"/);
+              if (match) {
+                imageDataUrl = match[0].slice(1, -1); // Remove quotes
+                break;
+              }
+            }
+          }
+        }
+        
+        if (!imageDataUrl) {
+          logger.warn('No image data URL found in execution data:', executionId);
           return null;
         }
 
-        base64Data = binaryData.data;
-        mimeType = binaryData.mimeType || mimeType;
-
-        // Remove data URL prefix if present
-        if (base64Data.startsWith('data:')) {
-          const commaIndex = base64Data.indexOf(',');
-          if (commaIndex !== -1) {
-            base64Data = base64Data.substring(commaIndex + 1);
-          }
+        // Parse data URL to extract base64 and mime type
+        const dataUrlMatch = imageDataUrl.match(/^data:([^;]+);base64,(.+)$/);
+        if (!dataUrlMatch) {
+          logger.warn('Invalid data URL format for execution:', executionId);
+          return null;
         }
+
+        mimeType = dataUrlMatch[1];
+        base64Data = dataUrlMatch[2];
 
       } catch (parseError) {
         logger.error('Failed to parse execution data JSON:', parseError);
@@ -163,20 +179,21 @@ export class ImageService {
     }
   }
 
-  async cacheImage(executionId: string, buffer: Buffer, date: Date): Promise<{
+  async cacheImage(executionId: string, buffer: Buffer, date?: Date): Promise<{
     originalPath: string;
     thumbnailPath: string | null;
   }> {
     await this.ensureCacheDirectory();
 
-    const originalPath = this.getCacheFilePath(executionId, false);
+    const cacheDate = date || new Date();
+    const originalPath = this.getCacheFilePath(executionId, false, cacheDate);
     const thumbnailPath = cacheConfig.enableThumbnails ? 
-      this.getCacheFilePath(executionId, true) : null;
+      this.getCacheFilePath(executionId, true, cacheDate) : null;
 
-    // Ensure directory structure exists
+    // Create directory structure if it doesn't exist
     await fs.mkdir(dirname(originalPath), { recursive: true });
 
-    // Save original image
+    // Save original webhook image
     await fs.writeFile(originalPath, buffer);
 
     // Generate and save thumbnail
@@ -185,23 +202,12 @@ export class ImageService {
       await fs.writeFile(thumbnailPath, thumbnailBuffer);
     }
 
-    // Create by-date symlink for organization
-    const byDatePath = this.getByDateCachePath(executionId, date);
-    await fs.mkdir(dirname(byDatePath), { recursive: true });
-    
-    try {
-      // Create relative symlink to avoid absolute path issues
-      await fs.symlink(originalPath, byDatePath);
-    } catch (symlinkError) {
-      // Symlink creation is optional, don't fail if it doesn't work
-      logger.debug('Failed to create symlink:', symlinkError);
-    }
-
-    logger.debug('Image cached successfully:', {
+    logger.debug('Webhook image cached successfully:', {
       executionId,
       originalPath,
       thumbnailPath,
-      size: formatBytes(buffer.length)
+      size: formatBytes(buffer.length),
+      date: cacheDate.toISOString()
     });
 
     return { originalPath, thumbnailPath };
@@ -212,24 +218,34 @@ export class ImageService {
     contentType: string;
     size: number;
   } | null> {
-    const cacheFilePath = this.getCacheFilePath(executionId, thumbnail);
+    // First, try to find the cached file by searching recent dates
+    // We'll check the last 30 days of cache directories
+    const searchDays = 30;
+    const today = new Date();
+    
+    for (let daysAgo = 0; daysAgo < searchDays; daysAgo++) {
+      const searchDate = new Date(today);
+      searchDate.setDate(searchDate.getDate() - daysAgo);
+      
+      const cacheFilePath = this.getCacheFilePath(executionId, thumbnail, searchDate);
+      
+      if (existsSync(cacheFilePath)) {
+        const stats = await fs.stat(cacheFilePath);
+        const stream = createReadStream(cacheFilePath);
 
-    // Check cache first
-    if (existsSync(cacheFilePath)) {
-      const stats = await fs.stat(cacheFilePath);
-      const stream = createReadStream(cacheFilePath);
+        logger.debug('Serving image from cache:', {
+          executionId,
+          thumbnail,
+          size: formatBytes(stats.size),
+          path: cacheFilePath
+        });
 
-      logger.debug('Serving image from cache:', {
-        executionId,
-        thumbnail,
-        size: formatBytes(stats.size)
-      });
-
-      return {
-        stream,
-        contentType: 'image/jpeg',
-        size: stats.size
-      };
+        return {
+          stream,
+          contentType: 'image/jpeg',
+          size: stats.size
+        };
+      }
     }
 
     // Extract from database if not in cache
@@ -297,54 +313,114 @@ export class ImageService {
     return imageData?.metadata || null;
   }
 
-  async cleanupOldCache(maxAgeHours: number = 24 * 7): Promise<{
+  async cleanupOldCache(maxAgeDays: number = 30): Promise<{
+    deletedDirectories: number;
     deletedFiles: number;
     freedSpace: number;
   }> {
-    const cutoffTime = new Date(Date.now() - maxAgeHours * 60 * 60 * 1000);
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - maxAgeDays);
+    
+    let deletedDirectories = 0;
     let deletedFiles = 0;
     let freedSpace = 0;
 
     try {
-      const byExecutionPath = join(this.cachePath, 'by-execution');
-      const executionDirs = await fs.readdir(byExecutionPath, { withFileTypes: true });
-
-      for (const dir of executionDirs) {
-        if (!dir.isDirectory()) continue;
-
-        const dirPath = join(byExecutionPath, dir.name);
-        const files = await fs.readdir(dirPath);
-
-        for (const file of files) {
-          const filePath = join(dirPath, file);
-          const stats = await fs.stat(filePath);
-
-          if (stats.mtime < cutoffTime) {
-            freedSpace += stats.size;
-            await fs.unlink(filePath);
-            deletedFiles++;
+      // Scan year directories
+      const years = await fs.readdir(this.cachePath, { withFileTypes: true });
+      
+      for (const year of years) {
+        if (!year.isDirectory()) continue;
+        
+        const yearPath = join(this.cachePath, year.name);
+        const months = await fs.readdir(yearPath, { withFileTypes: true });
+        
+        for (const month of months) {
+          if (!month.isDirectory()) continue;
+          
+          const monthPath = join(yearPath, month.name);
+          const days = await fs.readdir(monthPath, { withFileTypes: true });
+          
+          for (const day of days) {
+            if (!day.isDirectory()) continue;
+            
+            // Check if this day directory is older than cutoff
+            const dateStr = `${year.name}-${month.name}-${day.name}`;
+            const dirDate = new Date(dateStr);
+            
+            if (dirDate < cutoffDate) {
+              // Delete entire day directory and its contents
+              const dayPath = join(monthPath, day.name);
+              const { size, dirs, files } = await this.getDirectorySize(dayPath);
+              
+              await fs.rm(dayPath, { recursive: true, force: true });
+              
+              deletedDirectories += dirs;
+              deletedFiles += files;
+              freedSpace += size;
+              
+              logger.info('Cleaned up old cache directory:', {
+                path: dayPath,
+                date: dateStr,
+                filesDeleted: files,
+                spaceFreed: formatBytes(size)
+              });
+            }
+          }
+          
+          // Remove empty month directories
+          const remainingDays = await fs.readdir(monthPath);
+          if (remainingDays.length === 0) {
+            await fs.rmdir(monthPath);
           }
         }
-
-        // Remove empty directories
-        const remainingFiles = await fs.readdir(dirPath);
-        if (remainingFiles.length === 0) {
-          await fs.rmdir(dirPath);
+        
+        // Remove empty year directories
+        const remainingMonths = await fs.readdir(yearPath);
+        if (remainingMonths.length === 0) {
+          await fs.rmdir(yearPath);
         }
       }
 
       logger.info('Cache cleanup completed:', {
+        deletedDirectories,
         deletedFiles,
         freedSpace: formatBytes(freedSpace),
-        maxAgeHours
+        maxAgeDays
       });
 
-      return { deletedFiles, freedSpace };
+      return { deletedDirectories, deletedFiles, freedSpace };
 
     } catch (error) {
       logger.error('Cache cleanup failed:', error);
-      return { deletedFiles: 0, freedSpace: 0 };
+      return { deletedDirectories: 0, deletedFiles: 0, freedSpace: 0 };
     }
+  }
+
+  private async getDirectorySize(dirPath: string): Promise<{ size: number; dirs: number; files: number }> {
+    let totalSize = 0;
+    let dirCount = 0;
+    let fileCount = 0;
+
+    const entries = await fs.readdir(dirPath, { withFileTypes: true });
+    
+    for (const entry of entries) {
+      const fullPath = join(dirPath, entry.name);
+      
+      if (entry.isDirectory()) {
+        dirCount++;
+        const subDir = await this.getDirectorySize(fullPath);
+        totalSize += subDir.size;
+        dirCount += subDir.dirs;
+        fileCount += subDir.files;
+      } else {
+        fileCount++;
+        const stats = await fs.stat(fullPath);
+        totalSize += stats.size;
+      }
+    }
+    
+    return { size: totalSize, dirs: dirCount, files: fileCount };
   }
 }
 

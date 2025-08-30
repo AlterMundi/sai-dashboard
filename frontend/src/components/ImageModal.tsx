@@ -14,7 +14,6 @@ import { ImageModalProps } from '@/types';
 import {
   X,
   Download,
-  ExternalLink,
   Copy,
   Calendar,
   Clock,

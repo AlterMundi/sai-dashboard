@@ -9,7 +9,6 @@ import {
   mockImageLoad,
   mockImageError
 } from '@/test/test-utils';
-import * as apiModule from '@/services/api';
 
 vi.mock('@/services/api', () => ({
   executionsApi: {

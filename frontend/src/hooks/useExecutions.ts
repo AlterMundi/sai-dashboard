@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { executionsApi } from '@/services/api';
-import { ExecutionWithImage, ExecutionFilters, UseExecutionsReturn } from '@/types';
+import { ExecutionWithImage, ExecutionFilters, UseExecutionsReturn, ExecutionStats, DailySummary } from '@/types';
 
 export function useExecutions(initialFilters: ExecutionFilters = {}): UseExecutionsReturn {
   const [executions, setExecutions] = useState<ExecutionWithImage[]>([]);
@@ -133,7 +133,7 @@ export function useExecutionSearch() {
 
 // Hook for getting execution statistics
 export function useExecutionStats() {
-  const [stats, setStats] = useState(null);
+  const [stats, setStats] = useState<ExecutionStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -166,7 +166,7 @@ export function useExecutionStats() {
 
 // Hook for daily summary
 export function useDailySummary(days = 30) {
-  const [summary, setSummary] = useState([]);
+  const [summary, setSummary] = useState<DailySummary[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 

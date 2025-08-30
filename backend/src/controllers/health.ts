@@ -84,7 +84,7 @@ export const healthCheck = asyncHandler(async (req: Request, res: Response): Pro
     
     if (database === 'error') {
       healthStatus.status = 'unhealthy';
-    } else if (database === 'disconnected' || cache === 'unavailable' || filesystem === 'error') {
+    } else if ((database as any) === 'disconnected' || cache === 'unavailable' || (filesystem as any) === 'error') {
       healthStatus.status = 'degraded';
     } else {
       healthStatus.status = 'healthy';

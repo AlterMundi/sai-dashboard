@@ -14,9 +14,6 @@ export function ImageCard({ execution, onClick, loading = false }: ImageCardProp
     ? executionsApi.getImageUrl(execution.id, true)
     : undefined;
 
-  const originalUrl = execution.imageUrl 
-    ? executionsApi.getImageUrl(execution.id, false)
-    : undefined;
 
   const handleImageLoad = () => {
     setImageLoading(false);
