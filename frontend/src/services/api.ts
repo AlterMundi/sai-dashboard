@@ -49,8 +49,10 @@ api.interceptors.response.use(
   async (error: AxiosError) => {
     const originalRequest = error.config as any;
 
-    // Handle 401 errors (unauthorized)
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    // Handle 401 errors (unauthorized) - but not for refresh requests to avoid infinite loops
+    if (error.response?.status === 401 && 
+        !originalRequest._retry && 
+        !originalRequest.url?.includes('/auth/refresh')) {
       originalRequest._retry = true;
 
       // Try to refresh token
@@ -99,7 +101,7 @@ export const authApi = {
       tokenManager.set(token);
       return response.data.data;
     } catch (error) {
-      handleApiError(error);
+      throw handleApiError(error);
     }
   },
 
@@ -119,7 +121,7 @@ export const authApi = {
       const response: AxiosResponse<ApiResponse<TokenValidation>> = await api.get('/auth/validate');
       return response.data.data;
     } catch (error) {
-      handleApiError(error);
+      throw handleApiError(error);
     }
   },
 
@@ -130,7 +132,7 @@ export const authApi = {
       tokenManager.set(token);
       return response.data.data;
     } catch (error) {
-      handleApiError(error);
+      throw handleApiError(error);
     }
   },
 };
@@ -150,7 +152,7 @@ export const executionsApi = {
         meta: response.data.meta || {}
       };
     } catch (error) {
-      handleApiError(error);
+      throw handleApiError(error);
     }
   },
 
@@ -159,7 +161,7 @@ export const executionsApi = {
       const response: AxiosResponse<ApiResponse<ExecutionWithImage>> = await api.get(`/executions/${id}`);
       return response.data.data;
     } catch (error) {
-      handleApiError(error);
+      throw handleApiError(error);
     }
   },
 
@@ -170,7 +172,7 @@ export const executionsApi = {
       });
       return response.data.data;
     } catch (error) {
-      handleApiError(error);
+      throw handleApiError(error);
     }
   },
 
@@ -181,7 +183,7 @@ export const executionsApi = {
       });
       return response.data.data;
     } catch (error) {
-      handleApiError(error);
+      throw handleApiError(error);
     }
   },
 
@@ -190,7 +192,7 @@ export const executionsApi = {
       const response: AxiosResponse<ApiResponse<ExecutionStats>> = await api.get('/executions/stats');
       return response.data.data;
     } catch (error) {
-      handleApiError(error);
+      throw handleApiError(error);
     }
   },
 
@@ -208,7 +210,7 @@ export const healthApi = {
       const response: AxiosResponse<ApiResponse<HealthStatus>> = await api.get('/health');
       return response.data.data;
     } catch (error) {
-      handleApiError(error);
+      throw handleApiError(error);
     }
   },
 
@@ -217,7 +219,7 @@ export const healthApi = {
       const response: AxiosResponse<ApiResponse<{ ready: boolean; reason?: string }>> = await api.get('/health/ready');
       return response.data.data;
     } catch (error) {
-      handleApiError(error);
+      throw handleApiError(error);
     }
   },
 };
@@ -229,7 +231,7 @@ export const sseApi = {
       const response: AxiosResponse<ApiResponse<SSEStatus>> = await api.get('/events/status');
       return response.data.data;
     } catch (error) {
-      handleApiError(error);
+      throw handleApiError(error);
     }
   },
 
