@@ -158,14 +158,25 @@ GRANT SELECT ON sai_daily_summary TO sai_dashboard_readonly;
 4. **Complex views should be avoided in hot code paths**
 5. **Sometimes simple and direct is better than elegant and abstract**
 
-## Performance Test Results
+## Performance Test Results (FINAL)
 
-| Query Type | Method | Response Time | Rows Scanned | Index Used |
-|------------|--------|---------------|--------------|------------|
-| Single ID Lookup | Direct Table | 0.058ms | 1 | Primary Key ✅ |
-| Single ID Lookup | View | 2-10 seconds | 8,400+ | Workflow Index ❌ |
-| List Executions | View | 200-250ms | 50 | Workflow Index ✅ |
-| Daily Statistics | View | 200-250ms | Aggregated | Date Index ✅ |
+| Query Type | Method | Response Time | Rows Scanned | Index Used | Real-World Impact |
+|------------|--------|---------------|--------------|------------|------------------|
+| **Image Data Extraction** | Direct Table | **4.0ms** | 1 | Primary Key ✅ | Sub-second image loading |
+| **Image Data Extraction** | View | **21.4 seconds** | 3,677+ | Sequential Scan ❌ | Timeouts, 500 errors |
+| **Single ID Lookup** | Direct Table | **0.058ms** | 1 | Primary Key ✅ | Instant metadata retrieval |
+| **Single ID Lookup** | View | **2-10 seconds** | 8,400+ | Workflow Index ❌ | Dashboard failures |
+| **List Executions** | Direct Table | **50-100ms** | 50 | Compound Index ✅ | Fast dashboard loading |
+| **Daily Statistics** | View | **3.5ms** | Aggregated | Date Index ✅ | Excellent (kept as-is) |
+
+## Production Performance Results (2025-08-30)
+
+### **Image Serving Performance**
+- **End-to-end response time**: 265ms (total HTTP request)
+- **Database extraction**: 4ms (vs 21.4 seconds with views)
+- **Sharp image processing**: ~200ms (thumbnail generation)
+- **Filesystem caching**: Sub-millisecond (cached images)
+- **Rate limiting**: 10,000 req/min (smooth browsing)
 
 ## Conclusion
 
