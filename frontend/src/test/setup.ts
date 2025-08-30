@@ -23,7 +23,7 @@ Object.defineProperty(window, 'matchMedia', {
 });
 
 // Mock IntersectionObserver
-global.IntersectionObserver = vi.fn().mockImplementation(() => ({
+(globalThis as any).IntersectionObserver = vi.fn().mockImplementation(() => ({
   observe: vi.fn(),
   unobserve: vi.fn(),
   disconnect: vi.fn(),
@@ -34,7 +34,7 @@ global.IntersectionObserver = vi.fn().mockImplementation(() => ({
 }));
 
 // Mock scrollTo
-window.scrollTo = vi.fn();
+window.scrollTo = vi.fn() as any;
 
 // Mock localStorage
 const localStorageMock = {
@@ -43,10 +43,10 @@ const localStorageMock = {
   removeItem: vi.fn(),
   clear: vi.fn(),
 };
-global.localStorage = localStorageMock as any;
+(globalThis as any).localStorage = localStorageMock;
 
 // Mock EventSource for SSE
-global.EventSource = vi.fn().mockImplementation(() => ({
+(globalThis as any).EventSource = vi.fn().mockImplementation(() => ({
   close: vi.fn(),
   addEventListener: vi.fn(),
   removeEventListener: vi.fn(),
