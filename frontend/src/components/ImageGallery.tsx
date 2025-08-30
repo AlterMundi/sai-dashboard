@@ -6,7 +6,7 @@ import { LoadingSpinner, LoadingState } from './ui/LoadingSpinner';
 import { useExecutions } from '@/hooks/useExecutions';
 import { ExecutionWithImage, ExecutionFilters } from '@/types';
 import { cn } from '@/utils';
-import { Grid, List, RefreshCw, Search, Filter, ArrowUp } from 'lucide-react';
+import { Grid, List, RefreshCw, ArrowUp } from 'lucide-react';
 
 interface ImageGalleryProps {
   initialFilters?: ExecutionFilters;

@@ -7,7 +7,6 @@ import {
   fireEvent,
   mockIntersectionObserver,
   createMockExecution,
-  mockApiResponses 
 } from '@/test/test-utils';
 import * as useExecutionsModule from '@/hooks/useExecutions';
 
@@ -186,7 +185,7 @@ describe('ImageGallery', () => {
     });
 
     // Mock intersection observer to simulate scrolling into view
-    const observer = mockIntersectionObserver(true);
+    mockIntersectionObserver(true);
     
     renderWithProviders(<ImageGallery />);
     

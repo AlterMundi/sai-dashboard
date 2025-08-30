@@ -8,10 +8,15 @@ import {
   userEvent
 } from '@/test/test-utils';
 import * as useAuthModule from '@/hooks/useAuth';
-import * as toast from 'react-hot-toast';
+import toast from 'react-hot-toast';
 
 vi.mock('@/hooks/useAuth');
-vi.mock('react-hot-toast');
+vi.mock('react-hot-toast', () => ({
+  default: {
+    success: vi.fn(),
+    error: vi.fn()
+  }
+}));
 
 describe('LoginForm', () => {
   const mockLogin = vi.fn();

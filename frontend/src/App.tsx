@@ -5,7 +5,6 @@ import { useAuth } from '@/hooks/useAuth';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { Dashboard } from '@/pages/Dashboard';
 import { Login } from '@/pages/Login';
-import { cn } from '@/utils';
 import './index.css';
 
 // Protected Route Component

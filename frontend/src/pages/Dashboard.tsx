@@ -1,24 +1,19 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Layout } from '@/components/Layout';
 import { ImageGallery } from '@/components/ImageGallery';
 import { LoadingState } from '@/components/ui/LoadingSpinner';
 import { useExecutionStats, useDailySummary } from '@/hooks/useExecutions';
 import { useSSEHandler } from '@/hooks/useSSE';
-import { ExecutionFilters, ExecutionWithImage } from '@/types';
+import { ExecutionFilters } from '@/types';
 import { formatPercentage, formatRelativeTime, cn } from '@/utils';
 import { 
   TrendingUp, 
   Activity, 
   CheckCircle, 
-  AlertTriangle, 
   Clock,
-  Image as ImageIcon,
   Search,
-  Filter,
-  Calendar,
-  BarChart3
+  Filter
 } from 'lucide-react';
-import toast from 'react-hot-toast';
 
 export function Dashboard() {
   const [filters, setFilters] = useState<ExecutionFilters>({});
@@ -27,7 +22,7 @@ export function Dashboard() {
   const [newExecutionsCount, setNewExecutionsCount] = useState(0);
   
   const { stats, isLoading: statsLoading, error: statsError } = useExecutionStats();
-  const { summary, isLoading: summaryLoading } = useDailySummary(7);
+  useDailySummary(7);
 
   // Handle real-time updates via SSE
   const { isConnected } = useSSEHandler({
@@ -219,7 +214,7 @@ export function Dashboard() {
                   <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
                   <select
                     value={filters.status || ''}
-                    onChange={(e) => applyQuickFilter({ status: e.target.value || undefined })}
+                    onChange={(e) => applyQuickFilter({ status: (e.target.value as any) || undefined })}
                     className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                   >
                     <option value="">All statuses</option>

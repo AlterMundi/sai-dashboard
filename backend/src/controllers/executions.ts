@@ -151,15 +151,7 @@ export const getExecutionImage = asyncHandler(async (req: Request, res: Response
       return;
     }
 
-    if (!execution.imageUrl && !execution.thumbnailUrl) {
-      res.status(404).json({
-        error: {
-          message: 'No image available for this execution',
-          code: 'NO_IMAGE_AVAILABLE'
-        }
-      });
-      return;
-    }
+    // Skip imageUrl check - try to extract image directly from database
 
     // Get image data
     const imageData = await imageService.getImage(executionId, isThumbnail);

@@ -1,7 +1,9 @@
 import { config } from 'dotenv';
 import { DatabaseConfig, CacheConfig } from '@/types';
+import { resolve } from 'path';
 
-config();
+// Load .env from project root (single source of truth)
+config({ path: resolve(__dirname, '../../../.env') });
 
 const requiredEnvVars = [
   'DATABASE_URL',

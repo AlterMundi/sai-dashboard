@@ -9,7 +9,7 @@ export function useSSE(): UseSSEReturn {
   const [lastEvent, setLastEvent] = useState<any>(null);
   const [clientCount, setClientCount] = useState(0);
   const eventSourceRef = useRef<EventSource | null>(null);
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const reconnectTimeoutRef = useRef<number | null>(null);
   const reconnectAttempts = useRef(0);
   const maxReconnectAttempts = 5;
   const baseReconnectDelay = 1000; // 1 second
@@ -155,13 +155,6 @@ export function useSSE(): UseSSEReturn {
     }
   }, []);
 
-  const disconnect = useCallback(() => {
-    cleanup();
-    setIsConnected(false);
-    setConnectionStatus('disconnected');
-    setLastEvent(null);
-    reconnectAttempts.current = 0;
-  }, [cleanup]);
 
   // Initialize connection on mount
   useEffect(() => {
@@ -224,7 +217,6 @@ export function useSSE(): UseSSEReturn {
     connectionStatus,
     clientCount,
     connect,
-    disconnect,
   };
 }
 

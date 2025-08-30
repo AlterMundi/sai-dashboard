@@ -197,6 +197,8 @@ export interface UseExecutionsReturn {
   hasNext: boolean;
   loadMore: () => void;
   refresh: () => void;
+  updateFilters: (filters: ExecutionFilters) => void;
+  filters: ExecutionFilters;
 }
 
 export interface UseSSEReturn {
@@ -204,6 +206,7 @@ export interface UseSSEReturn {
   lastEvent: any;
   connectionStatus: 'connecting' | 'connected' | 'disconnected' | 'error';
   clientCount: number;
+  connect: () => void;
 }
 
 // Store Types (Zustand)
