@@ -193,7 +193,7 @@ export const mockIntersectionObserver = (
     disconnect,
   };
 
-  global.IntersectionObserver = vi.fn().mockImplementation((callback) => {
+  (globalThis as any).IntersectionObserver = vi.fn().mockImplementation((callback) => {
     // Trigger callback immediately with mock entry
     callback([{ isIntersecting, target: document.createElement('div') }], mockObserver as any);
     return mockObserver;
@@ -219,7 +219,7 @@ export const mockEventSource = () => {
     },
   };
 
-  global.EventSource = vi.fn().mockImplementation(() => eventSource) as any;
+  (globalThis as any).EventSource = vi.fn().mockImplementation(() => eventSource) as any;
   return eventSource;
 };
 
