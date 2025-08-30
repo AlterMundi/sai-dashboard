@@ -1,0 +1,65 @@
+{
+  "name": "sai-dashboard",
+  "version": "1.0.0",
+  "description": "SAI Dashboard - Visual monitoring for n8n workflow executions",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && VITE_BASE_PATH=/dashboard/ VITE_API_URL=/dashboard/api npm run dev",
+    "build": "npm run build:backend && npm run build:frontend",
+    "build:backend": "cd backend && npm run build",
+    "build:frontend": "cd frontend && npm run build",
+    "start": "npm run start:backend",
+    "start:backend": "cd backend && npm run start",
+    "test": "npm run test:backend && npm run test:frontend",
+    "test:backend": "cd backend && npm test",
+    "test:frontend": "cd frontend && npm test",
+    "test:watch": "concurrently \"npm run test:backend -- --watch\" \"npm run test:frontend -- --watch\"",
+    "test:coverage": "npm run test:backend -- --coverage && npm run test:frontend -- --coverage",
+    "test:quick": "./scripts/quick-test.sh",
+    "test:all": "./scripts/run-all-tests.sh",
+    "test:integration": "./tests/integration/api-integration.test.sh && ./tests/integration/frontend-integration.test.sh",
+    "test:deployment": "./tests/deployment/production-verification.sh",
+    "lint": "npm run lint:backend && npm run lint:frontend",
+    "lint:backend": "cd backend && npm run lint",
+    "lint:frontend": "cd frontend && npm run lint",
+    "type-check": "npm run type-check:backend && npm run type-check:frontend",
+    "type-check:backend": "cd backend && npm run type-check",
+    "type-check:frontend": "cd frontend && npm run type-check",
+    "clean": "npm run clean:backend && npm run clean:frontend",
+    "clean:backend": "cd backend && rm -rf dist coverage node_modules/.cache",
+    "clean:frontend": "cd frontend && rm -rf dist coverage node_modules/.cache",
+    "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install",
+    "deploy": "./scripts/install.sh",
+    "deploy:verify": "./tests/deployment/production-verification.sh",
+    "tunnel:test": "./tests/deployment/ssh-tunnel-verification.sh"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.0"
+  },
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "file:///root/sai-dashboard"
+  },
+  "keywords": [
+    "sai",
+    "dashboard",
+    "n8n",
+    "workflow",
+    "monitoring",
+    "image-analysis",
+    "ollama",
+    "telegram"
+  ],
+  "author": "SAI Project",
+  "license": "MIT"
+}
