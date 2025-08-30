@@ -18,6 +18,7 @@ export default defineConfig({
       'localhost',
       '127.0.0.1',
       'n8n.altermundi.net',
+      'sai.altermundi.net',
       '.altermundi.net', // Allow all altermundi.net subdomains
     ],
     proxy: {
@@ -32,6 +33,7 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: true,
+    assetsDir: 'assets',
     rollupOptions: {
       output: {
         manualChunks: {
@@ -53,5 +55,5 @@ export default defineConfig({
     setupFiles: './src/test/setup.ts',
   },
   
-  base: process.env.VITE_BASE_PATH || '/',
+  base: process.env.VITE_BASE_PATH || '/dashboard/',
 });
