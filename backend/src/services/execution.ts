@@ -42,13 +42,13 @@ export class ExecutionService {
     // Date range filters
     if (startDate) {
       paramCount++;
-      whereConditions.push(`started_at >= $${paramCount}`);
+      whereConditions.push(`e.\"startedAt\" >= $${paramCount}`);
       queryParams.push(new Date(startDate));
     }
 
     if (endDate) {
       paramCount++;
-      whereConditions.push(`started_at <= $${paramCount}`);
+      whereConditions.push(`e.\"startedAt\" <= $${paramCount}`);
       queryParams.push(new Date(endDate));
     }
 
@@ -70,7 +70,7 @@ export class ExecutionService {
     const maxLookbackDate = new Date();
     maxLookbackDate.setDate(maxLookbackDate.getDate() - appConfig.sai.maxDaysLookback);
     paramCount++;
-    whereConditions.push(`started_at >= $${paramCount}`);
+    whereConditions.push(`e.\"startedAt\" >= $${paramCount}`);
     queryParams.push(maxLookbackDate);
 
     const whereClause = whereConditions.join(' AND ');
@@ -87,16 +87,16 @@ export class ExecutionService {
 
     const executionsQuery = `
       SELECT 
-        id,
-        workflow_id,
-        status,
-        started_at,
-        stopped_at,
-        mode,
-        finished,
-        retry_of,
-        retry_success_id,
-        workflow_name,
+        e.id::text as id,
+        e."workflowId"::text as workflow_id,
+        e.status,
+        e."startedAt" as started_at,
+        e."stoppedAt" as stopped_at,
+        e.mode,
+        e.finished,
+        e."retryOf"::text as retry_of,
+        e."retrySuccessId"::text as retry_success_id,
+        w.name as workflow_name,
         NULL as image_mime_type,
         false as has_image,
         NULL as ollama_analysis,
@@ -106,9 +106,13 @@ export class ExecutionService {
         NULL as image_url,
         NULL as thumbnail_url,
         NULL as duration_seconds
-      FROM sai_executions 
-      WHERE ${whereClause}
-      ORDER BY started_at DESC
+      FROM execution_entity e
+      JOIN workflow_entity w ON e."workflowId"::text = w.id::text
+      WHERE w.id = 'yDbfhooKemfhMIkC'
+        AND e.status IS NOT NULL
+        AND e."deletedAt" IS NULL
+        AND ${whereClause}
+      ORDER BY e."startedAt" DESC
       LIMIT $${limitParam} OFFSET $${offsetParam}
     `;
 
@@ -135,8 +139,10 @@ export class ExecutionService {
         telegramDelivered: exec.telegram_delivered || false
       };
       
-      if (exec.image_url) result.imageUrl = exec.image_url;
-      if (exec.thumbnail_url) result.thumbnailUrl = exec.thumbnail_url;
+      // Always set image URLs - they will be generated dynamically
+      // The frontend will construct the actual URLs using the API service
+      result.imageUrl = `/dashboard/api/executions/${exec.id}/image`;
+      result.thumbnailUrl = `/dashboard/api/executions/${exec.id}/image?thumbnail=true`;
       if (exec.telegram_message_id) result.telegramMessageId = exec.telegram_message_id;
       if (exec.ollama_analysis) {
         result.analysis = {
@@ -178,16 +184,16 @@ export class ExecutionService {
   async getExecutionById(executionId: string): Promise<ExecutionWithImage | null> {
     const query = `
       SELECT 
-        id,
-        workflow_id,
-        status,
-        started_at,
-        stopped_at,
-        mode,
-        finished,
-        retry_of,
-        retry_success_id,
-        workflow_name,
+        e.id::text as id,
+        e."workflowId"::text as workflow_id,
+        e.status,
+        e."startedAt" as started_at,
+        e."stoppedAt" as stopped_at,
+        e.mode,
+        e.finished,
+        e."retryOf"::text as retry_of,
+        e."retrySuccessId"::text as retry_success_id,
+        w.name as workflow_name,
         NULL as image_mime_type,
         false as has_image,
         NULL as ollama_analysis,
@@ -197,8 +203,12 @@ export class ExecutionService {
         NULL as image_url,
         NULL as thumbnail_url,
         NULL as duration_seconds
-      FROM sai_executions 
-      WHERE id = $1
+      FROM execution_entity e
+      JOIN workflow_entity w ON e."workflowId"::text = w.id::text
+      WHERE e.id = $1
+        AND w.id = 'yDbfhooKemfhMIkC'
+        AND e.status IS NOT NULL
+        AND e."deletedAt" IS NULL
     `;
 
     const results = await db.query<any>(query, [executionId]);
@@ -222,8 +232,9 @@ export class ExecutionService {
       telegramDelivered: exec.telegram_delivered || false
     };
     
-    if (exec.image_url) result.imageUrl = exec.image_url;
-    if (exec.thumbnail_url) result.thumbnailUrl = exec.thumbnail_url;
+    // Always set image URLs - they will be generated dynamically
+    result.imageUrl = `/dashboard/api/executions/${exec.id}/image`;
+    result.thumbnailUrl = `/dashboard/api/executions/${exec.id}/image?thumbnail=true`;
     if (exec.telegram_message_id) result.telegramMessageId = exec.telegram_message_id;
     if (exec.ollama_analysis) {
       result.analysis = {
@@ -238,19 +249,19 @@ export class ExecutionService {
 
   async getExecutionData(executionId: string, nodeId?: string): Promise<any> {
     let query = `
-      SELECT execution_id, node_id, data, data_size_bytes, created_at
-      FROM sai_execution_data 
-      WHERE execution_id = $1
+      SELECT "executionId"::text as execution_id, "nodeId" as node_id, data, "dataSizeInBytes" as data_size_bytes, "createdAt" as created_at
+      FROM execution_data
+      WHERE "executionId" = $1
     `;
     
     const queryParams = [executionId];
     
     if (nodeId) {
-      query += ` AND node_id = $2`;
+      query += ` AND "nodeId" = $2`;
       queryParams.push(nodeId);
     }
     
-    query += ` ORDER BY created_at DESC`;
+    query += ` ORDER BY "createdAt" DESC`;
 
     const results = await db.query(query, queryParams);
     
@@ -306,10 +317,14 @@ export class ExecutionService {
     const statsQuery = `
       SELECT 
         COUNT(*) as total_executions,
-        COUNT(CASE WHEN status = 'success' THEN 1 END) as successful_executions,
-        MAX(started_at) as last_execution
-      FROM sai_dashboard_executions
-      WHERE started_at >= CURRENT_DATE - INTERVAL '30 days'
+        COUNT(CASE WHEN e.status = 'success' THEN 1 END) as successful_executions,
+        MAX(e."startedAt") as last_execution
+      FROM execution_entity e
+      JOIN workflow_entity w ON e."workflowId"::text = w.id::text
+      WHERE w.id = 'yDbfhooKemfhMIkC'
+        AND e.status IS NOT NULL
+        AND e."deletedAt" IS NULL
+        AND e."startedAt" >= CURRENT_DATE - INTERVAL '30 days'
     `;
 
     const results = await db.query(statsQuery);

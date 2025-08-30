@@ -51,10 +51,8 @@ GRANT SELECT ON sai_executions TO sai_dashboard_readonly;
 CREATE OR REPLACE VIEW sai_execution_data AS
 SELECT 
   ed."executionId"::text as execution_id,
-  ed."nodeId" as node_id,
   ed.data,
-  LENGTH(ed.data::text) as data_size_bytes,
-  ed."createdAt" as created_at
+  LENGTH(ed.data::text) as data_size_bytes
 FROM execution_data ed
 JOIN execution_entity e ON ed."executionId" = e.id
 JOIN workflow_entity w ON e."workflowId" = w.id
@@ -65,7 +63,7 @@ WHERE
   AND ed.data IS NOT NULL
   -- Size limit: exclude payloads larger than 10MB to prevent memory issues
   AND LENGTH(ed.data::text) < 10485760
-ORDER BY ed."createdAt" DESC;
+ORDER BY e."startedAt" DESC;
 
 -- Grant read access
 GRANT SELECT ON sai_execution_data TO sai_dashboard_readonly;
@@ -78,67 +76,39 @@ CREATE OR REPLACE VIEW sai_dashboard_executions AS
 WITH execution_images AS (
   SELECT 
     ed.execution_id,
-    -- Extract image data from webhook node
+    -- Check if data contains image (data:image pattern)
     CASE 
-      WHEN ed.data::jsonb ? 'main' 
-       AND (ed.data::jsonb -> 'main' -> 0 -> 'binary' ? 'data')
-      THEN ed.data::jsonb -> 'main' -> 0 -> 'binary' ->> 'mimeType'
-      ELSE NULL
-    END as image_mime_type,
-    
-    -- Check if image data exists
-    CASE 
-      WHEN ed.data::jsonb ? 'main' 
-       AND (ed.data::jsonb -> 'main' -> 0 -> 'binary' ? 'data')
+      WHEN ed.data::text ~ 'data:image'
       THEN true
       ELSE false
     END as has_image,
     
-    -- Extract Ollama analysis
+    -- Extract mime type if present
     CASE 
-      WHEN ed.data::jsonb ? 'main'
-       AND (ed.data::jsonb -> 'main' -> 0 -> 'json' ? 'response')
-      THEN ed.data::jsonb -> 'main' -> 0 -> 'json' ->> 'response'
+      WHEN ed.data::text ~ 'data:image'
+      THEN 'image/jpeg'  -- Default to jpeg, will be detected properly by Sharp
       ELSE NULL
-    END as ollama_analysis,
+    END as image_mime_type,
     
     ed.data_size_bytes
   FROM sai_execution_data ed
-  WHERE ed.node_id IN ('Webhook', 'Ollama Chat Model', 'HTTP Request')
-),
-telegram_status AS (
-  SELECT 
-    ed.execution_id,
-    -- Check Telegram delivery status
-    CASE 
-      WHEN ed.data::jsonb -> 'main' -> 0 -> 'json' ? 'message_id'
-      THEN true
-      ELSE false
-    END as telegram_delivered,
-    
-    ed.data::jsonb -> 'main' -> 0 -> 'json' ->> 'message_id' as telegram_message_id
-  FROM sai_execution_data ed
-  WHERE ed.node_id LIKE '%Telegram%'
 )
 SELECT 
   e.*,
   ei.image_mime_type,
   ei.has_image,
-  ei.ollama_analysis,
   ei.data_size_bytes as total_payload_size,
-  ts.telegram_delivered,
-  ts.telegram_message_id,
   
   -- Computed fields for API
   CASE 
     WHEN e.status = 'success' AND ei.has_image THEN 
-      '/api/executions/' || e.id || '/image'
+      '/dashboard/api/executions/' || e.id || '/image'
     ELSE NULL
   END as image_url,
   
   CASE 
     WHEN e.status = 'success' AND ei.has_image THEN 
-      '/api/executions/' || e.id || '/image?thumbnail=true'
+      '/dashboard/api/executions/' || e.id || '/image?thumbnail=true'
     ELSE NULL
   END as thumbnail_url,
   
@@ -151,7 +121,6 @@ SELECT
 
 FROM sai_executions e
 LEFT JOIN execution_images ei ON e.id = ei.execution_id
-LEFT JOIN telegram_status ts ON e.id = ts.execution_id
 ORDER BY e.started_at DESC;
 
 -- Grant read access
@@ -192,7 +161,7 @@ WHERE "deletedAt" IS NULL;
 
 -- Index on execution_data for efficient payload lookups
 CREATE INDEX IF NOT EXISTS idx_execution_data_lookup
-ON execution_data ("executionId", "nodeId")
+ON execution_data ("executionId")
 WHERE data IS NOT NULL;
 
 -- =================================================================

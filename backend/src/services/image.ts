@@ -55,12 +55,14 @@ export class ImageService {
     mimeType: string;
   } | null> {
     try {
-      // Query execution data from n8n database - search for base64 image data
+      // Direct table access for maximum performance (4ms vs 21s with views)
+      // See DATABASE_PERFORMANCE.md for detailed analysis
       const query = `
-        SELECT ed.data
-        FROM execution_data ed
-        WHERE ed."executionId" = $1
-          AND ed.data::text ~ 'data:image'
+        SELECT data
+        FROM execution_data
+        WHERE "executionId" = $1
+          AND data IS NOT NULL
+          AND data::text ~ 'data:image'
         LIMIT 1
       `;
 
@@ -256,8 +258,10 @@ export class ImageService {
     }
 
     // Cache the extracted image
+    // Direct table access - views are too slow for single ID lookups
+    // See DATABASE_PERFORMANCE.md for detailed analysis
     const execution = await db.query(
-      'SELECT started_at FROM sai_executions WHERE id = $1',
+      'SELECT "startedAt" as started_at FROM execution_entity WHERE id = $1',
       [executionId]
     );
 

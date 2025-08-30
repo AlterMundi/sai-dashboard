@@ -198,8 +198,19 @@ export const executionsApi = {
 
   getImageUrl(executionId: string, thumbnail = false): string {
     const baseUrl = import.meta.env.VITE_API_URL || '/api';
-    const params = thumbnail ? '?thumbnail=true' : '';
-    return `${baseUrl}/executions/${executionId}/image${params}`;
+    const token = tokenManager.get();
+    const params = new URLSearchParams();
+    
+    if (thumbnail) {
+      params.append('thumbnail', 'true');
+    }
+    
+    if (token) {
+      params.append('token', token);
+    }
+    
+    const queryString = params.toString();
+    return `${baseUrl}/executions/${executionId}/image${queryString ? '?' + queryString : ''}`;
   },
 };
 
