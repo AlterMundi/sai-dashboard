@@ -15,7 +15,7 @@ SAI Dashboard is an autonomous read-only consumer that provides visual monitorin
 
 ## 🏗️ Architecture
 
-**Stack**: React 18 + TypeScript frontend, Node.js + Express API backend, PostgreSQL database (read-only access), filesystem caching (Redis future), Docker deployment with Linux networking fixes.
+**Stack**: React 18 + TypeScript frontend, Node.js + Express API backend, PostgreSQL database (read-only access), filesystem caching.
 
 **Key Components**:
 - **Frontend**: React SPA with authentication, lazy-loaded gallery, SSE client, responsive design
@@ -72,7 +72,7 @@ curl -s "https://sai.altermundi.net/dashboard/api/executions/stats/enhanced" -H 
 - Tunnels: tunnel-dashboard.service and tunnel-dashboard-api.service (active)
 
 **nginx Configuration Requirements:**
-The following locations must be added to the existing n8n.altermundi.net server block:
+The following locations must be added to the existing sai.altermundi.net server block:
 
 ```nginx
 # Dashboard - Exact redirect for trailing slash
@@ -152,19 +152,17 @@ npm test:coverage    # Test coverage report
 - ESLint configured for TypeScript + React with auto-fix
 - Tests use Jest (backend) and Vitest (frontend)
 
-### Docker Operations
+### Production Installation
 ```bash
-# Development environment
-docker-compose up -d                    # Start all services
-docker-compose -f docker-compose.yml -f docker-compose.override.yml up -d  # With dev overrides
+# One-command production deployment with quality checks
+./install-production.sh
 
-# Production deployment
-docker-compose --profile proxy up -d    # Include nginx proxy
-docker-compose --profile monitoring up -d  # Include monitoring stack
-
-# Service management
-docker-compose logs sai-dashboard-api   # View API logs
-docker-compose restart sai-dashboard-ui # Restart frontend
+# The script includes:
+# - Pre-build TypeScript validation
+# - Path alias resolution verification  
+# - Database connectivity testing
+# - Post-deployment health checks
+# - Service status monitoring
 ```
 
 ## 📊 Database Integration
@@ -193,7 +191,7 @@ docker-compose restart sai-dashboard-ui # Restart frontend
 - `GET /api/health` - System health check
 
 **Response Format**: Standardized JSON with data/meta/error structure
-**Authentication**: Optional Bearer token or API key support
+**Authentication**: Bearer token
 **Rate Limiting**: 100 requests/minute with burst protection
 
 ## 🎨 Frontend Structure
@@ -246,11 +244,9 @@ VITE_BASE_PATH=/dashboard/
 VITE_API_URL=/dashboard/api
 ```
 
-**Docker Port Configuration** (CRITICAL - avoid conflicts):
-- Backend API: Port 3001 
-- Frontend: Port 3000
-- Grafana: Port 3002 (NOT 3001 - fixed in `docker-compose.yml:216`)
-- Prometheus: Port 9090 (optional monitoring)
+**Port Configuration**:
+- Backend API: Port 3001
+- Frontend: Port 3000 (development only, production uses nginx on port 80)
 
 ## 🧪 Testing Strategy
 
@@ -278,17 +274,16 @@ VITE_API_URL=/dashboard/api
 ## 📦 Deployment Architecture
 
 **Production Stack**:
-- Docker Compose with fixed networking for Linux
+- Direct Node.js deployment via systemd service
 - Nginx reverse proxy with SSL termination (required for public access)
-- Filesystem cache on RAID storage
+- Filesystem cache on RAID storage at `/mnt/raid1/n8n/backup/images/`
 - Authentication middleware with session management
 - Rate limiting and security headers
-- Health checks at `/api/health`
+- Health checks at `/dashboard/api/health`
 
 **Critical Configuration**:
-- HTTPS enforced for public deployment
-- Grafana port changed to 3002 (was conflicting with API)
-- Database connection uses `extra_hosts` for Linux compatibility
+- HTTPS enforced for public deployment via nginx
+- Self-contained API routes under `/dashboard/api/*`
 - Rate limiting: 60 req/min general, 5 login attempts/15min
 - Session duration: 24 hours (configurable)
 
@@ -449,12 +444,12 @@ app.get('/api/events', authenticateSSE, (req, res) => {
 
 **Common Development Issues**:
 - **Database connection timeouts**: Check n8n database availability and credentials
-- **Port conflicts**: Ensure ports 3000/3001 are free, check Docker port mappings  
+- **Port conflicts**: Ensure ports 3000/3001 are free
 - **CORS errors**: Verify `CORS_ORIGIN` matches frontend URL
 - **Image loading failures**: Check filesystem cache permissions and base64 extraction
 - **Memory issues**: Monitor execution data queries, implement proper pagination
 - **Build failures**: Clear `node_modules` and reinstall, check TypeScript paths
-- **Docker Linux networking**: Ensure `extra_hosts` configured for database access
+- **Path alias errors**: Ensure tsc-alias runs after TypeScript compilation
 
 **Development Database**: If n8n database is unavailable, use the provided test data in `database/test-data.json` for local development.
 
@@ -475,10 +470,6 @@ app.get('/api/events', authenticateSSE, (req, res) => {
 - ✅ **nginx**: Single location block, no route conflicts
 - ✅ **No URL Rewriting**: Clean, maintainable configuration
 
-### **Legacy n8n Domain (Reference):**
-- ✅ Public access: https://n8n.altermundi.net/dashboard/
-- ✅ Complex URL rewriting solution (functional but fragile)
-
 **Current Live Environment:**
 - Frontend: Port 3000 with `/dashboard/` base path
 - Backend: Port 3001 with self-contained `/dashboard/api/*` routes
@@ -493,34 +484,44 @@ app.get('/api/events', authenticateSSE, (req, res) => {
 
 This **self-contained deployment configuration** is production-ready and represents the evolution from complex routing to clean, maintainable architecture.
 
-## 📋 Quick Start Checklist
+## 🔧 API Testing & Authentication (MANDATORY REFERENCE)
 
-When starting work on this codebase:
+### **Correct API Authentication Pattern:**
+```bash
+# Get auth token first
+curl -s "https://sai.altermundi.net/dashboard/api/auth/login" \
+  -H "Content-Type:application/json" \
+  -d '{"password":"SaiDash2025SecureProd"}' > /tmp/token.json
 
-1. **Environment Setup**:
-   ```bash
-   cp .env.example .env
-   # Edit .env with database credentials and secure passwords
-   ```
+# Extract token  
+jq -r '.data.token' /tmp/token.json > /tmp/token.txt
 
-2. **Dependencies**:
-   ```bash
-   cd backend && npm install
-   cd frontend && npm install
-   ```
+# Use token for API calls
+curl -s "https://sai.altermundi.net/dashboard/api/executions/stats/enhanced" \
+  -H "Authorization: Bearer $(cat /tmp/token.txt)"
+```
 
-3. **Development**:
-   ```bash
-   # Terminal 1: Backend
-   cd backend && npm run dev
+### **Local Development Testing:**
+```bash
+# Health check (no auth required)
+curl -s http://localhost:3001/dashboard/api/health | jq
 
-   # Terminal 2: Frontend  
-   cd frontend && npm run dev
-   ```
+# Login and get token
+curl -s -X POST http://localhost:3001/dashboard/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"password":"SaiDash2025SecureProd"}' | jq -r '.data.token' > /tmp/token.txt
 
-4. **Database Access**: Verify read-only connection to n8n database
-5. **Cache Directory**: Ensure `/mnt/raid1/n8n/backup/images/` exists with proper permissions
-6. **Port Check**: Confirm ports 3000 and 3001 are available
+# Test authenticated endpoint  
+curl -s "http://localhost:3001/dashboard/api/executions?limit=1" \
+  -H "Authorization: Bearer $(cat /tmp/token.txt)" | jq '.data | length'
+```
+
+### **NEVER DO (Common Mistakes):**
+- Don't try multiple curl syntax variations in sequence
+- Don't use shell variables for tokens across tool calls  
+- Don't test authentication without first checking CLAUDE.md
+- Always use the exact patterns documented above
+
 
 ## 🎯 Key Files to Understand
 

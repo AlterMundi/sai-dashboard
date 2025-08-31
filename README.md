@@ -119,11 +119,11 @@ SAI Dashboard (Autonomous Read-Only Consumer)
 - **Parameterized queries** for security
 
 ### Deployment
-- **Docker** containers with Linux networking fixes
+- **Direct Node.js** deployment via systemd service
 - **HTTPS required** for public access
 - **Nginx reverse proxy** with SSL termination
-- **Health checks** at `/api/health`
-- **Filesystem cache** persisted on RAID
+- **Health checks** at `/dashboard/api/health`
+- **Filesystem cache** persisted on RAID at `/mnt/raid1/n8n/backup/images/`
 
 ## 🔐 Security Considerations
 
@@ -152,7 +152,7 @@ SAI Dashboard (Autonomous Read-Only Consumer)
 ```
 sai-dashboard/
 ├── README.md
-├── docker-compose.yml
+├── install-production.sh   # Production deployment script with quality checks
 ├── .env.example
 ├── frontend/
 │   ├── src/
@@ -160,8 +160,7 @@ sai-dashboard/
 │   │   ├── services/
 │   │   ├── types/
 │   │   └── utils/
-│   ├── package.json
-│   └── Dockerfile
+│   └── package.json
 ├── backend/
 │   ├── src/
 │   │   ├── routes/
