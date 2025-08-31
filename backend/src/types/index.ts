@@ -237,7 +237,7 @@ export interface ExecutionFilters extends PaginationQuery {
   riskLevel?: 'high' | 'medium' | 'low' | 'none';
   telegramDelivered?: boolean;
   datePreset?: 'today' | 'yesterday' | 'last7days' | 'last30days' | 'thisMonth' | 'lastMonth';
-  sortBy?: 'date' | 'risk' | 'status';
+  sortBy?: 'date' | 'risk' | 'status' | 'confidence' | 'camera' | 'priority';
   sortOrder?: 'asc' | 'desc';
   
   // Enhanced filters for new analysis fields
