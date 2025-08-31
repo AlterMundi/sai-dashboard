@@ -2,11 +2,12 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { useInView } from 'react-intersection-observer';
 import { ImageCard } from './ImageCard';
 import { ImageModal } from './ImageModal';
+import { FilterBar } from './FilterBar';
 import { LoadingSpinner, LoadingState } from './ui/LoadingSpinner';
 import { useExecutions } from '@/hooks/useExecutions';
 import { ExecutionWithImage, ExecutionFilters } from '@/types';
 import { cn } from '@/utils';
-import { Grid, List, RefreshCw, ArrowUp } from 'lucide-react';
+import { Grid, List, RefreshCw, ArrowUp, Filter } from 'lucide-react';
 
 interface ImageGalleryProps {
   initialFilters?: ExecutionFilters;
@@ -18,6 +19,7 @@ export function ImageGallery({ initialFilters = {}, className }: ImageGalleryPro
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [showScrollTop, setShowScrollTop] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
   const galleryRef = useRef<HTMLDivElement>(null);
   
   const {
@@ -68,6 +70,10 @@ export function ImageGallery({ initialFilters = {}, className }: ImageGalleryPro
     refresh();
   }, [refresh]);
 
+  const handleFiltersReset = useCallback(() => {
+    updateFilters({ page: 0, limit: 50 });
+  }, [updateFilters]);
+
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -115,6 +121,20 @@ export function ImageGallery({ initialFilters = {}, className }: ImageGalleryPro
         </div>
 
         <div className="flex items-center space-x-2">
+          {/* Filter Toggle Button */}
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className={cn(
+              'p-2 transition-colors rounded-lg',
+              showFilters 
+                ? 'bg-blue-600 text-white' 
+                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+            )}
+            title="Toggle filters"
+          >
+            <Filter className="h-4 w-4" />
+          </button>
+
           {/* Refresh Button */}
           <button
             onClick={handleRefresh}
@@ -154,6 +174,18 @@ export function ImageGallery({ initialFilters = {}, className }: ImageGalleryPro
           </div>
         </div>
       </div>
+
+      {/* Enhanced Filter Bar */}
+      {showFilters && (
+        <div className="mb-6">
+          <FilterBar
+            filters={filters}
+            onFiltersChange={updateFilters}
+            onReset={handleFiltersReset}
+            isLoading={isLoading}
+          />
+        </div>
+      )}
 
       {/* Loading state for initial load */}
       <LoadingState isLoading={isLoading && executions.length === 0} error={null}>
