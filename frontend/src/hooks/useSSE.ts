@@ -39,9 +39,20 @@ export function useSSE(): UseSSEReturn {
 
       eventSource.onopen = () => {
         console.log('SSE connection opened');
+        setIsConnected(true);
         setConnectionStatus('connected');
         reconnectAttempts.current = 0; // Reset reconnect attempts on successful connection
       };
+
+      // Fallback: Check connection after 3 seconds if onopen hasn't fired
+      setTimeout(() => {
+        if (eventSource.readyState === EventSource.OPEN && !isConnected) {
+          console.log('SSE connection established via fallback check');
+          setIsConnected(true);
+          setConnectionStatus('connected');
+          reconnectAttempts.current = 0;
+        }
+      }, 3000);
 
       eventSource.onerror = (error) => {
         console.error('SSE connection error:', error);
