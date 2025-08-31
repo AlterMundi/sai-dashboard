@@ -179,7 +179,9 @@ export interface PaginatedResponse<T> {
     page: number;
     limit: number;
     hasNext: boolean;
+    analysisStatus?: AnalysisStatus;
   };
+  alerts?: AnalysisAlert[];
 }
 
 // Daily Summary Type
@@ -198,6 +200,23 @@ export interface ExecutionStats {
   successRate: number;
   avgDailyExecutions: number;
   lastExecution: string | null;
+}
+
+// Analysis Status Types
+export interface AnalysisStatus {
+  totalInRange: number;
+  analyzed: number | 'unknown';
+  pending: number | 'unknown';
+  coverage: number | 'unknown';
+}
+
+export interface AnalysisAlert {
+  type: 'warning' | 'info' | 'success';
+  level: 'high' | 'medium' | 'low';
+  message: string;
+  details: string;
+  action?: string;
+  actionLabel?: string;
 }
 
 // Authentication Types
@@ -317,6 +336,9 @@ export interface UseExecutionsReturn {
   refresh: () => void;
   updateFilters: (filters: ExecutionFilters) => void;
   filters: ExecutionFilters;
+  analysisStatus: AnalysisStatus | null;
+  alerts: AnalysisAlert[];
+  triggerAnalysis: () => Promise<void>;
 }
 
 export interface UseSSEReturn {

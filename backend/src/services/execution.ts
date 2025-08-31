@@ -12,10 +12,133 @@ import { enhancedAnalysisService } from './enhanced-analysis';
 
 export class ExecutionService {
   
+  /**
+   * Check analysis coverage for executions matching given conditions
+   * Handles analysis table growing freely beyond executions table
+   */
+  private async getAnalysisCoverage(whereConditions: string, queryParams: any[]): Promise<{
+    totalInRange: number;
+    analyzed: number;
+    pending: number;
+    coverage: number;
+    missingIds: string[];
+  }> {
+    // Query to get execution IDs that match filters and their analysis status
+    // This allows analysis table to have more records than executions (analysis can grow freely)
+    const coverageQuery = `
+      SELECT 
+        e.id::text as execution_id,
+        CASE WHEN ea.execution_id IS NOT NULL THEN 1 ELSE 0 END as has_analysis
+      FROM execution_entity e
+      JOIN workflow_entity w ON e."workflowId"::text = w.id::text
+      LEFT JOIN sai_execution_analysis ea ON e.id = ea.execution_id
+      WHERE w.id = 'yDbfhooKemfhMIkC'
+        AND e.status IS NOT NULL
+        AND e."deletedAt" IS NULL
+        AND ${whereConditions}
+      ORDER BY e."startedAt" DESC
+    `;
+
+    try {
+      const results = await db.query(coverageQuery, queryParams);
+      
+      const totalInRange = results.length;
+      const analyzed = results.filter((r: any) => r.has_analysis === 1).length;
+      const pending = totalInRange - analyzed;
+      const coverage = totalInRange > 0 ? (analyzed / totalInRange) * 100 : 100;
+      const missingIds = results
+        .filter((r: any) => r.has_analysis === 0)
+        .map((r: any) => r.execution_id);
+
+      console.log(`[DEBUG] Coverage query results: total=${totalInRange}, analyzed=${analyzed}, pending=${pending}, coverage=${coverage}%`);
+
+      return {
+        totalInRange,
+        analyzed,
+        pending,
+        coverage,
+        missingIds
+      };
+    } catch (error) {
+      console.error('[ERROR] Failed to get analysis coverage:', error);
+      return {
+        totalInRange: 0,
+        analyzed: -1,
+        pending: -1, 
+        coverage: -1,
+        missingIds: []
+      };
+    }
+  }
+
+  /**
+   * Process analyses with SSE updates for hybrid staged processing
+   * This implements Stage 2 & 3 of the hybrid approach
+   */
+  private async processAnalysesWithSSEUpdates(missingIds: string[], originalFilters: ExecutionFilters): Promise<void> {
+    const sseManager = (global as any).sseManager; // Reference to SSE manager from routes
+    
+    for (const executionId of missingIds) {
+      try {
+        // Process individual analysis
+        const analysisResult = await enhancedAnalysisService.extractAndStoreAnalysis(executionId);
+        
+        if (analysisResult && sseManager) {
+          // Stage 3: Send SSE update about completed analysis
+          sseManager.broadcast({
+            type: 'analysis_complete',
+            data: {
+              executionId,
+              analysisResult,
+              timestamp: new Date().toISOString()
+            }
+          });
+          
+          logger.debug(`SSE update sent for analysis completion: ${executionId}`);
+        }
+      } catch (error) {
+        logger.warn(`Failed to process analysis for execution ${executionId}:`, error);
+        
+        if (sseManager) {
+          // Send failure notification via SSE
+          sseManager.broadcast({
+            type: 'analysis_failed',
+            data: {
+              executionId,
+              error: error instanceof Error ? error.message : 'Unknown error',
+              timestamp: new Date().toISOString()
+            }
+          });
+        }
+      }
+      
+      // Small delay to avoid overwhelming the system
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    
+    // Send completion summary
+    if (sseManager) {
+      sseManager.broadcast({
+        type: 'batch_analysis_complete',
+        data: {
+          processedCount: missingIds.length,
+          timestamp: new Date().toISOString()
+        }
+      });
+    }
+  }
+
   async getExecutions(filters: ExecutionFilters = {}): Promise<{
     executions: ExecutionWithImage[];
     total: number;
     hasNext: boolean;
+    analysisStatus?: {
+      totalInRange: number;
+      analyzed: number;
+      pending: number;
+      coverage: number;
+      missingIds: string[];
+    };
   }> {
     const {
       page = 0,
@@ -148,14 +271,26 @@ export class ExecutionService {
       // Response required filter
       if (filters.responseRequired !== undefined) {
         paramCount++;
-        whereConditions.push(`COALESCE(ea.response_required, false) = $${paramCount}`);
+        if (filters.responseRequired === false) {
+          // For "No response required": only confirmed analysis showing false
+          whereConditions.push(`ea.response_required = $${paramCount} AND ea.execution_id IS NOT NULL`);
+        } else {
+          // For "Response required": confirmed true OR unanalyzed (might require response)
+          whereConditions.push(`(ea.response_required = $${paramCount} OR ea.execution_id IS NULL)`);
+        }
         queryParams.push(filters.responseRequired);
       }
       
       // Human verification filter
       if (filters.verifiedByHuman !== undefined) {
         paramCount++;
-        whereConditions.push(`COALESCE(ea.verified_by_human, false) = $${paramCount}`);
+        if (filters.verifiedByHuman === false) {
+          // For "Not verified": only confirmed analysis showing false
+          whereConditions.push(`ea.verified_by_human = $${paramCount} AND ea.execution_id IS NOT NULL`);
+        } else {
+          // For "Verified": confirmed true OR unanalyzed (might be verified)
+          whereConditions.push(`(ea.verified_by_human = $${paramCount} OR ea.execution_id IS NULL)`);
+        }
         queryParams.push(filters.verifiedByHuman);
       }
       
@@ -175,36 +310,56 @@ export class ExecutionService {
       // Detection type filters
       if (filters.smokeDetected !== undefined) {
         paramCount++;
-        whereConditions.push(`COALESCE(ea.smoke_detected, false) = $${paramCount}`);
+        if (filters.smokeDetected === false) {
+          // For "No smoke": only confirmed analysis showing false
+          whereConditions.push(`ea.smoke_detected = $${paramCount} AND ea.execution_id IS NOT NULL`);
+        } else {
+          // For "Smoke detected": confirmed true OR unanalyzed (might have smoke)
+          whereConditions.push(`(ea.smoke_detected = $${paramCount} OR ea.execution_id IS NULL)`);
+        }
         queryParams.push(filters.smokeDetected);
       }
       
       if (filters.flameDetected !== undefined) {
         paramCount++;
-        whereConditions.push(`COALESCE(ea.flame_detected, false) = $${paramCount}`);
+        if (filters.flameDetected === false) {
+          // For "No flame": only confirmed analysis showing false
+          whereConditions.push(`ea.flame_detected = $${paramCount} AND ea.execution_id IS NOT NULL`);
+        } else {
+          // For "Flame detected": confirmed true OR unanalyzed (might have flame)
+          whereConditions.push(`(ea.flame_detected = $${paramCount} OR ea.execution_id IS NULL)`);
+        }
         queryParams.push(filters.flameDetected);
       }
     }
 
     // Telegram delivery filter (only applies to enriched queries)
+    // Simple logic: true = delivered, false = not delivered
     if (telegramDelivered !== undefined && needsEnrichment) {
       paramCount++;
-      whereConditions.push(`COALESCE(ea.telegram_delivered, false) = $${paramCount}`);
+      // Only show executions with confirmed analysis status for this filter
+      whereConditions.push(`ea.telegram_delivered = $${paramCount} AND ea.execution_id IS NOT NULL`);
       queryParams.push(telegramDelivered);
-      console.log('TELEGRAM FILTER DEBUG:', { telegramDelivered, paramCount, needsEnrichment });
     }
 
     // Has image filter (only applies to enriched queries)
+    // Safe filtering: only include executions with confirmed analysis status
     if (hasImage !== undefined && needsEnrichment) {
       paramCount++;
-      whereConditions.push(`COALESCE(ea.has_image, false) = $${paramCount}`);
+      if (hasImage === false) {
+        // For "Without images": only executions with confirmed analysis showing no images
+        whereConditions.push(`ea.has_image = $${paramCount} AND ea.execution_id IS NOT NULL`);
+      } else {
+        // For "With images": confirmed images OR executions still being analyzed (assume images for SAI workflow)
+        whereConditions.push(`(ea.has_image = $${paramCount} OR ea.execution_id IS NULL)`);
+      }
       queryParams.push(hasImage);
     }
 
     // Search filter (only applies to enriched queries)
     if (search && search.trim() && needsEnrichment) {
       paramCount++;
-      whereConditions.push(`ea.ollama_analysis ILIKE $${paramCount}`);
+      whereConditions.push(`ea.ollama_analysis_text ILIKE $${paramCount}`);
       queryParams.push(`%${search.trim()}%`);
     }
 
@@ -214,6 +369,11 @@ export class ExecutionService {
     paramCount++;
     whereConditions.push(`e.\"startedAt\" >= $${paramCount}`);
     queryParams.push(maxLookbackDate);
+
+    // Analysis coverage validation for ALL queries (not just enriched)
+    let analysisStatus: any = undefined;
+    const whereClauseForCoverage = whereConditions.length > 0 ? whereConditions.join(' AND ') : '1=1';
+    analysisStatus = await this.getAnalysisCoverage(whereClauseForCoverage, queryParams);
 
     const whereClause = whereConditions.join(' AND ');
 
@@ -281,7 +441,7 @@ export class ExecutionService {
     // For initial loads, we'll determine hasNext by fetching limit+1 records
     let total = 0;
 
-    // Get executions
+    // Reserve slots for LIMIT and OFFSET parameters - will be assigned after WHERE conditions
     paramCount++;
     const limitParam = paramCount;
     paramCount++;
@@ -330,7 +490,8 @@ export class ExecutionService {
           ea.response_required,
           ea.expert_review_status,
           ea.expert_risk_assessment,
-          ea.verified_by_human
+          ea.verified_by_human,
+          ea.execution_id as analysis_exists
         FROM execution_entity e
         JOIN workflow_entity w ON e."workflowId"::text = w.id::text
         LEFT JOIN sai_execution_analysis ea ON e.id = ea.execution_id
@@ -379,13 +540,30 @@ export class ExecutionService {
       `;
     }
 
-    // Fetch one extra record to determine if there are more pages
+    // Add LIMIT and OFFSET parameters at the end (they were reserved but placed after WHERE params)
     queryParams.push(actualLimit + 1, actualOffset);
 
     const executions = await db.query<ExecutionWithImage>(
       executionsQuery, 
       queryParams
     );
+
+    // Hybrid Staged Processing: Process missing analyses from coverage validation
+    if (needsEnrichment && analysisStatus && analysisStatus.missingIds.length > 0) {
+      const missingIds = analysisStatus.missingIds.slice(0, 20); // Limit to 20 to avoid overwhelming the system
+      
+      logger.info(`Hybrid processing: ${missingIds.length} analyses pending`, { 
+        totalMissing: analysisStatus.missingIds.length,
+        coverage: analysisStatus.coverage,
+        executionIds: missingIds 
+      });
+      
+      // Stage 1: Return immediate results (already completed above)
+      // Stage 2: Process missing analyses in background with SSE updates
+      this.processAnalysesWithSSEUpdates(missingIds, filters).catch(error => {
+        logger.error('Hybrid staged processing error:', error);
+      });
+    }
 
     // Process results with enhanced analysis data
     const processedExecutions: ExecutionWithImage[] = executions.map((exec: any) => {
@@ -475,7 +653,8 @@ export class ExecutionService {
     return {
       executions: processedExecutions,
       total,
-      hasNext
+      hasNext,
+      analysisStatus
     };
   }
 

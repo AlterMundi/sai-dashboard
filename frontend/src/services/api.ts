@@ -142,6 +142,7 @@ export const executionsApi = {
   async getExecutions(filters: ExecutionFilters = {}): Promise<{
     executions: ExecutionWithImage[];
     meta: any;
+    alerts?: any[];
   }> {
     try {
       const response: AxiosResponse<ApiResponse<ExecutionWithImage[]>> = await api.get('/executions', {
@@ -149,7 +150,8 @@ export const executionsApi = {
       });
       return {
         executions: response.data.data,
-        meta: response.data.meta || {}
+        meta: response.data.meta || {},
+        alerts: (response.data as any).alerts || []
       };
     } catch (error) {
       throw handleApiError(error);
@@ -211,6 +213,22 @@ export const executionsApi = {
     
     const queryString = params.toString();
     return `${baseUrl}/executions/${executionId}/image${queryString ? '?' + queryString : ''}`;
+  },
+
+  async triggerAnalysis(batchSize = 50): Promise<{
+    triggered: boolean;
+    pending: number;
+    message: string;
+    estimatedTime?: string;
+  }> {
+    try {
+      const response: AxiosResponse<ApiResponse<any>> = await api.post('/executions/trigger-analysis', {
+        batchSize
+      });
+      return response.data.data;
+    } catch (error) {
+      throw handleApiError(error);
+    }
   },
 };
 
