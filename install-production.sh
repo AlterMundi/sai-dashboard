@@ -925,12 +925,39 @@ verify_installation() {
         fi
     done
     
-    # Test database connectivity through API
+    # Test database connectivity through API with proper authentication
     log "Testing database connectivity via API..."
-    if curl -s http://localhost:3001/dashboard/api/executions?limit=1 | grep -q "data" 2>/dev/null; then
-        log "✓ Database queries working through API"
+    
+    # Get authentication token
+    local auth_token=""
+    if [[ -n "${DASHBOARD_PASSWORD:-}" ]]; then
+        # Check if jq is available for JSON parsing
+        if command -v jq >/dev/null 2>&1; then
+            auth_token=$(curl -s -X POST http://localhost:3001/dashboard/api/auth/login \
+                -H "Content-Type: application/json" \
+                -d "{\"password\":\"$DASHBOARD_PASSWORD\"}" 2>/dev/null | \
+                jq -r '.data.token // empty' 2>/dev/null)
+        else
+            # Fallback: simple grep/sed extraction if jq is not available
+            local auth_response=$(curl -s -X POST http://localhost:3001/dashboard/api/auth/login \
+                -H "Content-Type: application/json" \
+                -d "{\"password\":\"$DASHBOARD_PASSWORD\"}" 2>/dev/null)
+            auth_token=$(echo "$auth_response" | grep -o '"token":"[^"]*"' | sed 's/"token":"\([^"]*\)"/\1/')
+        fi
+    fi
+    
+    # Test authenticated API call
+    if [[ -n "$auth_token" ]]; then
+        if curl -s -H "Authorization: Bearer $auth_token" \
+            http://localhost:3001/dashboard/api/executions?limit=1 | \
+            grep -q "data" 2>/dev/null; then
+            log "✓ Database queries working through API with authentication"
+        else
+            warn "⚠ Database queries may not be working properly (check database connection)"
+        fi
     else
-        warn "⚠ Database queries may not be working properly"
+        warn "⚠ Could not authenticate API - skipping database connectivity test"
+        warn "  Ensure DASHBOARD_PASSWORD is set correctly in .env file"
     fi
     
     # Check if frontend files exist and are accessible
