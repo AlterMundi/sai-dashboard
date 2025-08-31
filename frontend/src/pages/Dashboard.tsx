@@ -208,7 +208,7 @@ export function Dashboard() {
           {/* Extended Filters */}
           {showFilters && (
             <div className="mt-6 pt-6 border-t border-gray-200">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {/* Status Filter */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
@@ -238,6 +238,85 @@ export function Dashboard() {
                     <option value="">All executions</option>
                     <option value="true">With images</option>
                     <option value="false">Without images</option>
+                  </select>
+                </div>
+
+                {/* Risk Level Filter */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Risk Level</label>
+                  <select
+                    value={filters.riskLevel || ''}
+                    onChange={(e) => applyQuickFilter({ riskLevel: (e.target.value as any) || undefined })}
+                    className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  >
+                    <option value="">All risk levels</option>
+                    <option value="high">High Risk</option>
+                    <option value="medium">Medium Risk</option>
+                    <option value="low">Low Risk</option>
+                    <option value="none">No Risk</option>
+                  </select>
+                </div>
+
+                {/* Telegram Delivery Filter */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Telegram Delivery</label>
+                  <select
+                    value={filters.telegramDelivered === undefined ? '' : filters.telegramDelivered.toString()}
+                    onChange={(e) => applyQuickFilter({ 
+                      telegramDelivered: e.target.value === '' ? undefined : e.target.value === 'true' 
+                    })}
+                    className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  >
+                    <option value="">All executions</option>
+                    <option value="true">Delivered to Telegram</option>
+                    <option value="false">Not delivered</option>
+                  </select>
+                </div>
+
+                {/* Date Preset Filter */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Date Preset</label>
+                  <select
+                    value={filters.datePreset || ''}
+                    onChange={(e) => applyQuickFilter({ datePreset: (e.target.value as any) || undefined })}
+                    className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  >
+                    <option value="">Custom date range</option>
+                    <option value="today">Today</option>
+                    <option value="yesterday">Yesterday</option>
+                    <option value="last7days">Last 7 days</option>
+                    <option value="last30days">Last 30 days</option>
+                    <option value="thisMonth">This month</option>
+                    <option value="lastMonth">Last month</option>
+                  </select>
+                </div>
+
+                {/* Sort By Filter */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Sort By</label>
+                  <select
+                    value={filters.sortBy || ''}
+                    onChange={(e) => applyQuickFilter({ sortBy: (e.target.value as any) || undefined })}
+                    className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  >
+                    <option value="">Default order</option>
+                    <option value="date">Date</option>
+                    <option value="risk">Risk Level</option>
+                    <option value="status">Status</option>
+                  </select>
+                </div>
+
+                {/* Sort Order Filter */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Sort Order</label>
+                  <select
+                    value={filters.sortOrder || ''}
+                    onChange={(e) => applyQuickFilter({ sortOrder: (e.target.value as any) || undefined })}
+                    className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  >
+                    <option value="">Default</option>
+                    <option value="asc">Ascending</option>
+                    <option value="desc">Descending</option>
                   </select>
                 </div>
 
@@ -278,18 +357,33 @@ export function Dashboard() {
                   Failed executions
                 </button>
                 <button
-                  onClick={() => applyQuickFilter({ 
-                    startDate: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-                  })}
+                  onClick={() => applyQuickFilter({ datePreset: 'today' })}
                   className="px-3 py-1 bg-primary-100 text-primary-700 rounded-full text-sm hover:bg-primary-200 transition-colors"
                 >
-                  Last 24 hours
+                  Today
+                </button>
+                <button
+                  onClick={() => applyQuickFilter({ riskLevel: 'high' })}
+                  className="px-3 py-1 bg-red-100 text-red-700 rounded-full text-sm hover:bg-red-200 transition-colors"
+                >
+                  High Risk Only
+                </button>
+                <button
+                  onClick={() => applyQuickFilter({ telegramDelivered: true })}
+                  className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm hover:bg-blue-200 transition-colors"
+                >
+                  Telegram Delivered
+                </button>
+                <button
+                  onClick={() => applyQuickFilter({ sortBy: 'risk', sortOrder: 'desc' })}
+                  className="px-3 py-1 bg-orange-100 text-orange-700 rounded-full text-sm hover:bg-orange-200 transition-colors"
+                >
+                  Sort by Risk (High first)
                 </button>
               </div>
             </div>
           )}
         </div>
-
         {/* Main Gallery */}
         <ImageGallery 
           initialFilters={filters}

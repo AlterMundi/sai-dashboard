@@ -14,7 +14,12 @@ export const getExecutions = asyncHandler(async (req: Request, res: Response): P
     startDate,
     endDate,
     search,
-    hasImage
+    hasImage,
+    riskLevel,
+    telegramDelivered,
+    datePreset,
+    sortBy,
+    sortOrder
   } = req.query;
 
   const filters: ExecutionFilters = {
@@ -25,7 +30,12 @@ export const getExecutions = asyncHandler(async (req: Request, res: Response): P
     startDate: startDate as string,
     endDate: endDate as string,
     search: search as string,
-    hasImage: hasImage === 'true' ? true : hasImage === 'false' ? false : undefined
+    hasImage: hasImage === 'true' ? true : hasImage === 'false' ? false : undefined,
+    riskLevel: riskLevel as any,
+    telegramDelivered: telegramDelivered === 'true' ? true : telegramDelivered === 'false' ? false : undefined,
+    datePreset: datePreset as any,
+    sortBy: sortBy as any,
+    sortOrder: sortOrder as any
   };
 
   // Validate date filters
@@ -343,6 +353,29 @@ export const searchExecutions = asyncHandler(async (req: Request, res: Response)
       error: {
         message: 'Search failed',
         code: 'SEARCH_ERROR'
+      }
+    });
+  }
+});
+
+export const getEnhancedStatistics = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+  try {
+    const stats = await executionService.getEnhancedStatistics();
+
+    res.json({
+      data: stats,
+      meta: {
+        timestamp: new Date().toISOString(),
+        cached: false
+      }
+    });
+
+  } catch (error) {
+    logger.error('Failed to fetch enhanced statistics:', error);
+    res.status(500).json({
+      error: {
+        message: 'Failed to fetch enhanced statistics',
+        code: 'FETCH_ENHANCED_STATS_ERROR'
       }
     });
   }

@@ -20,7 +20,8 @@ import {
   getExecutionData,
   getDailySummary,
   getExecutionStats,
-  searchExecutions
+  searchExecutions,
+  getEnhancedStatistics
 } from '@/controllers/executions';
 import {
   connectSSE,
@@ -111,6 +112,9 @@ executionRouter.get('/summary/daily', getDailySummary);
 
 // General execution statistics
 executionRouter.get('/stats', getExecutionStats);
+
+// Enhanced execution statistics with detailed metrics
+executionRouter.get('/stats/enhanced', getEnhancedStatistics);
 
 // Specific execution details
 executionRouter.get('/:executionId', getExecutionById);
