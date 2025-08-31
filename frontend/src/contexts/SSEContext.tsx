@@ -2,6 +2,8 @@ import { createContext, useContext, useState, useEffect, useRef, useCallback, Re
 import { sseApi } from '@/services/api';
 import { UseSSEReturn, SSEExecutionEvent, SSEHeartbeatEvent, SSEConnectionEvent } from '@/types';
 import toast from 'react-hot-toast';
+import { useNotifications } from '@/hooks/useNotifications';
+import { NotificationOverlay } from '@/components/notifications/NotificationOverlay';
 
 // Create the SSE Context
 const SSEContext = createContext<UseSSEReturn | null>(null);
@@ -15,6 +17,8 @@ export function SSEProvider({ children }: SSEProviderProps) {
   const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected' | 'error'>('disconnected');
   const [lastEvent, setLastEvent] = useState<any>(null);
   const [clientCount, setClientCount] = useState(0);
+  const [liveStats, setLiveStats] = useState<any>(null);
+  const [systemHealth, setSystemHealth] = useState<any>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
   const reconnectTimeoutRef = useRef<number | null>(null);
   const reconnectAttempts = useRef(0);
@@ -22,6 +26,18 @@ export function SSEProvider({ children }: SSEProviderProps) {
   const isConnectingRef = useRef(false);
   const maxReconnectAttempts = 5;
   const baseReconnectDelay = 1000; // 1 second
+
+  // Notification system
+  const {
+    notifications,
+    dismissNotification,
+    handleNotificationAction,
+    notifyNewExecution,
+    notifyExecutionError,
+    notifyBatchComplete,
+    notifySystemHealth,
+    notifySystemStats
+  } = useNotifications();
 
   const cleanup = useCallback(() => {
     if (eventSourceRef.current) {
@@ -161,14 +177,8 @@ export function SSEProvider({ children }: SSEProviderProps) {
           console.log('SSE Context: New execution received:', data.execution.id);
           setLastEvent({ type: 'execution:new', data, timestamp: new Date() });
           
-          // Show notification for new successful executions
-          toast.success(
-            `New analysis completed: ${data.execution.id.slice(-8)}`,
-            {
-              duration: 4000,
-              icon: '🔍',
-            }
-          );
+          // Use smart notification system instead of basic toast
+          notifyNewExecution(data);
         } catch (error) {
           console.warn('SSE Context: Failed to parse execution:new event:', error);
         }
@@ -181,14 +191,8 @@ export function SSEProvider({ children }: SSEProviderProps) {
           console.log('SSE Context: Execution error received:', data.executionId);
           setLastEvent({ type: 'execution:error', data, timestamp: new Date() });
           
-          // Show error notification
-          toast.error(
-            `Execution failed: ${data.executionId.slice(-8)}`,
-            {
-              duration: 5000,
-              icon: '⚠️',
-            }
-          );
+          // Use smart notification system
+          notifyExecutionError(data);
         } catch (error) {
           console.warn('SSE Context: Failed to parse execution:error event:', error);
         }
@@ -203,6 +207,63 @@ export function SSEProvider({ children }: SSEProviderProps) {
           console.debug('SSE Context: Heartbeat:', data);
         } catch (error) {
           console.warn('SSE Context: Failed to parse heartbeat event:', error);
+        }
+      });
+
+      // System statistics event
+      eventSource.addEventListener('system:stats', (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          console.log('SSE Context: System stats received:', data);
+          setLastEvent({ type: 'system:stats', data, timestamp: new Date() });
+          setLiveStats(data);
+          
+          // Smart notification for significant stats changes
+          notifySystemStats(data);
+        } catch (error) {
+          console.warn('SSE Context: Failed to parse system:stats event:', error);
+        }
+      });
+
+      // System health event
+      eventSource.addEventListener('system:health', (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          console.log('SSE Context: System health received:', data);
+          setLastEvent({ type: 'system:health', data, timestamp: new Date() });
+          setSystemHealth(data);
+          
+          // Smart notification for health issues
+          notifySystemHealth(data);
+        } catch (error) {
+          console.warn('SSE Context: Failed to parse system:health event:', error);
+        }
+      });
+
+      // Batch completion event
+      eventSource.addEventListener('execution:batch', (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          console.log('SSE Context: Batch completion received:', data);
+          setLastEvent({ type: 'execution:batch', data, timestamp: new Date() });
+          
+          // Smart notification for batch completion
+          notifyBatchComplete(data);
+        } catch (error) {
+          console.warn('SSE Context: Failed to parse execution:batch event:', error);
+        }
+      });
+
+      // Execution progress event
+      eventSource.addEventListener('execution:progress', (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          console.log('SSE Context: Execution progress received:', data.executionId, data.progress);
+          setLastEvent({ type: 'execution:progress', data, timestamp: new Date() });
+          
+          // Could trigger progress UI updates here
+        } catch (error) {
+          console.warn('SSE Context: Failed to parse execution:progress event:', error);
         }
       });
 
@@ -293,10 +354,21 @@ export function SSEProvider({ children }: SSEProviderProps) {
     lastEvent,
     connectionStatus,
     clientCount,
+    liveStats,
+    systemHealth,
     connect,
   };
 
-  return <SSEContext.Provider value={contextValue}>{children}</SSEContext.Provider>;
+  return (
+    <SSEContext.Provider value={contextValue}>
+      {children}
+      <NotificationOverlay
+        notifications={notifications}
+        onDismiss={dismissNotification}
+        onAction={handleNotificationAction}
+      />
+    </SSEContext.Provider>
+  );
 }
 
 // Hook to use the SSE Context
