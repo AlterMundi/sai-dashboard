@@ -101,6 +101,7 @@ sseRouter.get('/', (req, res, next) => {
 // SSE status requires normal auth
 sseRouter.get('/status', authenticateToken, requireAuth, getSSEStatus);
 
+// SSE Events (must come BEFORE global auth middleware to use custom auth)
 router.use('/events', sseRouter);
 
 // =================================================================

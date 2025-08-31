@@ -25,6 +25,7 @@ SKIP_DEPLOY=false
 SKIP_SERVICE=false
 SKIP_VERIFY=false
 FORCE_REBUILD=false
+CLEAN_BUILD=false
 VERBOSE=false
 DRY_RUN=false
 
@@ -63,6 +64,7 @@ ${BOLD}Options:${NC}
     ${CYAN}-v, --verbose${NC}           Enable verbose output
     ${CYAN}-d, --dry-run${NC}           Simulate installation without making changes
     ${CYAN}-f, --force${NC}             Force rebuild even if builds exist
+    ${CYAN}-c, --clean${NC}             Clean build directories before building
     
     ${BOLD}Skip Phases:${NC}
     ${CYAN}--skip-prereq${NC}           Skip prerequisite checks
@@ -109,6 +111,11 @@ parse_args() {
                 ;;
             -f|--force)
                 FORCE_REBUILD=true
+                CLEAN_BUILD=true    # Force includes clean build
+                shift
+                ;;
+            -c|--clean)
+                CLEAN_BUILD=true
                 shift
                 ;;
             --skip-prereq)
@@ -324,6 +331,35 @@ pre_build_checks() {
     success "Pre-build checks completed in ${duration}s"
 }
 
+# Clean build directories
+clean_build_directories() {
+    [ "$CLEAN_BUILD" = false ] && return
+    
+    info "Cleaning build directories and caches..."
+    if [ "$DRY_RUN" = true ]; then
+        info "[DRY RUN] Would clean frontend/dist, backend/dist, and build caches"
+        return
+    fi
+    
+    # Clean frontend
+    if [[ -d "$SCRIPT_DIR/frontend/dist" ]]; then
+        rm -rf "$SCRIPT_DIR/frontend/dist"
+        info "Cleaned frontend/dist"
+    fi
+    if [[ -d "$SCRIPT_DIR/frontend/node_modules/.cache" ]]; then
+        rm -rf "$SCRIPT_DIR/frontend/node_modules/.cache"
+        info "Cleaned frontend build cache"
+    fi
+    
+    # Clean backend
+    if [[ -d "$SCRIPT_DIR/backend/dist" ]]; then
+        rm -rf "$SCRIPT_DIR/backend/dist"
+        info "Cleaned backend/dist"
+    fi
+    
+    success "Build directories cleaned"
+}
+
 # Build frontend
 build_frontend() {
     [ "$SKIP_BUILD" = true ] && { info "Skipping frontend build (--skip-build)"; return; }
@@ -357,8 +393,15 @@ build_frontend() {
     if [ "$DRY_RUN" = true ]; then
         info "[DRY RUN] Would build frontend with VITE_BASE_PATH=/dashboard/ VITE_API_URL=/dashboard/api"
     else
+        # Export environment variables for the build
+        export VITE_BASE_PATH="/dashboard/"
+        export VITE_API_URL="/dashboard/api"
+        
+        # Verify environment variables are set
+        info "Environment variables: VITE_BASE_PATH=${VITE_BASE_PATH}, VITE_API_URL=${VITE_API_URL}"
+        
         if [ "$VERBOSE" = true ]; then
-            VITE_BASE_PATH="/dashboard/" VITE_API_URL="/dashboard/api" npm run build -- --mode production
+            VITE_BASE_PATH="/dashboard/" VITE_API_URL="/dashboard/api" npm run build -- --mode production || error "Frontend build failed"
         else
             VITE_BASE_PATH="/dashboard/" VITE_API_URL="/dashboard/api" npm run build -- --mode production >/dev/null 2>&1 || error "Frontend build failed"
         fi
@@ -377,6 +420,24 @@ build_frontend() {
         # Check for proper base path configuration
         if ! grep -q "/dashboard/" dist/index.html 2>/dev/null; then
             warn "Frontend may not have correct base path configured"
+        fi
+        
+        # Validate that environment variables were properly embedded in built JavaScript
+        info "Validating environment variable embedding in built assets..."
+        local js_files=$(find dist/assets -name "*.js" -type f 2>/dev/null)
+        local found_dashboard_api=false
+        
+        for js_file in $js_files; do
+            if grep -q "dashboard/api" "$js_file" 2>/dev/null; then
+                found_dashboard_api=true
+                break
+            fi
+        done
+        
+        if [ "$found_dashboard_api" = true ]; then
+            success "Environment variables correctly embedded in build"
+        else
+            error "Environment variables NOT properly embedded - API calls will fail. Check VITE_API_URL configuration."
         fi
     fi
     
@@ -670,51 +731,16 @@ configure_web_server() {
 configure_nginx() {
     log "Configuring nginx..."
     
-    # Create server block for dashboard
-    sudo tee /etc/nginx/sites-available/sai-dashboard > /dev/null << EOF
-# SAI Dashboard - Local server configuration
-server {
-    listen 80;
-    listen [::]:80;
-    server_name localhost 127.0.0.1 sai.altermundi.net _;
-    
-    # Dashboard - Exact redirect for trailing slash
-    location = /dashboard {
-        return 301 \$scheme://\$host/dashboard/;
-    }
-    
-    # Dashboard static files
-    location /dashboard/ {
-        alias $WEB_ROOT/sai-dashboard/;
-        try_files \$uri \$uri/ /dashboard/index.html;
-        
-        # Cache static assets
-        location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
-            expires 1y;
-            add_header Cache-Control "public, immutable";
-        }
-    }
-    
-    # API proxy
-    location /dashboard/api/ {
-        proxy_pass http://127.0.0.1:3001;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-        proxy_cache_bypass \$http_upgrade;
-        proxy_buffering off;
-    }
-    
-    # Security headers
-    add_header X-Frame-Options DENY;
-    add_header X-Content-Type-Options nosniff;
-    add_header X-XSS-Protection "1; mode=block";
-}
-EOF
+    # Copy nginx configuration from repo
+    if [[ -f "$SCRIPT_DIR/nginx/sai-dashboard-local.conf" ]]; then
+        log "Using nginx configuration from repository..."
+        # Replace WEB_ROOT placeholder in the config file
+        sed "s|\$WEB_ROOT|$WEB_ROOT|g" "$SCRIPT_DIR/nginx/sai-dashboard-local.conf" | \
+            sudo tee /etc/nginx/sites-available/sai-dashboard > /dev/null
+        log "✓ Nginx configuration copied from repository"
+    else
+        error "Repository nginx configuration not found: $SCRIPT_DIR/nginx/sai-dashboard-local.conf"
+    fi
     
     # Enable site
     sudo ln -sf /etc/nginx/sites-available/sai-dashboard /etc/nginx/sites-enabled/
@@ -1038,7 +1064,10 @@ main() {
     # Phase 2: Quality checks
     pre_build_checks
     
-    # Phase 3: Build
+    # Phase 3: Clean (if requested)
+    clean_build_directories
+    
+    # Phase 4: Build
     if [ "$SKIP_BUILD" = false ]; then
         build_frontend
         build_backend
@@ -1046,7 +1075,7 @@ main() {
         info "Skipping build phase (--skip-build)"
     fi
     
-    # Phase 4: Deploy
+    # Phase 5: Deploy
     if [ "$SKIP_DEPLOY" = false ]; then
         create_directories
         deploy_files

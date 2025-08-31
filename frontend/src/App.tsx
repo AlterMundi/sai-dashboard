@@ -3,6 +3,7 @@ import { Toaster } from 'react-hot-toast';
 import { HelmetProvider } from 'react-helmet-async';
 import { useAuth } from '@/hooks/useAuth';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { SSEProvider } from '@/contexts/SSEContext';
 import { Dashboard } from '@/pages/Dashboard';
 import { Login } from '@/pages/Login';
 import './index.css';
@@ -43,7 +44,9 @@ function App() {
               path="/" 
               element={
                 <ProtectedRoute>
-                  <Dashboard />
+                  <SSEProvider>
+                    <Dashboard />
+                  </SSEProvider>
                 </ProtectedRoute>
               } 
             />
