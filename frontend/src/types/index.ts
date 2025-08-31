@@ -52,6 +52,11 @@ export interface ExecutionFilters {
   endDate?: string;
   search?: string;
   hasImage?: boolean;
+  riskLevel?: 'high' | 'medium' | 'low' | 'none';
+  telegramDelivered?: boolean;
+  datePreset?: 'today' | 'yesterday' | 'last7days' | 'last30days' | 'thisMonth' | 'lastMonth';
+  sortBy?: 'date' | 'risk' | 'status';
+  sortOrder?: 'asc' | 'desc';
 }
 
 export interface PaginatedResponse<T> {

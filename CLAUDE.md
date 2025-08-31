@@ -49,6 +49,20 @@ docker-compose up -d
 
 ## 🌐 Production Deployment (TESTED & WORKING)
 
+### Production Setup
+```bash
+# installation script
+./install-production.sh
+
+# Test enhanced statistics endpoint with proper auth
+# Get auth token first
+curl -s "https://sai.altermundi.net/dashboard/api/auth/login" -H "Content-Type:application/json" -d '{"password":"SaiDash2025SecureProd"}' > /tmp/token.json
+# Extract token
+jq -r '.data.token' /tmp/token.json > /tmp/token.txt
+# Test desired endpoint (example)
+curl -s "https://sai.altermundi.net/dashboard/api/executions/stats/enhanced" -H "Authorization: Bearer $(cat /tmp/token.txt)"
+```
+
 ### Critical Production Configuration
 
 **Server Status (Reverse Tunnel Architecture):**
