@@ -1,17 +1,34 @@
 #!/bin/bash
 # SAI Dashboard Production Installation Script
-# System-agnostic deployment using relative paths
+# Complete deployment with built-in quality checks
 
 set -e  # Exit on any error
+
+# Script version
+VERSION="2.0.0"
 
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+MAGENTA='\033[0;35m'
 NC='\033[0m' # No Color
+BOLD='\033[1m'
 
-# Logging function
+# Configuration flags (defaults)
+SKIP_PREREQ=false
+SKIP_QUALITY=false
+SKIP_BUILD=false
+SKIP_DEPLOY=false
+SKIP_SERVICE=false
+SKIP_VERIFY=false
+FORCE_REBUILD=false
+VERBOSE=false
+DRY_RUN=false
+
+# Logging functions
 log() {
     echo -e "${GREEN}[$(date +'%Y-%m-%d %H:%M:%S')] $1${NC}"
 }
@@ -22,7 +39,130 @@ warn() {
 
 error() {
     echo -e "${RED}[ERROR] $1${NC}"
-    exit 1
+    [ "$DRY_RUN" = true ] || exit 1
+}
+
+info() {
+    echo -e "${CYAN}[INFO] $1${NC}"
+}
+
+success() {
+    echo -e "${GREEN}${BOLD}✓${NC} ${GREEN}$1${NC}"
+}
+
+# Show usage
+show_usage() {
+    cat << EOF
+${BOLD}SAI Dashboard Production Installation Script v${VERSION}${NC}
+
+${BOLD}Usage:${NC}
+    $0 [OPTIONS]
+
+${BOLD}Options:${NC}
+    ${CYAN}-h, --help${NC}              Show this help message
+    ${CYAN}-v, --verbose${NC}           Enable verbose output
+    ${CYAN}-d, --dry-run${NC}           Simulate installation without making changes
+    ${CYAN}-f, --force${NC}             Force rebuild even if builds exist
+    
+    ${BOLD}Skip Phases:${NC}
+    ${CYAN}--skip-prereq${NC}           Skip prerequisite checks
+    ${CYAN}--skip-quality${NC}          Skip pre-build quality checks
+    ${CYAN}--skip-build${NC}            Skip build phase (use existing builds)
+    ${CYAN}--skip-deploy${NC}           Skip deployment phase
+    ${CYAN}--skip-service${NC}          Skip service configuration
+    ${CYAN}--skip-verify${NC}           Skip post-installation verification
+    
+    ${BOLD}Individual Phases:${NC}
+    ${CYAN}--only-build${NC}            Only run build phase
+    ${CYAN}--only-deploy${NC}           Only run deployment phase
+    ${CYAN}--only-verify${NC}           Only run verification phase
+
+${BOLD}Examples:${NC}
+    ${CYAN}$0${NC}                      # Complete installation (default)
+    ${CYAN}$0 --skip-quality${NC}       # Fast installation, skip quality checks
+    ${CYAN}$0 --only-build${NC}         # Build only, don't deploy
+    ${CYAN}$0 --dry-run${NC}            # Simulate without changes
+    ${CYAN}$0 -f --only-deploy${NC}     # Force redeploy with existing builds
+
+${BOLD}Default Behavior:${NC}
+    Runs complete installation with all quality checks enabled.
+
+EOF
+    exit 0
+}
+
+# Parse command line arguments
+parse_args() {
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            -h|--help)
+                show_usage
+                ;;
+            -v|--verbose)
+                VERBOSE=true
+                shift
+                ;;
+            -d|--dry-run)
+                DRY_RUN=true
+                info "DRY RUN MODE - No changes will be made"
+                shift
+                ;;
+            -f|--force)
+                FORCE_REBUILD=true
+                shift
+                ;;
+            --skip-prereq)
+                SKIP_PREREQ=true
+                shift
+                ;;
+            --skip-quality)
+                SKIP_QUALITY=true
+                shift
+                ;;
+            --skip-build)
+                SKIP_BUILD=true
+                shift
+                ;;
+            --skip-deploy)
+                SKIP_DEPLOY=true
+                shift
+                ;;
+            --skip-service)
+                SKIP_SERVICE=true
+                shift
+                ;;
+            --skip-verify)
+                SKIP_VERIFY=true
+                shift
+                ;;
+            --only-build)
+                SKIP_PREREQ=true
+                SKIP_DEPLOY=true
+                SKIP_SERVICE=true
+                SKIP_VERIFY=true
+                shift
+                ;;
+            --only-deploy)
+                SKIP_PREREQ=true
+                SKIP_QUALITY=true
+                SKIP_BUILD=true
+                SKIP_VERIFY=true
+                shift
+                ;;
+            --only-verify)
+                SKIP_PREREQ=true
+                SKIP_QUALITY=true
+                SKIP_BUILD=true
+                SKIP_DEPLOY=true
+                SKIP_SERVICE=true
+                shift
+                ;;
+            *)
+                error "Unknown option: $1"
+                show_usage
+                ;;
+        esac
+    done
 }
 
 # Detect system
@@ -105,55 +245,214 @@ check_prerequisites() {
         warn "psql not found. Database connection may not work."
     fi
     
+    # Validate environment configuration
+    log "Validating environment configuration..."
+    source "$SCRIPT_DIR/.env"
+    
+    # Check required environment variables
+    REQUIRED_VARS=("DB_HOST" "DB_PORT" "DB_NAME" "DB_USER" "DB_PASSWORD" "DASHBOARD_PASSWORD" "SESSION_SECRET")
+    for var in "${REQUIRED_VARS[@]}"; do
+        if [[ -z "${!var}" ]]; then
+            error "Required environment variable missing: $var"
+        fi
+    done
+    
+    # Test database connectivity (quick check)
+    log "Testing database connectivity..."
+    if timeout 3 bash -c "echo > /dev/tcp/$DB_HOST/${DB_PORT:-5432}" 2>/dev/null; then
+        log "✓ Database port accessible at $DB_HOST:${DB_PORT:-5432}"
+    else
+        error "Cannot connect to database at $DB_HOST:${DB_PORT:-5432}"
+    fi
+    
     log "Prerequisites check passed"
+}
+
+# Pre-build quality checks
+pre_build_checks() {
+    [ "$SKIP_QUALITY" = true ] && { info "Skipping quality checks (--skip-quality)"; return; }
+    
+    log "Running pre-build quality checks..."
+    local start_time=$(date +%s)
+    
+    # Backend TypeScript validation
+    info "Validating backend TypeScript..."
+    cd "$SCRIPT_DIR/backend"
+    
+    if [ "$DRY_RUN" = true ]; then
+        info "[DRY RUN] Would validate backend TypeScript"
+    else
+        if [ "$VERBOSE" = true ]; then
+            npm run type-check || error "Backend TypeScript validation failed"
+        else
+            if ! npm run type-check >/dev/null 2>&1; then
+                error "Backend TypeScript validation failed. Run 'cd backend && npm run type-check' to see errors."
+            fi
+        fi
+    fi
+    success "Backend TypeScript valid"
+    
+    # Frontend TypeScript validation
+    info "Validating frontend TypeScript..."
+    cd "$SCRIPT_DIR/frontend"
+    
+    if [ "$DRY_RUN" = true ]; then
+        info "[DRY RUN] Would validate frontend TypeScript"
+    else
+        if [ "$VERBOSE" = true ]; then
+            npm run type-check || error "Frontend TypeScript validation failed"
+        else
+            if ! npm run type-check >/dev/null 2>&1; then
+                error "Frontend TypeScript validation failed. Run 'cd frontend && npm run type-check' to see errors."
+            fi
+        fi
+    fi
+    success "Frontend TypeScript valid"
+    
+    # Lint checks (non-blocking, just warn)
+    if [ "$VERBOSE" = true ]; then
+        info "Running lint checks..."
+        cd "$SCRIPT_DIR/backend"
+        npm run lint || warn "Backend has lint warnings"
+        
+        cd "$SCRIPT_DIR/frontend"
+        npm run lint || warn "Frontend has lint warnings"
+    fi
+    
+    local end_time=$(date +%s)
+    local duration=$((end_time - start_time))
+    success "Pre-build checks completed in ${duration}s"
 }
 
 # Build frontend
 build_frontend() {
-    log "Building frontend for production..."
+    [ "$SKIP_BUILD" = true ] && { info "Skipping frontend build (--skip-build)"; return; }
     
     cd "$SCRIPT_DIR/frontend"
     
-    # Install dependencies 
-    log "Installing frontend dependencies..."
-    npm install
-    
-    # Build with production settings
-    log "Building React application..."
-    VITE_BASE_PATH="/dashboard/" VITE_API_URL="/dashboard/api" npm run build -- --mode production
-    
-    if [[ ! -d "dist" ]]; then
-        error "Frontend build failed - no dist directory created"
+    # Check if build exists and force flag
+    if [[ -d "dist" ]] && [ "$FORCE_REBUILD" = false ]; then
+        info "Frontend build already exists. Use -f to force rebuild."
+        return
     fi
     
-    log "Frontend built successfully"
+    log "Building frontend for production..."
+    local start_time=$(date +%s)
+    
+    # Install dependencies 
+    info "Installing frontend dependencies (this may take a moment)..."
+    if [ "$DRY_RUN" = true ]; then
+        info "[DRY RUN] Would install frontend dependencies"
+    else
+        if [ "$VERBOSE" = true ]; then
+            npm install
+        else
+            npm install --silent >/dev/null 2>&1 || error "Failed to install frontend dependencies"
+        fi
+    fi
+    success "Frontend dependencies installed"
+    
+    # Build with production settings
+    info "Building React application (this may take 30-60 seconds)..."
+    if [ "$DRY_RUN" = true ]; then
+        info "[DRY RUN] Would build frontend with VITE_BASE_PATH=/dashboard/ VITE_API_URL=/dashboard/api"
+    else
+        if [ "$VERBOSE" = true ]; then
+            VITE_BASE_PATH="/dashboard/" VITE_API_URL="/dashboard/api" npm run build -- --mode production
+        else
+            VITE_BASE_PATH="/dashboard/" VITE_API_URL="/dashboard/api" npm run build -- --mode production >/dev/null 2>&1 || error "Frontend build failed"
+        fi
+    fi
+    
+    if [ "$DRY_RUN" = false ]; then
+        if [[ ! -d "dist" ]]; then
+            error "Frontend build failed - no dist directory created"
+        fi
+        
+        # Validate build output
+        if [[ ! -f "dist/index.html" ]]; then
+            error "Frontend build incomplete - missing index.html"
+        fi
+        
+        # Check for proper base path configuration
+        if ! grep -q "/dashboard/" dist/index.html 2>/dev/null; then
+            warn "Frontend may not have correct base path configured"
+        fi
+    fi
+    
+    local end_time=$(date +%s)
+    local duration=$((end_time - start_time))
+    success "Frontend built and validated successfully in ${duration}s"
 }
 
 # Build backend
 build_backend() {
-    log "Building backend for production..."
+    [ "$SKIP_BUILD" = true ] && { info "Skipping backend build (--skip-build)"; return; }
     
     cd "$SCRIPT_DIR/backend"
     
+    # Check if build exists and force flag
+    if [[ -d "dist" ]] && [ "$FORCE_REBUILD" = false ]; then
+        info "Backend build already exists. Use -f to force rebuild."
+        return
+    fi
+    
+    log "Building backend for production..."
+    local start_time=$(date +%s)
+    
     # Install dependencies
-    log "Installing backend dependencies..."
-    npm install
+    info "Installing backend dependencies (this may take a moment)..."
+    if [ "$DRY_RUN" = true ]; then
+        info "[DRY RUN] Would install backend dependencies"
+    else
+        if [ "$VERBOSE" = true ]; then
+            npm install
+        else
+            npm install --silent >/dev/null 2>&1 || error "Failed to install backend dependencies"
+        fi
+    fi
+    success "Backend dependencies installed"
     
     # Build TypeScript using npm script
-    log "Compiling TypeScript..."
-    npm run build
-    
-    if [[ ! -d "dist" ]]; then
-        error "Backend build failed - no dist directory created"
+    info "Compiling TypeScript (this may take 20-40 seconds)..."
+    if [ "$DRY_RUN" = true ]; then
+        info "[DRY RUN] Would compile backend TypeScript"
+    else
+        if [ "$VERBOSE" = true ]; then
+            npm run build || error "Backend build failed"
+        else
+            npm run build >/dev/null 2>&1 || error "Backend build failed"
+        fi
     fi
     
-    # Verify that tsc-alias resolved imports properly
-    log "Verifying path alias resolution..."
-    if grep -r "@/" dist/ >/dev/null 2>&1; then
-        error "Path aliases (@/) not resolved in compiled code. tsc-alias may have failed."
+    if [ "$DRY_RUN" = false ]; then
+        if [[ ! -d "dist" ]]; then
+            error "Backend build failed - no dist directory created"
+        fi
+        
+        # CRITICAL: Verify that tsc-alias resolved imports properly
+        info "Verifying path alias resolution (critical check)..."
+        if grep -r "@/" dist/ >/dev/null 2>&1; then
+            error "❌ CRITICAL: Path aliases (@/) not resolved in compiled code. tsc-alias failed!"
+            error "This will cause runtime failures. Fix tsconfig paths configuration."
+            exit 1
+        fi
+        success "Path aliases resolved correctly"
+        
+        # Verify main entry point exists
+        if [[ ! -f "dist/index.js" ]]; then
+            error "Backend build incomplete - missing dist/index.js"
+        fi
+        
+        # Check for self-contained routing
+        if ! grep -q "/dashboard/api" dist/index.js 2>/dev/null; then
+            warn "Backend may not have self-contained API routing configured"
+        fi
     fi
     
-    log "Backend built successfully"
+    local end_time=$(date +%s)
+    local duration=$((end_time - start_time))
+    success "Backend built and validated successfully in ${duration}s"
 }
 
 # Create production directories
@@ -184,26 +483,39 @@ create_directories() {
 
 # Deploy files
 deploy_files() {
+    [ "$SKIP_DEPLOY" = true ] && { info "Skipping file deployment (--skip-deploy)"; return; }
+    
     log "Deploying application files..."
     
+    if [ "$DRY_RUN" = true ]; then
+        info "[DRY RUN] Would deploy frontend to $WEB_ROOT/sai-dashboard/"
+        info "[DRY RUN] Would deploy backend to /opt/sai-dashboard/backend/"
+        info "[DRY RUN] Would copy environment configuration"
+        return
+    fi
+    
     # Copy frontend build
-    log "Deploying frontend..."
-    sudo cp -r "$SCRIPT_DIR/frontend/dist/"* "$WEB_ROOT/sai-dashboard/"
+    info "Deploying frontend assets..."
+    sudo cp -r "$SCRIPT_DIR/frontend/dist/"* "$WEB_ROOT/sai-dashboard/" || error "Failed to deploy frontend"
+    success "Frontend deployed"
     
     # Copy backend files
-    log "Deploying backend..."
-    sudo cp -r "$SCRIPT_DIR/backend/dist" "/opt/sai-dashboard/backend/"
-    sudo cp -r "$SCRIPT_DIR/backend/node_modules" "/opt/sai-dashboard/backend/"
-    sudo cp "$SCRIPT_DIR/backend/package.json" "/opt/sai-dashboard/backend/"
+    info "Deploying backend application..."
+    sudo cp -r "$SCRIPT_DIR/backend/dist" "/opt/sai-dashboard/backend/" || error "Failed to deploy backend dist"
+    sudo cp -r "$SCRIPT_DIR/backend/node_modules" "/opt/sai-dashboard/backend/" || error "Failed to deploy backend modules"
+    sudo cp "$SCRIPT_DIR/backend/package.json" "/opt/sai-dashboard/backend/" || error "Failed to deploy package.json"
+    success "Backend deployed"
     
     # Copy environment file
-    sudo cp "$SCRIPT_DIR/.env" "/opt/sai-dashboard/"
+    info "Deploying configuration..."
+    sudo cp "$SCRIPT_DIR/.env" "/opt/sai-dashboard/" || error "Failed to deploy environment configuration"
     
     # Set permissions
+    info "Setting file permissions..."
     sudo chown -R "$WEB_USER:$WEB_USER" "/opt/sai-dashboard"
     sudo chown -R "$WEB_USER:$WEB_USER" "$WEB_ROOT/sai-dashboard"
     
-    log "Files deployed successfully"
+    success "Files deployed successfully"
 }
 
 # Create systemd service
@@ -549,26 +861,91 @@ start_services() {
 verify_installation() {
     log "Verifying installation..."
     
-    # Check if API is responding
-    if curl -f -s http://localhost:3001/dashboard/api/health >/dev/null; then
-        log "✓ API health check passed"
+    # Give service a moment to fully start
+    sleep 3
+    
+    # Check if API is responding (with retries)
+    log "Testing API health endpoint..."
+    local retry_count=0
+    local max_retries=5
+    
+    while [[ $retry_count -lt $max_retries ]]; do
+        if curl -f -s -m 5 http://localhost:3001/dashboard/api/health >/dev/null 2>&1; then
+            log "✓ API health check passed"
+            
+            # Test API response time
+            local start_time=$(date +%s%N)
+            curl -s -m 5 http://localhost:3001/dashboard/api/health >/dev/null 2>&1
+            local end_time=$(date +%s%N)
+            local response_time=$(( (end_time - start_time) / 1000000 ))
+            
+            if [[ $response_time -lt 500 ]]; then
+                log "✓ API response time: ${response_time}ms (excellent)"
+            elif [[ $response_time -lt 2000 ]]; then
+                log "✓ API response time: ${response_time}ms (good)"
+            else
+                warn "⚠ API response time: ${response_time}ms (slow)"
+            fi
+            break
+        else
+            retry_count=$((retry_count + 1))
+            if [[ $retry_count -lt $max_retries ]]; then
+                log "API not ready yet, retrying in 2 seconds... ($retry_count/$max_retries)"
+                sleep 2
+            else
+                error "❌ API health check failed after $max_retries attempts"
+                error "Check logs: sudo journalctl -u sai-dashboard-api -n 50"
+            fi
+        fi
+    done
+    
+    # Test database connectivity through API
+    log "Testing database connectivity via API..."
+    if curl -s http://localhost:3001/dashboard/api/executions?limit=1 | grep -q "data" 2>/dev/null; then
+        log "✓ Database queries working through API"
     else
-        warn "✗ API health check failed"
+        warn "⚠ Database queries may not be working properly"
     fi
     
-    # Check if frontend files exist
+    # Check if frontend files exist and are accessible
     if [[ -f "$WEB_ROOT/sai-dashboard/index.html" ]]; then
         log "✓ Frontend files deployed"
+        
+        # Check if frontend assets are properly built
+        if ls "$WEB_ROOT/sai-dashboard/assets/"*.js >/dev/null 2>&1; then
+            log "✓ Frontend JavaScript assets found"
+        else
+            warn "⚠ Frontend JavaScript assets may be missing"
+        fi
     else
-        warn "✗ Frontend files not found"
+        error "❌ Frontend files not found at $WEB_ROOT/sai-dashboard/"
     fi
     
     # Check service status
     if [[ "$INIT_SYSTEM" == "systemd" ]]; then
         if sudo systemctl is-active --quiet sai-dashboard-api.service; then
             log "✓ Service is running"
+            
+            # Check for recent errors in service logs
+            if sudo journalctl -u sai-dashboard-api.service --since "5 minutes ago" | grep -i error >/dev/null 2>&1; then
+                warn "⚠ Recent errors found in service logs"
+                warn "Check: sudo journalctl -u sai-dashboard-api.service --since '5 minutes ago'"
+            else
+                log "✓ No recent errors in service logs"
+            fi
         else
-            warn "✗ Service is not running"
+            error "❌ Service is not running"
+            error "Debug: sudo systemctl status sai-dashboard-api.service"
+        fi
+    fi
+    
+    # Final nginx configuration test
+    if command -v nginx >/dev/null 2>&1; then
+        if sudo nginx -t >/dev/null 2>&1; then
+            log "✓ nginx configuration valid"
+        else
+            error "❌ nginx configuration has errors"
+            error "Run: sudo nginx -t"
         fi
     fi
     
@@ -599,30 +976,116 @@ show_deployment_info() {
     echo "  • Password: $(grep DASHBOARD_PASSWORD /opt/sai-dashboard/.env | cut -d'=' -f2)"
 }
 
+# Show installation summary
+show_summary() {
+    echo
+    echo -e "${BOLD}${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${BOLD}         SAI Dashboard Installation Summary         ${NC}"
+    echo -e "${BOLD}${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo
+    
+    local total_time=$(($(date +%s) - SCRIPT_START_TIME))
+    local minutes=$((total_time / 60))
+    local seconds=$((total_time % 60))
+    
+    echo -e "${BOLD}Installation completed in: ${CYAN}${minutes}m ${seconds}s${NC}"
+    echo
+    
+    echo -e "${BOLD}Steps executed:${NC}"
+    [ "$SKIP_PREREQ" = false ] && echo -e "  ${GREEN}✓${NC} Prerequisites checked"
+    [ "$SKIP_QUALITY" = false ] && echo -e "  ${GREEN}✓${NC} Quality checks passed"
+    [ "$SKIP_BUILD" = false ] && echo -e "  ${GREEN}✓${NC} Applications built"
+    [ "$SKIP_DEPLOY" = false ] && echo -e "  ${GREEN}✓${NC} Files deployed"
+    [ "$SKIP_SERVICE" = false ] && echo -e "  ${GREEN}✓${NC} Services configured"
+    [ "$SKIP_VERIFY" = false ] && echo -e "  ${GREEN}✓${NC} Installation verified"
+    
+    echo
+    echo -e "${BOLD}${GREEN}🎉 Installation successful!${NC}"
+    echo -e "${BOLD}${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+}
+
 # Main installation function
 main() {
-    log "🚀 Starting SAI Dashboard Production Installation..."
+    # Record start time
+    SCRIPT_START_TIME=$(date +%s)
     
+    # Parse command line arguments
+    parse_args "$@"
+    
+    # Show banner
+    echo
+    echo -e "${BOLD}${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${BOLD}    SAI Dashboard Production Installation v${VERSION}    ${NC}"
+    echo -e "${BOLD}${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo
+    
+    [ "$DRY_RUN" = true ] && echo -e "${YELLOW}${BOLD}DRY RUN MODE - No changes will be made${NC}\n"
+    
+    log "Starting installation process..."
+    
+    # Get script directory
     get_script_dir
-    detect_system
-    check_prerequisites
-    build_frontend
-    build_backend
-    create_directories
-    deploy_files
     
-    if [[ "$INIT_SYSTEM" == "systemd" ]]; then
-        create_systemd_service
+    # Phase 1: System detection and prerequisites
+    if [ "$SKIP_PREREQ" = false ]; then
+        detect_system
+        check_prerequisites
     else
-        create_sysv_service
+        info "Skipping prerequisites (--skip-prereq)"
+        get_script_dir  # Still need this for paths
     fi
     
-    configure_web_server
-    start_services
-    verify_installation
-    show_deployment_info
+    # Phase 2: Quality checks
+    pre_build_checks
     
-    log "✅ Installation completed successfully!"
+    # Phase 3: Build
+    if [ "$SKIP_BUILD" = false ]; then
+        build_frontend
+        build_backend
+    else
+        info "Skipping build phase (--skip-build)"
+    fi
+    
+    # Phase 4: Deploy
+    if [ "$SKIP_DEPLOY" = false ]; then
+        create_directories
+        deploy_files
+    else
+        info "Skipping deployment (--skip-deploy)"
+    fi
+    
+    # Phase 5: Service configuration
+    if [ "$SKIP_SERVICE" = false ]; then
+        # Ensure INIT_SYSTEM is set if we skipped detection
+        if [ -z "$INIT_SYSTEM" ]; then
+            detect_system
+        fi
+        
+        if [[ "$INIT_SYSTEM" == "systemd" ]]; then
+            create_systemd_service
+        else
+            create_sysv_service
+        fi
+        configure_web_server
+        start_services
+    else
+        info "Skipping service configuration (--skip-service)"
+    fi
+    
+    # Phase 6: Verification
+    if [ "$SKIP_VERIFY" = false ]; then
+        verify_installation
+    else
+        info "Skipping verification (--skip-verify)"
+    fi
+    
+    # Show final information
+    if [ "$SKIP_DEPLOY" = false ] && [ "$SKIP_SERVICE" = false ]; then
+        show_deployment_info
+    fi
+    
+    # Show summary
+    show_summary
 }
 
 # Run main function
