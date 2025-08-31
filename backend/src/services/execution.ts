@@ -2,10 +2,13 @@ import { db } from '@/database/pool';
 import { 
   ExecutionWithImage, 
   ExecutionFilters, 
-  DailySummary
+  DailySummary,
+  SaiEnhancedAnalysis,
+  ComprehensiveAnalysis
 } from '@/types';
 import { logger } from '@/utils/logger';
 import { appConfig } from '@/config';
+import { enhancedAnalysisService } from './enhanced-analysis';
 
 export class ExecutionService {
   
@@ -108,14 +111,78 @@ export class ExecutionService {
     }
 
 
-    // Risk level filter (only applies to enriched queries)
-    if (riskLevel && needsEnrichment) {
-      if (riskLevel === 'none') {
-        whereConditions.push(`(ea.risk_level = 'none' OR ea.risk_level IS NULL)`);
-      } else {
+    // Enhanced filters for new analysis capabilities
+    if (needsEnrichment) {
+      // Risk level filter
+      if (riskLevel) {
+        if (riskLevel === 'none') {
+          whereConditions.push(`(ea.risk_level = 'none' OR ea.risk_level IS NULL)`);
+        } else {
+          paramCount++;
+          whereConditions.push(`ea.risk_level = $${paramCount}`);
+          queryParams.push(riskLevel);
+        }
+      }
+      
+      // Camera filter
+      if (filters.cameraId) {
         paramCount++;
-        whereConditions.push(`ea.risk_level = $${paramCount}`);
-        queryParams.push(riskLevel);
+        whereConditions.push(`ea.camera_id = $${paramCount}`);
+        queryParams.push(filters.cameraId);
+      }
+      
+      // Node type filter
+      if (filters.nodeType) {
+        paramCount++;
+        whereConditions.push(`ea.node_type = $${paramCount}`);
+        queryParams.push(filters.nodeType);
+      }
+      
+      // Alert priority filter
+      if (filters.alertPriority) {
+        paramCount++;
+        whereConditions.push(`ea.alert_priority = $${paramCount}`);
+        queryParams.push(filters.alertPriority);
+      }
+      
+      // Response required filter
+      if (filters.responseRequired !== undefined) {
+        paramCount++;
+        whereConditions.push(`COALESCE(ea.response_required, false) = $${paramCount}`);
+        queryParams.push(filters.responseRequired);
+      }
+      
+      // Human verification filter
+      if (filters.verifiedByHuman !== undefined) {
+        paramCount++;
+        whereConditions.push(`COALESCE(ea.verified_by_human, false) = $${paramCount}`);
+        queryParams.push(filters.verifiedByHuman);
+      }
+      
+      // Confidence range filters
+      if (filters.minConfidence !== undefined) {
+        paramCount++;
+        whereConditions.push(`ea.confidence_score >= $${paramCount}`);
+        queryParams.push(filters.minConfidence);
+      }
+      
+      if (filters.maxConfidence !== undefined) {
+        paramCount++;
+        whereConditions.push(`ea.confidence_score <= $${paramCount}`);
+        queryParams.push(filters.maxConfidence);
+      }
+      
+      // Detection type filters
+      if (filters.smokeDetected !== undefined) {
+        paramCount++;
+        whereConditions.push(`COALESCE(ea.smoke_detected, false) = $${paramCount}`);
+        queryParams.push(filters.smokeDetected);
+      }
+      
+      if (filters.flameDetected !== undefined) {
+        paramCount++;
+        whereConditions.push(`COALESCE(ea.flame_detected, false) = $${paramCount}`);
+        queryParams.push(filters.flameDetected);
       }
     }
 
@@ -163,7 +230,7 @@ export class ExecutionService {
           break;
         case 'risk':
           if (needsEnrichment) {
-            // Use the extracted risk_level from CTE
+            // Use precomputed risk_level with direct index access
             orderByClause = `
               CASE 
                 WHEN ea.risk_level = 'high' THEN 1
@@ -174,6 +241,34 @@ export class ExecutionService {
             `;
           } else {
             // Fallback to date sorting if not enriched
+            orderByClause = `e."startedAt" ${direction}`;
+          }
+          break;
+        case 'confidence':
+          if (needsEnrichment) {
+            orderByClause = `ea.confidence_score ${direction} NULLS LAST, e."startedAt" DESC`;
+          } else {
+            orderByClause = `e."startedAt" ${direction}`;
+          }
+          break;
+        case 'camera':
+          if (needsEnrichment) {
+            orderByClause = `ea.camera_id ${direction} NULLS LAST, e."startedAt" DESC`;
+          } else {
+            orderByClause = `e."startedAt" ${direction}`;
+          }
+          break;
+        case 'priority':
+          if (needsEnrichment) {
+            orderByClause = `
+              CASE 
+                WHEN ea.alert_priority = 'critical' THEN 1
+                WHEN ea.alert_priority = 'high' THEN 2
+                WHEN ea.alert_priority = 'normal' THEN 3
+                ELSE 4
+              END ${direction}, e."startedAt" DESC
+            `;
+          } else {
             orderByClause = `e."startedAt" ${direction}`;
           }
           break;
@@ -195,49 +290,8 @@ export class ExecutionService {
     let executionsQuery: string;
     
     if (needsEnrichment) {
-      // Enriched query with selective execution_data access
+      // NEW: Use precomputed analysis table instead of expensive regex CTE
       executionsQuery = `
-        WITH execution_analysis AS (
-          SELECT 
-            ed."executionId"::integer as execution_id,
-            -- Fast analysis extraction using CASE when for minimal processing
-            CASE 
-              WHEN ed.data ILIKE '%data:image%' THEN true
-              ELSE false
-            END as has_image,
-            -- Extract risk level from ollama analysis with more precise patterns
-            CASE 
-              WHEN ed.data ~ '(fire|risk|danger).*(high|severe|critical|extreme)' OR 
-                   ed.data ~ '(high).*(risk|fire|danger)' THEN 'high'
-              WHEN ed.data ~ '(fire|risk|danger).*(medium|moderate|elevated)' OR
-                   ed.data ~ '(medium|moderate).*(risk|fire|danger)' THEN 'medium'  
-              WHEN ed.data ~ '(fire|risk|danger).*(low|minimal|slight)' OR
-                   ed.data ~ '(low|minimal).*(risk|fire|danger)' THEN 'low'
-              WHEN ed.data ~ '(no|zero|none).*(fire|risk|danger)' OR
-                   ed.data ILIKE '%no fire%' OR ed.data ILIKE '%no risk%' THEN 'none'
-              ELSE 'none'
-            END as risk_level,
-            -- Extract ollama analysis text with improved patterns
-            CASE 
-              WHEN ed.data ~ '"(content|message|text|response)":\s*"[^"]*[Ff]ire[^"]*"' THEN 
-                LEFT(REGEXP_REPLACE(ed.data, '.*"(?:content|message|text|response)":\s*"([^"]*[Ff]ire[^"]*)".*', '\\1'), 500)
-              WHEN ed.data ~ '"(content|message|text|response)":\s*"[^"]*[Rr]isk[^"]*"' THEN
-                LEFT(REGEXP_REPLACE(ed.data, '.*"(?:content|message|text|response)":\s*"([^"]*[Rr]isk[^"]*)".*', '\\1'), 500)
-              WHEN ed.data ~ 'ollama.*"(?:content|message|text)":\s*"[^"]*"' THEN
-                LEFT(REGEXP_REPLACE(ed.data, '.*ollama.*"(?:content|message|text)":\s*"([^"]*)".*', '\\1'), 500)
-              ELSE NULL
-            END as ollama_analysis,
-            -- Check for specific telegram delivery success indicators
-            CASE 
-              WHEN ed.data ~ '"ok":\s*true' AND ed.data ILIKE '%sendphoto%' THEN true
-              WHEN ed.data ~ 'message_id.*[0-9]+' AND ed.data ILIKE '%telegram%' THEN true
-              WHEN ed.data ILIKE '%telegram%' AND ed.data ~ '"status":\s*"success"' THEN true
-              ELSE false  
-            END as telegram_delivered
-          FROM execution_data ed
-          WHERE ed.data IS NOT NULL
-            AND LENGTH(ed.data) < 5242880  -- 5MB limit for safety
-        )
         SELECT 
           e.id::text as id,
           e."workflowId"::text as workflow_id,
@@ -251,20 +305,35 @@ export class ExecutionService {
           w.name as workflow_name,
           'image/jpeg' as image_mime_type,
           COALESCE(ea.has_image, false) as has_image,
-          ea.ollama_analysis,
+          ea.ollama_analysis_text as ollama_analysis,
           0 as total_payload_size,
           COALESCE(ea.telegram_delivered, false) as telegram_delivered,
-          NULL as telegram_message_id,
+          ea.telegram_message_id,
           NULL as image_url,
           NULL as thumbnail_url,
           CASE 
             WHEN e."stoppedAt" IS NOT NULL THEN 
               EXTRACT(EPOCH FROM (e."stoppedAt" - e."startedAt"))
             ELSE NULL
-          END as duration_seconds
+          END as duration_seconds,
+          -- Enhanced analysis fields
+          ea.camera_id,
+          ea.camera_location,
+          ea.node_id,
+          ea.node_type,
+          ea.risk_level,
+          ea.confidence_score,
+          ea.smoke_detected,
+          ea.flame_detected,
+          ea.heat_signature_detected,
+          ea.alert_priority,
+          ea.response_required,
+          ea.expert_review_status,
+          ea.expert_risk_assessment,
+          ea.verified_by_human
         FROM execution_entity e
         JOIN workflow_entity w ON e."workflowId"::text = w.id::text
-        LEFT JOIN execution_analysis ea ON e.id = ea.execution_id
+        LEFT JOIN sai_execution_analysis ea ON e.id = ea.execution_id
         WHERE w.id = 'yDbfhooKemfhMIkC'
           AND e.status IS NOT NULL
           AND e."deletedAt" IS NULL
@@ -318,7 +387,7 @@ export class ExecutionService {
       queryParams
     );
 
-    // Process results
+    // Process results with enhanced analysis data
     const processedExecutions: ExecutionWithImage[] = executions.map((exec: any) => {
       const result: ExecutionWithImage = {
         id: exec.id,
@@ -333,17 +402,52 @@ export class ExecutionService {
         telegramDelivered: exec.telegram_delivered || false
       };
       
-      // Always set image URLs - they will be generated dynamically
-      // The frontend will construct the actual URLs using the API service
+      // Always set image URLs
       result.imageUrl = `/dashboard/api/executions/${exec.id}/image`;
       result.thumbnailUrl = `/dashboard/api/executions/${exec.id}/image?thumbnail=true`;
       if (exec.telegram_message_id) result.telegramMessageId = exec.telegram_message_id;
-      if (exec.ollama_analysis) {
+      
+      // Enhanced analysis data (if available from precomputed table)
+      if (exec.risk_level || exec.ollama_analysis) {
         result.analysis = {
-          riskAssessment: exec.ollama_analysis,
-          confidence: 0.85, // Default confidence - could be parsed from analysis
-          description: exec.ollama_analysis
+          riskAssessment: exec.ollama_analysis || `Risk level: ${exec.risk_level || 'unknown'}`,
+          confidence: exec.confidence_score || 0.85,
+          description: exec.ollama_analysis || 'Analysis pending'
         };
+        
+        // Add enhanced analysis if available
+        if (exec.camera_id || exec.smoke_detected !== undefined) {
+          result.enhancedAnalysis = {
+            executionId: exec.id,
+            cameraId: exec.camera_id,
+            cameraLocation: exec.camera_location,
+            nodeId: exec.node_id,
+            nodeType: exec.node_type,
+            riskLevel: exec.risk_level || 'none',
+            confidenceScore: exec.confidence_score,
+            hasImage: exec.has_image || false,
+            smokeDetected: exec.smoke_detected,
+            flameDetected: exec.flame_detected,
+            heatSignatureDetected: exec.heat_signature_detected,
+            alertPriority: exec.alert_priority || 'normal',
+            responseRequired: exec.response_required,
+            telegramDelivered: exec.telegram_delivered || false,
+            ollamaAnalysisText: exec.ollama_analysis,
+            processedAt: new Date(),
+            processingVersion: '2.0',
+            extractionMethod: 'enhanced'
+          };
+        }
+        
+        // Add expert review data if available
+        if (exec.expert_review_status) {
+          result.expertReview = {
+            expertReviewStatus: exec.expert_review_status,
+            expertReviewPriority: exec.expert_review_priority,
+            expertRiskAssessment: exec.expert_risk_assessment,
+            useForTraining: true
+          };
+        }
       }
       
       return result;
