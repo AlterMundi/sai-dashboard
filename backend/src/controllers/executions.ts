@@ -62,7 +62,8 @@ export const getExecutions = asyncHandler(async (req: Request, res: Response): P
   try {
     const result = await executionService.getExecutions(filters);
 
-    res.json({
+    // Prepare response with discrete alert system
+    const response: any = {
       data: result.executions,
       meta: {
         total: result.total,
@@ -77,7 +78,67 @@ export const getExecutions = asyncHandler(async (req: Request, res: Response): P
           hasImage: filters.hasImage
         }
       }
-    });
+    };
+
+    // Always add analysis status - even for non-enriched queries
+    if (result.analysisStatus) {
+      const { totalInRange, analyzed, pending, coverage } = result.analysisStatus;
+      
+      response.meta.analysisStatus = {
+        totalInRange,
+        analyzed: analyzed === -1 ? 'unknown' : analyzed,
+        pending: pending === -1 ? 'unknown' : pending,
+        coverage: coverage === -1 ? 'unknown' : Math.round(coverage * 100) / 100
+      };
+      
+      // Enhanced alerts with trigger action for missing analyses
+      if (coverage < 50) {
+        response.alerts = [{
+          type: 'warning',
+          level: 'high',
+          message: `Low analysis coverage (${Math.round(coverage)}%). Results may be incomplete.`,
+          details: `${pending} of ${totalInRange} executions need analysis processing.`,
+          action: 'trigger_analysis_available',
+          actionLabel: 'Process Missing Analyses'
+        }];
+      } else if (coverage < 90) {
+        response.alerts = [{
+          type: 'info',
+          level: 'medium', 
+          message: `Analysis processing in progress (${Math.round(coverage)}% complete).`,
+          details: `${pending} analyses pending completion.`,
+          action: 'background_processing_active',
+          actionLabel: 'Processing...'
+        }];
+      } else if (pending > 0) {
+        response.alerts = [{
+          type: 'info',
+          level: 'low',
+          message: `Analysis nearly complete (${Math.round(coverage)}%).`,
+          details: `${pending} final analyses processing.`,
+          action: 'background_processing_active',
+          actionLabel: 'Almost done'
+        }];
+      }
+      
+      logger.info('Analysis coverage status', {
+        coverage: Math.round(coverage),
+        totalInRange,
+        analyzed,
+        pending,
+        hasAlerts: !!response.alerts
+      });
+    } else {
+      // For non-enriched queries, still provide basic analysis status
+      response.meta.analysisStatus = {
+        totalInRange: result.total || 0,
+        analyzed: 'unknown',
+        pending: 'unknown', 
+        coverage: 'unknown'
+      };
+    }
+
+    res.json(response);
 
   } catch (error) {
     logger.error('Failed to fetch executions:', { filters, error });
@@ -376,6 +437,72 @@ export const getEnhancedStatistics = asyncHandler(async (req: Request, res: Resp
       error: {
         message: 'Failed to fetch enhanced statistics',
         code: 'FETCH_ENHANCED_STATS_ERROR'
+      }
+    });
+  }
+});
+
+export const triggerAnalysisProcessing = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+  const { batchSize = 50 } = req.body;
+
+  try {
+    // Get missing analyses count
+    const query = `
+      SELECT COUNT(*) as missing_count
+      FROM execution_entity e
+      JOIN workflow_entity w ON e."workflowId"::text = w.id::text
+      LEFT JOIN sai_execution_analysis ea ON e.id = ea.execution_id
+      WHERE w.id = 'yDbfhooKemfhMIkC'
+        AND e.status IS NOT NULL
+        AND e."deletedAt" IS NULL
+        AND ea.execution_id IS NULL
+    `;
+
+    const countResult = await executionService.getExecutions({ hasImage: true, limit: 1 }); // Trigger enriched query
+    const analysisStatus = countResult.analysisStatus;
+
+    if (!analysisStatus || analysisStatus.pending === 0) {
+      res.json({
+        data: {
+          message: 'No missing analyses found. All executions are up to date.',
+          triggered: false,
+          pending: 0
+        },
+        meta: {
+          timestamp: new Date().toISOString()
+        }
+      });
+      return;
+    }
+
+    // Trigger background processing by making enriched query
+    // This will automatically start processing missing analyses
+    logger.info(`Manual analysis trigger requested`, {
+      requestedBatchSize: batchSize,
+      pendingAnalyses: analysisStatus.pending,
+      coverage: analysisStatus.coverage
+    });
+
+    res.json({
+      data: {
+        message: `Analysis processing triggered for ${analysisStatus.pending} executions.`,
+        triggered: true,
+        pending: analysisStatus.pending,
+        coverage: analysisStatus.coverage,
+        estimatedTime: `${Math.ceil(analysisStatus.pending / 100)} minutes`
+      },
+      meta: {
+        timestamp: new Date().toISOString(),
+        batchSize: Math.min(batchSize, 50)
+      }
+    });
+
+  } catch (error) {
+    logger.error('Failed to trigger analysis processing:', error);
+    res.status(500).json({
+      error: {
+        message: 'Failed to trigger analysis processing',
+        code: 'TRIGGER_ANALYSIS_ERROR'
       }
     });
   }

@@ -21,7 +21,8 @@ import {
   getDailySummary,
   getExecutionStats,
   searchExecutions,
-  getEnhancedStatistics
+  getEnhancedStatistics,
+  triggerAnalysisProcessing
 } from '@/controllers/executions';
 import {
   getExpertAssignments,
@@ -142,6 +143,9 @@ executionRouter.get('/:executionId/image', getExecutionImage);
 // Enhanced analysis endpoints
 executionRouter.get('/:executionId/analysis', getComprehensiveAnalysis);
 executionRouter.post('/:executionId/process', processExecutionAnalysis);
+
+// Manual analysis trigger
+executionRouter.post('/trigger-analysis', triggerAnalysisProcessing);
 
 router.use('/executions', executionRouter);
 

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { executionsApi } from '@/services/api';
-import { ExecutionWithImage, ExecutionFilters, UseExecutionsReturn, ExecutionStats, DailySummary } from '@/types';
+import { ExecutionWithImage, ExecutionFilters, UseExecutionsReturn, ExecutionStats, DailySummary, AnalysisStatus, AnalysisAlert } from '@/types';
 
 export function useExecutions(initialFilters: ExecutionFilters = {}): UseExecutionsReturn {
   const [executions, setExecutions] = useState<ExecutionWithImage[]>([]);
@@ -9,6 +9,8 @@ export function useExecutions(initialFilters: ExecutionFilters = {}): UseExecuti
   const [hasNext, setHasNext] = useState(false);
   const [currentPage, setCurrentPage] = useState(0);
   const [filters, setFilters] = useState<ExecutionFilters>(initialFilters);
+  const [analysisStatus, setAnalysisStatus] = useState<AnalysisStatus | null>(null);
+  const [alerts, setAlerts] = useState<AnalysisAlert[]>([]);
 
   const fetchExecutions = useCallback(async (
     newFilters: ExecutionFilters = filters,
@@ -35,6 +37,8 @@ export function useExecutions(initialFilters: ExecutionFilters = {}): UseExecuti
       }
 
       setHasNext(response.meta?.hasNext || false);
+      setAnalysisStatus(response.meta?.analysisStatus || null);
+      setAlerts(response.alerts || []);
       setError(null);
 
     } catch (error) {
@@ -73,6 +77,13 @@ export function useExecutions(initialFilters: ExecutionFilters = {}): UseExecuti
     fetchExecutions(newFilters, true);
   }, [fetchExecutions]);
 
+  // Trigger analysis function
+  const triggerAnalysis = useCallback(async () => {
+    await executionsApi.triggerAnalysis();
+    // Refresh executions after triggering to get updated status
+    await fetchExecutions(filters, true);
+  }, [filters, fetchExecutions]);
+
   // Initial fetch
   useEffect(() => {
     fetchExecutions(filters, true);
@@ -87,6 +98,9 @@ export function useExecutions(initialFilters: ExecutionFilters = {}): UseExecuti
     refresh,
     updateFilters,
     filters,
+    analysisStatus,
+    alerts,
+    triggerAnalysis,
   };
 }
 

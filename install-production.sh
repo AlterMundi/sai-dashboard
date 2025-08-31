@@ -510,19 +510,37 @@ EOF
     log "Simple static server created (port 8080)"
 }
 
-# Start services
+# Start/restart services
 start_services() {
     log "Starting services..."
     
     if [[ "$INIT_SYSTEM" == "systemd" ]]; then
-        sudo systemctl start sai-dashboard-api.service
+        # Check if service is already running and restart if needed
+        if sudo systemctl is-active --quiet sai-dashboard-api.service; then
+            log "Service is already running, restarting..."
+            sudo systemctl restart sai-dashboard-api.service
+        else
+            log "Starting new service..."
+            sudo systemctl start sai-dashboard-api.service
+        fi
+        
+        # Wait a moment for service to start
+        sleep 2
+        
         if sudo systemctl is-active --quiet sai-dashboard-api.service; then
             log "SAI Dashboard API service started successfully"
         else
             error "Failed to start SAI Dashboard API service"
+            sudo journalctl -u sai-dashboard-api.service --no-pager -n 10
         fi
     else
-        sudo service sai-dashboard-api start
+        # SysV systems
+        if sudo service sai-dashboard-api status >/dev/null 2>&1; then
+            log "Service is running, restarting..."
+            sudo service sai-dashboard-api restart
+        else
+            sudo service sai-dashboard-api start
+        fi
         log "SAI Dashboard API service started (SysV)"
     fi
 }

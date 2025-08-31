@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Layout } from '@/components/Layout';
 import { ImageGallery } from '@/components/ImageGallery';
 import { LoadingState } from '@/components/ui/LoadingSpinner';
-import { useExecutionStats, useDailySummary } from '@/hooks/useExecutions';
+import { useExecutionStats, useDailySummary, useExecutions } from '@/hooks/useExecutions';
 import { useSSEHandler } from '@/hooks/useSSE';
 import { ExecutionFilters } from '@/types';
 import { formatPercentage, formatRelativeTime, cn } from '@/utils';
@@ -23,6 +23,9 @@ export function Dashboard() {
   
   const { stats, isLoading: statsLoading, error: statsError } = useExecutionStats();
   useDailySummary(7);
+  
+  // Get analysis status for compact header display  
+  const { analysisStatus } = useExecutions({});
 
   // Handle real-time updates via SSE
   const { isConnected } = useSSEHandler({
@@ -179,8 +182,22 @@ export function Dashboard() {
               </div>
             </form>
 
-            {/* Filter Toggle */}
-            <div className="flex items-center space-x-2">
+            {/* Compact Analysis Status */}
+            <div className="flex items-center space-x-3">
+              {analysisStatus && typeof analysisStatus.coverage === 'number' && (
+                <div className="hidden sm:flex items-center px-3 py-1 bg-gray-50 rounded-full text-xs text-gray-600">
+                  <div className={`w-2 h-2 rounded-full mr-2 ${
+                    analysisStatus.coverage >= 90 ? 'bg-green-500' :
+                    analysisStatus.coverage >= 50 ? 'bg-yellow-500' : 'bg-red-500'
+                  }`}></div>
+                  Analysis: {Math.round(analysisStatus.coverage)}% Complete
+                  {typeof analysisStatus.pending === 'number' && analysisStatus.pending > 0 && (
+                    <span className="ml-1 text-gray-500">({analysisStatus.pending} pending)</span>
+                  )}
+                </div>
+              )}
+              
+              {/* Filter Toggle */}
               <button
                 onClick={() => setShowFilters(!showFilters)}
                 className={cn(
@@ -208,6 +225,7 @@ export function Dashboard() {
           {/* Extended Filters */}
           {showFilters && (
             <div className="mt-6 pt-6 border-t border-gray-200">
+              {/* Analysis status is now handled in the ImageGallery FilterBar */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {/* Status Filter */}
                 <div>
