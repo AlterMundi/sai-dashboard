@@ -35,28 +35,141 @@ export interface ImageAnalysis {
   recommendations?: string[];
 }
 
+export interface SaiEnhancedAnalysis {
+  executionId: string;
+  cameraId?: string;
+  cameraLocation?: string;
+  nodeId?: string;
+  nodeType?: string;
+  riskLevel: 'high' | 'medium' | 'low' | 'none';
+  confidenceScore?: number;
+  hasImage: boolean;
+  smokeDetected?: boolean;
+  flameDetected?: boolean;
+  heatSignatureDetected?: boolean;
+  motionDetected?: boolean;
+  imageWidth?: number;
+  imageHeight?: number;
+  imageSizeBytes?: number;
+  imageFormat?: string;
+  imageQualityScore?: number;
+  alertPriority: 'critical' | 'high' | 'normal' | 'low';
+  responseRequired: boolean;
+  telegramDelivered: boolean;
+  telegramMessageId?: string;
+  telegramChatId?: string;
+  latitude?: number;
+  longitude?: number;
+  fireZoneRisk?: string;
+  detectionTimestamp?: string;
+  isDaylight?: boolean;
+  weatherConditions?: string;
+  temperatureCelsius?: number;
+  humidityPercent?: number;
+  windSpeedKmh?: number;
+  incidentId?: string;
+  ollamaAnalysisText?: string;
+  processedAt: string;
+  processingVersion: string;
+  extractionMethod: string;
+}
+
+export interface ExpertReview {
+  expertReviewStatus: 'pending' | 'in_review' | 'completed' | 'disputed';
+  expertReviewPriority?: number;
+  assignedExpertId?: string;
+  expertReviewDeadline?: string;
+  expertRiskAssessment?: 'high' | 'medium' | 'low' | 'none';
+  expertConfidence?: number;
+  expertAgreesWithAi?: boolean;
+  expertNotes?: string;
+  expertReasoning?: string;
+  expertTags?: string[];
+  fireType?: string;
+  fireStage?: string;
+  fireCause?: string;
+  reviewedAt?: string;
+  reviewDurationMinutes?: number;
+  expertName?: string;
+  needsSecondOpinion?: boolean;
+  consensusReached?: boolean;
+  useForTraining: boolean;
+}
+
 export interface ExecutionWithImage extends SaiExecution {
   imageUrl?: string;
   thumbnailUrl?: string;
   analysis?: ImageAnalysis;
+  enhancedAnalysis?: SaiEnhancedAnalysis;
+  expertReview?: ExpertReview;
   telegramDelivered?: boolean;
   telegramMessageId?: string;
 }
 
 // Filter and Pagination Types
 export interface ExecutionFilters {
+  // Pagination
   page?: number;
   limit?: number;
+  
+  // Basic execution filters
   status?: 'success' | 'error' | 'waiting' | 'running' | 'canceled';
   startDate?: string;
   endDate?: string;
   search?: string;
   hasImage?: boolean;
-  riskLevel?: 'high' | 'medium' | 'low' | 'none';
   telegramDelivered?: boolean;
+  
+  // Enhanced analysis filters
+  riskLevel?: 'high' | 'medium' | 'low' | 'none';
+  cameraId?: string;
+  cameraLocation?: string;
+  nodeId?: string;
+  alertPriority?: 'critical' | 'high' | 'normal' | 'low';
+  responseRequired?: boolean;
+  smokeDetected?: boolean;
+  flameDetected?: boolean;
+  heatSignatureDetected?: boolean;
+  motionDetected?: boolean;
+  confidenceMin?: number;
+  confidenceMax?: number;
+  imageQualityMin?: number;
+  
+  // Geographic filters
+  latitude?: number;
+  longitude?: number;
+  fireZoneRisk?: string;
+  withinRadius?: number; // km
+  
+  // Environmental filters
+  isDaylight?: boolean;
+  weatherConditions?: string;
+  temperatureMin?: number;
+  temperatureMax?: number;
+  
+  // Expert review filters
+  expertReviewStatus?: 'pending' | 'in_review' | 'completed' | 'disputed';
+  assignedExpertId?: string;
+  expertRiskAssessment?: 'high' | 'medium' | 'low' | 'none';
+  needsSecondOpinion?: boolean;
+  useForTraining?: boolean;
+  reviewOverdue?: boolean;
+  
+  // Incident correlation
+  incidentId?: string;
+  hasIncident?: boolean;
+  multiCamera?: boolean;
+  
+  // Date presets and sorting
   datePreset?: 'today' | 'yesterday' | 'last7days' | 'last30days' | 'thisMonth' | 'lastMonth';
-  sortBy?: 'date' | 'risk' | 'status';
+  sortBy?: 'date' | 'risk' | 'status' | 'confidence' | 'priority' | 'camera' | 'expert';
   sortOrder?: 'asc' | 'desc';
+  
+  // Advanced filters
+  analysisTextSearch?: string;
+  expertNotesSearch?: string;
+  tagFilter?: string[];
+  processingVersion?: string;
 }
 
 export interface PaginatedResponse<T> {
@@ -245,6 +358,113 @@ export interface AppError {
 // Route Types
 export interface RouteParams {
   executionId?: string;
+}
+
+// Expert Review Types
+export interface ExpertUser {
+  id: string;
+  name: string;
+  email: string;
+  certification?: string;
+  specialization: 'general' | 'wildfire' | 'industrial' | 'residential' | 'urban';
+  experienceYears: number;
+  isActive: boolean;
+  maxCaseload: number;
+  accuracyScore: number;
+  currentCaseload?: number;
+}
+
+export interface ExpertAssignment {
+  executionId: string;
+  expertReviewPriority: number;
+  expertReviewDeadline?: string;
+  cameraId?: string;
+  cameraLocation?: string;
+  aiAssessment: 'high' | 'medium' | 'low' | 'none';
+  aiConfidence?: number;
+  detectionTimestamp?: string;
+  ollamaAnalysisText?: string;
+  assignedExpertId?: string;
+  expertReviewStatus: 'pending' | 'in_review' | 'completed' | 'disputed';
+  deadlineStatus: 'OVERDUE' | 'URGENT' | 'ON_TIME';
+  executionStatus: string;
+  executionStartedAt: string;
+}
+
+export interface ExpertTags {
+  fire_indicators: string[];
+  environmental: string[];
+  false_positives: string[];
+  image_quality: string[];
+  urgency: string[];
+  complexity: string[];
+  fire_behavior: string[];
+  weather_impact: string[];
+}
+
+export interface ExpertSystemStats {
+  totalPendingReviews: number;
+  averageReviewTime: number;
+  expertAgreementRate: number;
+  qualityScores: {
+    aiAccuracy: number;
+    expertConsistency: number;
+    trainingDataQuality: number;
+  };
+}
+
+export interface IncidentAnalysis {
+  incidentId: string;
+  totalDetections: number;
+  camerasInvolved: number;
+  maxRiskLevel: 'high' | 'medium' | 'low' | 'none';
+  incidentStart: string;
+  incidentEnd: string;
+  responseRequired: boolean;
+  expertReviewed: number;
+  cameraList: string[];
+}
+
+// Enhanced Statistics Types
+export interface EnhancedExecutionStats extends ExecutionStats {
+  overview: {
+    totalExecutions: number;
+    successRate: number;
+    errorRate: number;
+    averageExecutionTime: number;
+    activeToday: number;
+  };
+  statusBreakdown: {
+    success: number;
+    error: number;
+    running: number;
+    waiting: number;
+    canceled: number;
+  };
+  recentActivity: {
+    lastHour: number;
+    last24Hours: number;
+    last7Days: number;
+    last30Days: number;
+  };
+  performanceMetrics: {
+    avgResponseTime: number;
+    minResponseTime: number;
+    maxResponseTime: number;
+    medianResponseTime: number;
+    p95ResponseTime: number;
+    p99ResponseTime: number;
+  };
+  hourlyDistribution: Array<{
+    hour: number;
+    count: number;
+  }>;
+  errorTrend: Array<{
+    date: string;
+    errors: number;
+    total: number;
+    errorRate: number;
+  }>;
 }
 
 // Theme Types
