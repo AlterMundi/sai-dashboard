@@ -39,7 +39,6 @@ export function useSSE(): UseSSEReturn {
 
       eventSource.onopen = () => {
         console.log('SSE connection opened');
-        setIsConnected(true);
         setConnectionStatus('connected');
         reconnectAttempts.current = 0; // Reset reconnect attempts on successful connection
       };
@@ -60,7 +59,7 @@ export function useSSE(): UseSSEReturn {
             
             reconnectTimeoutRef.current = setTimeout(() => {
               connect();
-            }, delay);
+            }, delay) as unknown as number;
           } else {
             setConnectionStatus('error');
             toast.error('Real-time connection failed. Please refresh the page.');
@@ -77,7 +76,11 @@ export function useSSE(): UseSSEReturn {
           console.log('SSE connection event:', data);
           setLastEvent({ type: 'connection', data, timestamp: new Date() });
           
+          // Set connected state when we receive the connection event
           if (data.message === 'Connected to SAI Dashboard real-time updates') {
+            setIsConnected(true);
+            setConnectionStatus('connected');
+            reconnectAttempts.current = 0;
             toast.success('Real-time updates connected', { duration: 2000 });
           }
         } catch (error) {
