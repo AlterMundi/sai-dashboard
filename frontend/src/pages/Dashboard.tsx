@@ -2,18 +2,19 @@ import { useState } from 'react';
 import { Layout } from '@/components/Layout';
 import { ImageGallery } from '@/components/ImageGallery';
 import { LoadingState } from '@/components/ui/LoadingSpinner';
-import { SSEDebugBoard } from '@/components/debug/SSEDebugBoard';
+import { LiveExecutionStrip } from '@/components/LiveExecutionStrip';
+import { LiveStatsCard, SystemHealthIndicator } from '@/components/LiveStatsCard';
 import { useExecutionStats, useDailySummary, useExecutions } from '@/hooks/useExecutions';
-import { useSSEHandler } from '@/contexts/SSEContext';
+import { useSSEHandler, useSSE } from '@/contexts/SSEContext';
 import { ExecutionFilters } from '@/types';
-import { formatPercentage, formatRelativeTime, cn } from '@/utils';
+import { formatPercentage, cn } from '@/utils';
 import { 
-  TrendingUp, 
   Activity, 
   CheckCircle, 
-  Clock,
   Search,
-  Filter
+  Filter,
+  Users,
+  Timer
 } from 'lucide-react';
 
 export function Dashboard() {
@@ -28,8 +29,11 @@ export function Dashboard() {
   // Get analysis status for compact header display  
   const { analysisStatus } = useExecutions({});
 
+  // Get live SSE data
+  const { isConnected, systemHealth } = useSSE();
+
   // Handle real-time updates via SSE
-  const { isConnected } = useSSEHandler({
+  useSSEHandler({
     onNewExecution: (data) => {
       console.log('New execution received:', data.execution);
       setNewExecutionsCount(prev => prev + 1);
@@ -78,15 +82,21 @@ export function Dashboard() {
           </div>
           
           {/* Real-time Status */}
-          <div className="mt-4 sm:mt-0 flex items-center space-x-2">
+          <div className="mt-4 sm:mt-0 flex items-center space-x-3">
+            {/* System Health */}
+            {systemHealth && <SystemHealthIndicator />}
+            
+            {/* Live Connection Status */}
             {isConnected && (
-              <div className="flex items-center px-3 py-1 bg-success-100 text-success-800 rounded-full text-sm">
-                <div className="h-2 w-2 bg-success-600 rounded-full mr-2 animate-pulse" />
+              <div className="flex items-center px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm">
+                <div className="h-2 w-2 bg-green-600 rounded-full mr-2 animate-pulse" />
                 Live Updates
               </div>
             )}
+            
+            {/* New Executions Counter */}
             {newExecutionsCount > 0 && (
-              <div className="flex items-center px-3 py-1 bg-primary-100 text-primary-800 rounded-full text-sm">
+              <div className="flex items-center px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
                 <Activity className="h-3 w-3 mr-1" />
                 {newExecutionsCount} new
               </div>
@@ -94,68 +104,42 @@ export function Dashboard() {
           </div>
         </div>
 
-        {/* SSE Debug Board */}
-        <SSEDebugBoard />
 
         {/* Statistics Cards */}
         <LoadingState isLoading={statsLoading} error={statsError}>
           {stats && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
-                    <Activity className="h-6 w-6 text-primary-600" />
-                  </div>
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600">Total Executions</p>
-                    <p className="text-2xl font-semibold text-gray-900">
-                      {stats.totalExecutions.toLocaleString()}
-                    </p>
-                  </div>
-                </div>
-              </div>
+              <LiveStatsCard
+                title="Total Executions"
+                icon={<Activity className="h-6 w-6" />}
+                statKey="totalExecutions"
+                initialValue={stats.totalExecutions}
+                format={(v) => v.toLocaleString()}
+              />
 
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
-                    <CheckCircle className="h-6 w-6 text-success-600" />
-                  </div>
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600">Success Rate</p>
-                    <p className="text-2xl font-semibold text-gray-900">
-                      {formatPercentage(stats.successRate)}
-                    </p>
-                  </div>
-                </div>
-              </div>
+              <LiveStatsCard
+                title="Success Rate"
+                icon={<CheckCircle className="h-6 w-6" />}
+                statKey="successRate"
+                initialValue={stats.successRate}
+                format={(v) => formatPercentage(v)}
+              />
 
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
-                    <TrendingUp className="h-6 w-6 text-warning-600" />
-                  </div>
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600">Daily Average</p>
-                    <p className="text-2xl font-semibold text-gray-900">
-                      {stats.avgDailyExecutions.toFixed(1)}
-                    </p>
-                  </div>
-                </div>
-              </div>
+              <LiveStatsCard
+                title="Queue Size"
+                icon={<Users className="h-6 w-6" />}
+                statKey="queueSize"
+                initialValue={0}
+                format={(v) => `${v} pending`}
+              />
 
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
-                    <Clock className="h-6 w-6 text-gray-600" />
-                  </div>
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600">Last Execution</p>
-                    <p className="text-sm font-semibold text-gray-900">
-                      {stats.lastExecution ? formatRelativeTime(stats.lastExecution) : 'N/A'}
-                    </p>
-                  </div>
-                </div>
-              </div>
+              <LiveStatsCard
+                title="Avg Processing"
+                icon={<Timer className="h-6 w-6" />}
+                statKey="avgProcessingTime"
+                initialValue={0}
+                format={(v) => `${v.toFixed(1)}s`}
+              />
             </div>
           )}
         </LoadingState>
@@ -406,6 +390,10 @@ export function Dashboard() {
             </div>
           )}
         </div>
+
+        {/* Live Execution Strip */}
+        <LiveExecutionStrip />
+
         {/* Main Gallery */}
         <ImageGallery 
           initialFilters={filters}

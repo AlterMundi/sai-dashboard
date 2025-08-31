@@ -265,6 +265,8 @@ export function useSSE(): UseSSEReturn {
     lastEvent,
     connectionStatus,
     clientCount,
+    liveStats: lastEvent?.type === 'system:stats' ? lastEvent.data : null,
+    systemHealth: lastEvent?.type === 'system:health' ? lastEvent.data : null,
     connect,
   };
 }

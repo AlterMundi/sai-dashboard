@@ -346,6 +346,8 @@ export interface UseSSEReturn {
   lastEvent: any;
   connectionStatus: 'connecting' | 'connected' | 'disconnected' | 'error';
   clientCount: number;
+  liveStats: any;
+  systemHealth: any;
   connect: () => void;
 }
 
