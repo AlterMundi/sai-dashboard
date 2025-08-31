@@ -239,16 +239,20 @@ export const connectSSE = asyncHandler(async (req: Request, res: Response): Prom
     return;
   }
 
-  // Set SSE headers
+  // Set SSE headers - CRITICAL: Connection header must match nginx proxy settings
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache',
-    'Connection': 'keep-alive',
+    // DON'T set Connection header - let nginx proxy handle it with Connection: ''
     'Access-Control-Allow-Origin': req.get('origin') || '*',
     'Access-Control-Allow-Credentials': 'true',
     'X-Accel-Buffering': 'no' // Disable nginx buffering
   });
 
+  // Send initial data to trigger browser onopen event
+  res.write('data: \n\n');
+  res.flush?.(); // Force immediate response flush
+  
   const userId = req.user?.id;
   const clientId = sseManager.addClient(res, userId);
 

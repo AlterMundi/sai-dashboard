@@ -2,8 +2,9 @@ import { useState } from 'react';
 import { Layout } from '@/components/Layout';
 import { ImageGallery } from '@/components/ImageGallery';
 import { LoadingState } from '@/components/ui/LoadingSpinner';
+import { SSEDebugBoard } from '@/components/debug/SSEDebugBoard';
 import { useExecutionStats, useDailySummary, useExecutions } from '@/hooks/useExecutions';
-import { useSSEHandler } from '@/hooks/useSSE';
+import { useSSEHandler } from '@/contexts/SSEContext';
 import { ExecutionFilters } from '@/types';
 import { formatPercentage, formatRelativeTime, cn } from '@/utils';
 import { 
@@ -92,6 +93,9 @@ export function Dashboard() {
             )}
           </div>
         </div>
+
+        {/* SSE Debug Board */}
+        <SSEDebugBoard />
 
         {/* Statistics Cards */}
         <LoadingState isLoading={statsLoading} error={statsError}>

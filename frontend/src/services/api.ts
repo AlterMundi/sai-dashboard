@@ -274,9 +274,13 @@ export const sseApi = {
       url.searchParams.set('token', token);
     }
     
-    const eventSource = new EventSource(url.toString(), {
-      withCredentials: true,
-    });
+    console.log('🔧 API: Creating EventSource with URL:', url.toString());
+    console.log('🔧 API: withCredentials test - trying without credentials first');
+    
+    // Try without withCredentials first (research shows this can cause CORS issues)
+    const eventSource = new EventSource(url.toString());
+    
+    console.log('🔧 API: EventSource created, readyState:', eventSource.readyState);
 
     return eventSource;
   },

@@ -59,6 +59,8 @@ docker-compose up -d
 curl -s "https://sai.altermundi.net/dashboard/api/auth/login" -H "Content-Type:application/json" -d '{"password":"SaiDash2025SecureProd"}' > /tmp/token.json
 # Extract token
 jq -r '.data.token' /tmp/token.json > /tmp/token.txt
+# Or better
+curl -s -X POST http://localhost:3001/dashboard/api/auth/login   -H "Content-Type: application/json"   -d '{"password":"SaiDash2025SecureProd"}'  | grep -o '"token":"[^"]*"' | cut -d'"' -f4  > /tmp/token.txt
 # Test desired endpoint (example)
 curl -s "https://sai.altermundi.net/dashboard/api/executions/stats/enhanced" -H "Authorization: Bearer $(cat /tmp/token.txt)"
 ```

@@ -1,9 +1,16 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, useRef, useCallback, ReactNode } from 'react';
 import { sseApi } from '@/services/api';
 import { UseSSEReturn, SSEExecutionEvent, SSEHeartbeatEvent, SSEConnectionEvent } from '@/types';
 import toast from 'react-hot-toast';
 
-export function useSSE(): UseSSEReturn {
+// Create the SSE Context
+const SSEContext = createContext<UseSSEReturn | null>(null);
+
+interface SSEProviderProps {
+  children: ReactNode;
+}
+
+export function SSEProvider({ children }: SSEProviderProps) {
   const [isConnected, setIsConnected] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected' | 'error'>('disconnected');
   const [lastEvent, setLastEvent] = useState<any>(null);
@@ -31,25 +38,24 @@ export function useSSE(): UseSSEReturn {
   const connect = useCallback(() => {
     // Prevent concurrent connection attempts
     if (isConnectingRef.current) {
-      console.log('🚫 Connection already in progress, skipping');
+      console.log('🚫 SSE Context: Connection already in progress, skipping');
       return;
     }
     
     // Don't create multiple connections - be more strict
     if (eventSourceRef.current) {
       if (eventSourceRef.current.readyState === EventSource.CONNECTING || eventSourceRef.current.readyState === EventSource.OPEN) {
-        console.log('🚫 EventSource already exists and active, readyState:', eventSourceRef.current.readyState);
+        console.log('🚫 SSE Context: EventSource already exists and active, readyState:', eventSourceRef.current.readyState);
         return;
       }
       // Only cleanup if it's closed
       if (eventSourceRef.current.readyState === EventSource.CLOSED) {
-        console.log('🗑️ Cleaning up closed EventSource');
+        console.log('🗑️ SSE Context: Cleaning up closed EventSource');
         eventSourceRef.current = null;
       }
     }
     
     isConnectingRef.current = true;
-
     setConnectionStatus('connecting');
     
     try {
@@ -58,13 +64,28 @@ export function useSSE(): UseSSEReturn {
       const eventSource = sseApi.createEventSource();
       eventSourceRef.current = eventSource;
 
-      console.log(`🔌 Creating EventSource #${connectionId}:`, eventSource.url);
-      console.log(`🔌 Initial readyState #${connectionId}:`, eventSource.readyState);
+      console.log(`🔌 SSE Context: Creating EventSource #${connectionId}:`, eventSource.url);
+      console.log(`🔌 SSE Context: Initial readyState #${connectionId}:`, eventSource.readyState);
+      
+      // Monitor readyState changes every second for debugging
+      const readyStateMonitor = setInterval(() => {
+        console.log(`🔍 SSE Context: EventSource #${connectionId} readyState check:`, {
+          readyState: eventSource.readyState,
+          url: eventSource.url,
+          timestamp: new Date().toISOString()
+        });
+        
+        // Stop monitoring if connection opened or closed
+        if (eventSource.readyState !== EventSource.CONNECTING) {
+          clearInterval(readyStateMonitor);
+        }
+      }, 1000);
 
       eventSource.onopen = () => {
-        console.log(`✅ SSE connection #${connectionId} opened - onopen fired!`);
-        console.log(`✅ EventSource #${connectionId} readyState:`, eventSource.readyState);
-        console.log(`✅ EventSource #${connectionId} URL:`, eventSource.url);
+        console.log(`✅ SSE Context: Connection #${connectionId} opened - onopen fired!`);
+        console.log(`✅ SSE Context: EventSource #${connectionId} readyState:`, eventSource.readyState);
+        console.log(`✅ SSE Context: EventSource #${connectionId} URL:`, eventSource.url);
+        console.log(`✅ SSE Context: EventSource #${connectionId} withCredentials:`, eventSource.withCredentials);
         setIsConnected(true);
         setConnectionStatus('connected');
         reconnectAttempts.current = 0; // Reset reconnect attempts on successful connection
@@ -74,21 +95,21 @@ export function useSSE(): UseSSEReturn {
       // Fallback: Check connection after 3 seconds if onopen hasn't fired
       setTimeout(() => {
         if (eventSource.readyState === EventSource.OPEN) {
-          console.log('SSE connection established via fallback check');
+          console.log('SSE Context: Connection established via fallback check');
           setIsConnected(true);
           setConnectionStatus('connected');
           reconnectAttempts.current = 0;
           isConnectingRef.current = false; // Connection attempt completed
         } else if (eventSource.readyState === EventSource.CLOSED) {
-          console.log('SSE connection failed - EventSource closed during fallback check');
+          console.log('SSE Context: Connection failed - EventSource closed during fallback check');
           isConnectingRef.current = false; // Connection attempt failed
         }
       }, 3000);
 
       eventSource.onerror = (error) => {
-        console.error(`❌ SSE connection #${connectionId} error:`, error);
-        console.error(`❌ EventSource #${connectionId} readyState:`, eventSource.readyState);
-        console.error(`❌ EventSource #${connectionId} URL:`, eventSource.url);
+        console.error(`❌ SSE Context: Connection #${connectionId} error:`, error);
+        console.error(`❌ SSE Context: EventSource #${connectionId} readyState:`, eventSource.readyState);
+        console.error(`❌ SSE Context: EventSource #${connectionId} URL:`, eventSource.url);
         setIsConnected(false);
         isConnectingRef.current = false; // Connection attempt failed
         
@@ -100,7 +121,7 @@ export function useSSE(): UseSSEReturn {
             const delay = baseReconnectDelay * Math.pow(2, reconnectAttempts.current);
             reconnectAttempts.current += 1;
             
-            console.log(`Attempting to reconnect SSE in ${delay}ms (attempt ${reconnectAttempts.current}/${maxReconnectAttempts})`);
+            console.log(`SSE Context: Attempting to reconnect in ${delay}ms (attempt ${reconnectAttempts.current}/${maxReconnectAttempts})`);
             
             reconnectTimeoutRef.current = setTimeout(() => {
               connect();
@@ -118,7 +139,7 @@ export function useSSE(): UseSSEReturn {
       eventSource.addEventListener('connection', (event) => {
         try {
           const data: SSEConnectionEvent = JSON.parse(event.data);
-          console.log('SSE connection event:', data);
+          console.log('SSE Context: Connection event:', data);
           setLastEvent({ type: 'connection', data, timestamp: new Date() });
           
           // Set connected state when we receive the connection event
@@ -129,7 +150,7 @@ export function useSSE(): UseSSEReturn {
             toast.success('Real-time updates connected', { duration: 2000 });
           }
         } catch (error) {
-          console.warn('Failed to parse connection event:', error);
+          console.warn('SSE Context: Failed to parse connection event:', error);
         }
       });
 
@@ -137,7 +158,7 @@ export function useSSE(): UseSSEReturn {
       eventSource.addEventListener('execution:new', (event) => {
         try {
           const data: SSEExecutionEvent = JSON.parse(event.data);
-          console.log('New execution received:', data.execution.id);
+          console.log('SSE Context: New execution received:', data.execution.id);
           setLastEvent({ type: 'execution:new', data, timestamp: new Date() });
           
           // Show notification for new successful executions
@@ -149,7 +170,7 @@ export function useSSE(): UseSSEReturn {
             }
           );
         } catch (error) {
-          console.warn('Failed to parse execution:new event:', error);
+          console.warn('SSE Context: Failed to parse execution:new event:', error);
         }
       });
 
@@ -157,7 +178,7 @@ export function useSSE(): UseSSEReturn {
       eventSource.addEventListener('execution:error', (event) => {
         try {
           const data = JSON.parse(event.data);
-          console.log('Execution error received:', data.executionId);
+          console.log('SSE Context: Execution error received:', data.executionId);
           setLastEvent({ type: 'execution:error', data, timestamp: new Date() });
           
           // Show error notification
@@ -169,7 +190,7 @@ export function useSSE(): UseSSEReturn {
             }
           );
         } catch (error) {
-          console.warn('Failed to parse execution:error event:', error);
+          console.warn('SSE Context: Failed to parse execution:error event:', error);
         }
       });
 
@@ -179,9 +200,9 @@ export function useSSE(): UseSSEReturn {
           const data: SSEHeartbeatEvent = JSON.parse(event.data);
           setClientCount(data.clients);
           setLastEvent({ type: 'heartbeat', data, timestamp: new Date() });
-          console.debug('SSE heartbeat:', data);
+          console.debug('SSE Context: Heartbeat:', data);
         } catch (error) {
-          console.warn('Failed to parse heartbeat event:', error);
+          console.warn('SSE Context: Failed to parse heartbeat event:', error);
         }
       });
 
@@ -189,28 +210,29 @@ export function useSSE(): UseSSEReturn {
       eventSource.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          console.log('SSE generic message:', data);
+          console.log('SSE Context: Generic message:', data);
           setLastEvent({ type: 'message', data, timestamp: new Date() });
         } catch (error) {
-          console.warn('Failed to parse generic SSE message:', error);
+          console.warn('SSE Context: Failed to parse generic SSE message:', error);
         }
       };
 
     } catch (error) {
-      console.error('Failed to create SSE connection:', error);
+      console.error('SSE Context: Failed to create SSE connection:', error);
       setConnectionStatus('error');
       setIsConnected(false);
       isConnectingRef.current = false; // Connection attempt failed
     }
   }, []);
 
-
   // Initialize connection on mount
   useEffect(() => {
+    console.log('🚀 SSE Context: Provider mounted, initializing connection');
     connect();
 
     // Cleanup on unmount
     return () => {
+      console.log('🔌 SSE Context: Provider unmounting, cleaning up');
       cleanup();
     };
   }, [connect, cleanup]);
@@ -221,13 +243,13 @@ export function useSSE(): UseSSEReturn {
       if (document.hidden) {
         // Tab is hidden, close connection to save resources
         if (eventSourceRef.current && eventSourceRef.current.readyState === EventSource.OPEN) {
-          console.log('Tab hidden, closing SSE connection');
+          console.log('SSE Context: Tab hidden, closing connection');
           eventSourceRef.current.close();
         }
       } else {
         // Tab is visible, reconnect if needed
         if (!eventSourceRef.current || eventSourceRef.current.readyState === EventSource.CLOSED) {
-          console.log('Tab visible, reconnecting SSE');
+          console.log('SSE Context: Tab visible, reconnecting');
           setTimeout(connect, 100); // Small delay to ensure tab is fully visible
         }
       }
@@ -240,12 +262,12 @@ export function useSSE(): UseSSEReturn {
   // Handle online/offline status
   useEffect(() => {
     const handleOnline = () => {
-      console.log('Browser online, attempting SSE reconnection');
+      console.log('SSE Context: Browser online, attempting reconnection');
       connect();
     };
 
     const handleOffline = () => {
-      console.log('Browser offline, closing SSE connection');
+      console.log('SSE Context: Browser offline, closing connection');
       cleanup();
       setConnectionStatus('disconnected');
       setIsConnected(false);
@@ -260,13 +282,24 @@ export function useSSE(): UseSSEReturn {
     };
   }, [connect, cleanup]);
 
-  return {
+  const contextValue: UseSSEReturn = {
     isConnected,
     lastEvent,
     connectionStatus,
     clientCount,
     connect,
   };
+
+  return <SSEContext.Provider value={contextValue}>{children}</SSEContext.Provider>;
+}
+
+// Hook to use the SSE Context
+export function useSSE(): UseSSEReturn {
+  const context = useContext(SSEContext);
+  if (!context) {
+    throw new Error('useSSE must be used within an SSEProvider');
+  }
+  return context;
 }
 
 // Hook for handling SSE events with custom handlers

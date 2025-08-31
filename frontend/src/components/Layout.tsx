@@ -1,6 +1,6 @@
 import { ReactNode } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import { useSSE } from '@/hooks/useSSE';
+import { useSSE } from '@/contexts/SSEContext';
 import { LoadingSpinner } from './ui/LoadingSpinner';
 import { cn } from '@/utils';
 import { 
