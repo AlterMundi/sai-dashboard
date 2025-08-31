@@ -209,11 +209,17 @@ export function SSEProvider({ children }: SSEProviderProps) {
       // Generic message handler (fallback)
       eventSource.onmessage = (event) => {
         try {
+          // Skip empty data messages (initial SSE connection messages)
+          if (!event.data || event.data.trim() === '') {
+            console.log('SSE Context: Received empty data message (connection keepalive)');
+            return;
+          }
+          
           const data = JSON.parse(event.data);
           console.log('SSE Context: Generic message:', data);
           setLastEvent({ type: 'message', data, timestamp: new Date() });
         } catch (error) {
-          console.warn('SSE Context: Failed to parse generic SSE message:', error);
+          console.warn('SSE Context: Failed to parse SSE message:', error, 'Raw data:', event.data);
         }
       };
 
