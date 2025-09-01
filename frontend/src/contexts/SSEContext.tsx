@@ -249,6 +249,14 @@ export function SSEProvider({ children }: SSEProviderProps) {
           
           // Smart notification for batch completion
           notifyBatchComplete(data);
+          
+          // Add executions to live execution strip if they exist
+          if (data.executions && Array.isArray(data.executions)) {
+            data.executions.forEach((execution: any) => {
+              // Trigger individual execution event for live strip
+              setLastEvent({ type: 'execution:new', data: { execution }, timestamp: new Date() });
+            });
+          }
         } catch (error) {
           console.warn('SSE Context: Failed to parse execution:batch event:', error);
         }
@@ -384,6 +392,7 @@ export function useSSE(): UseSSEReturn {
 export function useSSEHandler(handlers: {
   onNewExecution?: (data: SSEExecutionEvent) => void;
   onExecutionError?: (data: any) => void;
+  onExecutionBatch?: (data: any) => void;
   onConnection?: (data: SSEConnectionEvent) => void;
   onHeartbeat?: (data: SSEHeartbeatEvent) => void;
 }) {
@@ -398,6 +407,9 @@ export function useSSEHandler(handlers: {
         break;
       case 'execution:error':
         handlers.onExecutionError?.(lastEvent.data);
+        break;
+      case 'execution:batch':
+        handlers.onExecutionBatch?.(lastEvent.data);
         break;
       case 'connection':
         handlers.onConnection?.(lastEvent.data);

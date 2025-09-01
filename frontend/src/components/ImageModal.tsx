@@ -5,11 +5,11 @@ import { LoadingSpinner } from './ui/LoadingSpinner';
 import { executionsApi } from '@/services/api';
 import { 
   formatDate, 
-  formatRelativeTime, 
   formatDuration, 
   copyToClipboard, 
   cn 
 } from '@/utils';
+import { DynamicTimeAgo } from './ui/DynamicTimeAgo';
 import { ImageModalProps } from '@/types';
 import {
   X,
@@ -246,7 +246,7 @@ export function ImageModal({ execution, isOpen, onClose }: ImageModalProps) {
                     <div>
                       <p className="text-gray-500">Started</p>
                       <p className="font-medium">{formatDate(execution.startedAt, 'MMM d, HH:mm')}</p>
-                      <p className="text-xs text-gray-400">{formatRelativeTime(execution.startedAt)}</p>
+                      <p className="text-xs text-gray-400"><DynamicTimeAgo date={execution.startedAt} /></p>
                     </div>
                   </div>
                   

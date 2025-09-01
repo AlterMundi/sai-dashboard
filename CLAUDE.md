@@ -127,8 +127,6 @@ location /dashboard/ {
 # Backend API development (port 3001)
 cd backend
 npm run dev          # Start with hot reload (tsx watch)
-npm run build        # TypeScript compilation to dist/
-npm run start        # Production start (requires build first)
 npm run lint         # ESLint code checking with --fix
 npm run type-check   # TypeScript validation without emit
 npm test             # Jest test suite
@@ -138,8 +136,6 @@ npm run db:setup     # Initialize database views
 # Frontend development (port 3000)
 cd frontend  
 npm run dev          # Vite dev server with hot reload
-npm run build        # TypeScript + Vite production build
-npm run preview      # Preview production build locally
 npm run lint         # ESLint + TypeScript checking with --fix
 npm run type-check   # TypeScript validation without emit
 npm test             # Vitest test suite
@@ -154,18 +150,47 @@ npm test:coverage    # Test coverage report
 - ESLint configured for TypeScript + React with auto-fix
 - Tests use Jest (backend) and Vitest (frontend)
 
+### ⚠️ CRITICAL: Production Deployment Rules
+
+**NEVER use `npm run build` directly for production!**
+
+```bash
+# ❌ WRONG - Manual builds can miss environment variables
+cd frontend && npm run build
+cd backend && npm run build
+
+# ✅ CORRECT - Always use install script
+./install-production.sh         # Standard deployment
+./install-production.sh --force # Force complete rebuild
+```
+
+**Why the install script is mandatory:**
+- **Environment Loading**: Properly loads all `.env` variables including `VITE_API_URL`
+- **Build Validation**: Pre-build TypeScript checks prevent broken deployments
+- **Dependency Resolution**: Handles path aliases and import resolution correctly
+- **Service Integration**: Configures systemd services and nginx routing
+- **Health Verification**: Tests API connectivity and database access post-deployment
+
 ### Production Installation
 ```bash
-# One-command production deployment with quality checks
+# Standard production deployment
 ./install-production.sh
 
+# Force complete rebuild (use when environment variables change)
+./install-production.sh --force
+
 # The script includes:
+# - Environment variable validation and loading
 # - Pre-build TypeScript validation
 # - Path alias resolution verification  
 # - Database connectivity testing
+# - Service configuration (systemd + nginx)
 # - Post-deployment health checks
-# - Service status monitoring
+# - API routing verification
 ```
+
+**⚡ Lesson Learned (2025-09-01):**
+When environment variables are modified (especially `VITE_*` variables), always use `--force` flag to ensure complete rebuild. Cached builds may use old configuration, causing API routing failures (`/api/*` instead of `/dashboard/api/*`).
 
 ## 📊 Database Integration
 

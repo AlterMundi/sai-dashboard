@@ -115,13 +115,10 @@ export function useNotifications() {
     return createNotification({
       type: 'execution:batch',
       icon: '📊',
-      title: `Batch Complete (${batchData.count} images)`,
-      body: `${batchData.highRisk} high risk, ${batchData.successful} successful`,
-      actions: [
-        { label: 'View Batch', action: 'viewBatch', priority: 'medium' },
-        { label: 'Download Report', action: 'report', priority: 'low' }
-      ],
-      duration: 10000,
+      title: `${batchData.count} New Executions`,
+      body: `${batchData.highRisk > 0 ? `⚠️ ${batchData.highRisk} high risk, ` : ''}${batchData.successful} successful`,
+      actions: [], // No buttons - strict notification only
+      duration: 8000, // Show for 8 seconds
       data: batchData
     });
   }, [createNotification]);

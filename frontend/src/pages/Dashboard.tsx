@@ -22,6 +22,7 @@ export function Dashboard() {
   const [showFilters, setShowFilters] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [newExecutionsCount, setNewExecutionsCount] = useState(0);
+  const [refreshTrigger, setRefreshTrigger] = useState(0); // Force gallery refresh
   
   const { stats, isLoading: statsLoading, error: statsError } = useExecutionStats();
   useDailySummary(7);
@@ -45,6 +46,20 @@ export function Dashboard() {
     },
     onExecutionError: (data) => {
       console.log('Execution error received:', data);
+    },
+    onExecutionBatch: (data) => {
+      console.log('Batch received with', data.count, 'new executions');
+      
+      // Update new executions counter
+      setNewExecutionsCount(prev => prev + data.count);
+      
+      // Trigger gallery refresh by changing the key
+      setRefreshTrigger(prev => prev + 1);
+      
+      // Clear counter after some time
+      setTimeout(() => {
+        setNewExecutionsCount(prev => Math.max(0, prev - data.count));
+      }, 30000);
     },
   });
 
@@ -397,7 +412,7 @@ export function Dashboard() {
         {/* Main Gallery */}
         <ImageGallery 
           initialFilters={filters}
-          key={JSON.stringify(filters)} // Force re-render when filters change
+          key={`${JSON.stringify(filters)}-${refreshTrigger}`} // Force re-render on filters change or refresh trigger
         />
       </div>
     </Layout>

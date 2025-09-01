@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { StatusBadge } from './ui/StatusBadge';
 import { LoadingSpinner } from './ui/LoadingSpinner';
+import { DynamicTimeAgo } from './ui/DynamicTimeAgo';
 import { executionsApi } from '@/services/api';
-import { formatRelativeTime, formatDuration, truncateText, cn } from '@/utils';
+import { formatDuration, truncateText, cn } from '@/utils';
 import { ImageCardProps } from '@/types';
 import { Calendar, Clock, AlertTriangle, CheckCircle, MessageCircle } from 'lucide-react';
 
@@ -103,7 +104,7 @@ export function ImageCard({ execution, onClick, loading = false }: ImageCardProp
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center text-xs text-gray-500">
             <Calendar className="h-3 w-3 mr-1" />
-            {formatRelativeTime(execution.startedAt)}
+            <DynamicTimeAgo date={execution.startedAt} />
           </div>
           {duration && (
             <div className="flex items-center text-xs text-gray-500">
