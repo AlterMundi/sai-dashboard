@@ -472,31 +472,134 @@ export const notifyExecutionProgress = async (executionId: string, progress: {
 
 // Periodic system monitoring for real-time stats
 let systemMonitoringInterval: NodeJS.Timeout | null = null;
+let executionPollingInterval: NodeJS.Timeout | null = null;
+
+// Batch execution tracking
+let pendingExecutions: any[] = [];
+let lastKnownExecutionId: string | null = null;
+
+// Poll for new executions every 10 seconds
+const pollForNewExecutions = async (): Promise<void> => {
+  try {
+    // Only poll if there are active clients
+    if (sseManager.getClientCount() === 0) return;
+
+    const { executionService } = await import('@/services/execution');
+    
+    // Get latest execution for SAI workflow
+    const latestExecutions = await executionService.getExecutions({
+      limit: 10, // Check last 10 to catch any we missed
+      page: 0,
+    });
+
+    if (latestExecutions.executions.length === 0) return;
+
+    const newExecutions = [];
+    
+    // Find new executions since last known ID
+    for (const execution of latestExecutions.executions) {
+      if (execution.id === lastKnownExecutionId) {
+        break; // Found where we left off
+      }
+      newExecutions.push(execution);
+    }
+
+    if (newExecutions.length > 0) {
+      // Update last known execution
+      lastKnownExecutionId = newExecutions[0].id;
+      
+      // Add to pending batch
+      pendingExecutions.push(...newExecutions);
+      
+      logger.debug('New executions detected', {
+        count: newExecutions.length,
+        pendingTotal: pendingExecutions.length,
+        latestId: lastKnownExecutionId
+      });
+    }
+  } catch (error) {
+    logger.warn('Failed to poll for new executions:', error);
+  }
+};
+
+// Broadcast batched executions every 30 seconds
+const broadcastExecutionBatch = async (): Promise<void> => {
+  try {
+    if (pendingExecutions.length === 0) return;
+
+    // Only broadcast if there are active clients
+    if (sseManager.getClientCount() === 0) {
+      // Clear pending executions if no clients
+      pendingExecutions = [];
+      return;
+    }
+
+    // Prepare batch data
+    const batchData = {
+      count: pendingExecutions.length,
+      executions: pendingExecutions.slice(0, 6).reverse(), // Show newest first, limit to 6 for live strip
+      successful: pendingExecutions.filter(e => e.status === 'success').length,
+      highRisk: pendingExecutions.filter(e => e.analysis?.riskAssessment === 'high').length,
+      timestamp: new Date().toISOString()
+    };
+
+    // Broadcast batch notification
+    const message: SSEMessage = {
+      type: 'execution:batch',
+      data: batchData
+    };
+
+    const clientCount = sseManager.broadcast(message);
+    
+    logger.info('Execution batch notification sent', {
+      executionCount: batchData.count,
+      successful: batchData.successful,
+      highRisk: batchData.highRisk,
+      clientCount
+    });
+
+    // Clear pending executions
+    pendingExecutions = [];
+  } catch (error) {
+    logger.error('Failed to broadcast execution batch:', error);
+  }
+};
 
 export const startSystemMonitoring = (): void => {
+  // Clear existing intervals
   if (systemMonitoringInterval) {
     clearInterval(systemMonitoringInterval);
   }
+  if (executionPollingInterval) {
+    clearInterval(executionPollingInterval);
+  }
 
+  // Start execution polling every 10 seconds
+  executionPollingInterval = setInterval(pollForNewExecutions, 10000);
+
+  // Start system monitoring every 30 seconds (includes batch broadcasting)
   systemMonitoringInterval = setInterval(async () => {
     try {
-      // Only broadcast if there are active clients
+      // Only run if there are active clients
       if (sseManager.getClientCount() === 0) return;
 
-      // Get system metrics (you can enhance this with actual system monitoring)
+      // Broadcast execution batch first
+      await broadcastExecutionBatch();
+
+      // Then system metrics
       const stats = {
-        totalExecutions: await getTotalExecutionCount(), // Implement this function
-        successRate: await getSuccessRate(), // Implement this function  
-        queueSize: getQueueSize(), // Implement this function
-        avgProcessingTime: await getAverageProcessingTime() // Implement this function
+        totalExecutions: await getTotalExecutionCount(),
+        successRate: await getSuccessRate(),
+        queueSize: getQueueSize(),
+        avgProcessingTime: await getAverageProcessingTime()
       };
 
       await notifySystemStats(stats);
 
       // System health monitoring
       const healthData = {
-        cpu: await getCPUUsage(), // Implement this function
-        memory: await getMemoryUsage(), // Implement this function
+        cpu: await getCPUUsage(),
+        memory: await getMemoryUsage(),
         queueSize: getQueueSize(),
         status: getSystemStatus() as 'healthy' | 'warning' | 'critical'
       };
@@ -507,15 +610,19 @@ export const startSystemMonitoring = (): void => {
     }
   }, 30000); // Every 30 seconds
 
-  logger.info('System monitoring started');
+  logger.info('System monitoring started with execution polling');
 };
 
 export const stopSystemMonitoring = (): void => {
   if (systemMonitoringInterval) {
     clearInterval(systemMonitoringInterval);
     systemMonitoringInterval = null;
-    logger.info('System monitoring stopped');
   }
+  if (executionPollingInterval) {
+    clearInterval(executionPollingInterval);
+    executionPollingInterval = null;
+  }
+  logger.info('System monitoring and execution polling stopped');
 };
 
 // Real database-backed functions for system monitoring
