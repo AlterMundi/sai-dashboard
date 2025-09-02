@@ -577,7 +577,7 @@ export const startSystemMonitoring = (): void => {
   // Start execution polling every 10 seconds
   executionPollingInterval = setInterval(pollForNewExecutions, 10000);
 
-  // Start system monitoring every 30 seconds (includes batch broadcasting)
+  // Start system monitoring every 10 seconds (includes batch broadcasting)  
   systemMonitoringInterval = setInterval(async () => {
     try {
       // Only run if there are active clients
@@ -608,7 +608,7 @@ export const startSystemMonitoring = (): void => {
     } catch (error) {
       logger.error('System monitoring error:', error);
     }
-  }, 30000); // Every 30 seconds
+  }, 10000); // Every 10 seconds
 
   logger.info('System monitoring started with execution polling');
 };

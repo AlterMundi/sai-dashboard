@@ -122,8 +122,34 @@ location /dashboard/ {
 3. No `try_files` with `proxy_pass` - causes nginx errors
 4. No URI parts in named locations - causes configuration failures
 
+## 🏢 Monorepo Structure & Workspaces
+
+This is a **monorepo** using npm workspaces. Key workspace understanding:
+
+```bash
+# Root-level commands affect all workspaces
+npm install          # Installs all dependencies for all workspaces
+npm run dev          # Runs both backend and frontend concurrently
+npm test             # Runs tests in both backend and frontend
+npm run lint         # Lints both backend and frontend
+npm run type-check   # TypeScript validation for both apps
+
+# Workspace-specific commands
+npm run dev:backend  # Only backend development server
+npm run dev:frontend # Only frontend development server (with proper env vars)
+```
+
+**Critical Workspace Rules**:
+- Dependencies in individual `backend/package.json` and `frontend/package.json`
+- Shared devDependencies (like concurrently) in root `package.json`
+- Path aliases (`@/`) work independently in each workspace
+- Build outputs: `backend/dist/` and `frontend/dist/`
+
 ### Development Workflow
 ```bash
+# Full stack development (recommended)
+npm run dev          # Runs both backend and frontend concurrently
+
 # Backend API development (port 3001)
 cd backend
 npm run dev          # Start with hot reload (tsx watch)
@@ -141,14 +167,24 @@ npm run type-check   # TypeScript validation without emit
 npm test             # Vitest test suite
 npm test:ui          # Vitest UI mode
 npm test:coverage    # Test coverage report
+
+# Running tests across the stack
+npm test             # Run all tests (backend + frontend)
+npm run test:watch   # Watch mode for all tests
+npm run test:coverage # Coverage report for both apps
+npm run test:quick   # Quick test script
+npm run test:integration # Integration test suite
 ```
 
 **Key Development Notes**:
-- Backend uses `tsx` for TypeScript execution in development
-- Frontend uses Vite with React plugin for hot reload
-- Both have path aliases configured (`@/` points to `src/`)
-- ESLint configured for TypeScript + React with auto-fix
-- Tests use Jest (backend) and Vitest (frontend)
+- Backend uses `tsx` for TypeScript execution with hot reload in development
+- Frontend uses Vite with React plugin and proxy configuration
+- Path aliases: `@/` points to `src/` in both backend and frontend (via tsconfig.json)
+- TypeScript: Strict mode enabled with path resolution and decorators
+- Build process: `tsc && tsc-alias` for backend, Vite for frontend
+- ESLint configured for TypeScript + React with auto-fix capabilities
+- Testing: Jest with Supertest (backend), Vitest with React Testing Library (frontend)
+- Workspaces: Monorepo structure with shared dependencies
 
 ### ⚠️ CRITICAL: Production Deployment Rules
 
@@ -189,8 +225,11 @@ cd backend && npm run build
 # - API routing verification
 ```
 
-**⚡ Lesson Learned (2025-09-01):**
-When environment variables are modified (especially `VITE_*` variables), always use `--force` flag to ensure complete rebuild. Cached builds may use old configuration, causing API routing failures (`/api/*` instead of `/dashboard/api/*`).
+**⚡ Critical Production Lessons (2025-09-01):**
+1. **Environment Variables**: Always use `--force` when `VITE_*` variables change to prevent cached build issues
+2. **Path Aliases**: The `tsc-alias` step is CRITICAL - without it, `@/*` imports cause runtime failures
+3. **Build Validation**: Install script includes validation that `@/*` patterns are resolved in compiled code
+4. **API Routing**: Frontend MUST have `VITE_API_URL=/dashboard/api` or API calls fail with wrong paths
 
 ## 📊 Database Integration
 
@@ -208,31 +247,52 @@ When environment variables are modified (especially `VITE_*` variables), always 
 
 ## 🔌 API Architecture
 
-**Base URL**: `http://localhost:3001/api`
+**Base URL**: `http://localhost:3001/dashboard/api` (Self-contained routing)
 
 **Core Endpoints**:
-- `GET /api/executions` - Paginated execution list with filters
-- `GET /api/executions/{id}` - Detailed execution information  
-- `GET /api/executions/{id}/image` - Serve execution images
-- `GET /api/executions/summary/daily` - Daily statistics
-- `GET /api/health` - System health check
+- `GET /executions` - Paginated execution list with filters
+- `GET /executions/{id}` - Detailed execution information  
+- `GET /executions/{id}/image` - Serve execution images
+- `GET /executions/summary/daily` - Daily statistics
+- `GET /executions/stats/enhanced` - Enhanced statistics with detailed metrics
+- `GET /events` - Server-Sent Events stream (auth via query param)
+- `GET /health` - System health check (no auth required)
+
+**Expert Review System** (Advanced features):
+- `GET /expert/assignments` - Expert review assignments
+- `POST /expert/assignments/{id}/review` - Submit expert review
+- `GET /expert/performance` - Expert performance metrics
+- `GET /incidents` - Multi-camera incident analysis
 
 **Response Format**: Standardized JSON with data/meta/error structure
-**Authentication**: Bearer token
-**Rate Limiting**: 100 requests/minute with burst protection
+**Authentication**: Bearer JWT token with role-based access
+**Rate Limiting**: 60 req/min general, burst protection, 5 login attempts/15min
 
 ## 🎨 Frontend Structure
 
 **Component Architecture**:
-- `ImageGallery` - Main grid view of execution images
-- `ImageCard` - Individual execution display with status/results
-- `ImageModal` - Full-screen image viewer with analysis overlay
-- `StatusBadge` - Execution status indicators
-- `Filters` - Date, status, and search filtering
+- `ImageGallery` - Main grid view with lazy loading and pagination
+- `ImageCard` - Individual execution display with status/results overlay
+- `ImageModal` - Full-screen viewer with comprehensive analysis data
+- `StatusBadge` - Execution status indicators with color coding
+- `FilterBar` - Advanced filtering (date, status, risk level, search)
+- `StatsDashboard` - Real-time statistics and performance metrics
+- `ExpertDashboard` - Expert review interface and assignment management
+- `LiveExecutionStrip` - Real-time execution updates via SSE
 
-**State Management**: React Query for server state, local state for UI
-**Styling**: Tailwind CSS with responsive grid layouts
-**Image Handling**: Base64 extraction from execution payloads, optimized serving
+**Advanced Features**:
+- **SSE Integration**: Real-time updates via `SSEContext` and `useSSE` hook
+- **Expert System**: Review workflow, assignments, and performance tracking  
+- **Multi-modal UI**: Dashboard, expert review, and incident analysis views
+- **Notification System**: Real-time alerts and status updates
+
+**State Management**: 
+- React Query (@tanstack/react-query) for server state and caching
+- Zustand for client-side state management
+- SSEContext for real-time data streams
+
+**Styling**: Tailwind CSS with component library (ui/button, ui/card, etc.)
+**Testing**: Vitest + React Testing Library with comprehensive test coverage
 
 ## 🔧 Configuration
 
@@ -331,17 +391,23 @@ VITE_API_URL=/dashboard/api
 
 ### Backend Architecture Notes
 - **Self-Contained Routes**: Backend serves all routes under `/dashboard/api/*` (see `backend/src/index.ts:62`)  
-- **Authentication**: Simple password-based auth with JWT tokens and rate limiting
-- **Database**: Read-only PostgreSQL access with connection pooling (5 connections max)
-- **Caching**: Filesystem-based at `/mnt/raid1/n8n/backup/images/`
-- **Error Handling**: Comprehensive error middleware with development/production modes
+- **Authentication System**: JWT tokens with role-based access, rate limiting, and session management
+- **Database**: Read-only PostgreSQL with connection pooling (max 5 connections, 5s timeout)
+- **Advanced Features**: Expert review system, incident analysis, real-time SSE events
+- **Caching**: Filesystem-based image cache at `/mnt/raid1/n8n/backup/images/`
+- **Security**: Helmet headers, CORS, input validation, parameterized queries
+- **Error Handling**: Comprehensive middleware with development/production modes
+- **Path Resolution**: Uses `tsc-alias` to resolve `@/*` imports after TypeScript compilation
 
 ### Frontend Architecture Notes  
-- **Base Path Support**: Configurable via `VITE_BASE_PATH` environment variable
+- **Base Path Support**: Configurable via `VITE_BASE_PATH` environment variable (`/dashboard/`)
 - **Proxy Configuration**: Vite dev server proxies `/dashboard/api` to backend (port 3001)
-- **State Management**: React Query for server state, Zustand for client state
-- **Component Structure**: Organized by feature with shared UI components in `/ui/`
-- **Testing**: Vitest + React Testing Library setup
+- **State Management**: React Query (@tanstack/react-query) + Zustand + SSEContext
+- **Routing**: React Router DOM with protected routes and authentication guards
+- **Component Library**: Custom UI components in `/ui/` (button, card, input, select, badge)
+- **Real-time Features**: Server-Sent Events integration with reconnection logic
+- **Testing**: Vitest + React Testing Library with jsdom environment and setup files
+- **Build Optimization**: Code splitting for vendor, router, and query libraries
 
 ### Database Query Patterns
 - **Two-Phase Loading**: Never load full execution data in list views
@@ -552,11 +618,30 @@ curl -s "http://localhost:3001/dashboard/api/executions?limit=1" \
 
 ## 🎯 Key Files to Understand
 
-- **Backend Entry**: `backend/src/index.ts` - Express server with self-contained routes
-- **API Routes**: `backend/src/routes/index.ts` - Complete API endpoint definitions
-- **Frontend Entry**: `frontend/src/main.tsx` - React application bootstrap  
-- **Vite Config**: `frontend/vite.config.ts` - Development server and build configuration
-- **Database Schema**: `database/schema-analysis.md` - n8n database structure reference
-- **Environment**: `.env.example` - Complete configuration template
+### Essential Architecture Files
+- **Backend Entry**: `backend/src/index.ts` - Express server with self-contained `/dashboard/api/*` routes
+- **API Routes**: `backend/src/routes/index.ts` - Complete API endpoint definitions with authentication layers
+- **Authentication**: `backend/src/middleware/auth.ts` - JWT tokens, rate limiting, role-based access
+- **Database Pool**: `backend/src/database/pool.ts` - PostgreSQL connection management
+- **SSE Controller**: `backend/src/controllers/sse.ts` - Real-time Server-Sent Events implementation
+
+### Frontend Core Files  
+- **Frontend Entry**: `frontend/src/main.tsx` - React application bootstrap with providers
+- **App Router**: `frontend/src/App.tsx` - Main router with protected routes
+- **SSE Context**: `frontend/src/contexts/SSEContext.tsx` - Real-time data stream management
+- **API Service**: `frontend/src/services/api.ts` - Axios-based API client with auth interceptors
+- **Vite Config**: `frontend/vite.config.ts` - Dev server, proxy config, build optimization
+
+### Configuration Files
+- **TypeScript Config**: `backend/tsconfig.json` - Path aliases, strict mode, decorators
+- **Environment**: `.env.example` - Complete configuration template with all variables
+- **Package.json**: Root level with workspace configuration and combined scripts
+- **Installation**: `install-production.sh` - Production deployment with validation
+
+### Advanced Features
+- **Expert Review**: `backend/src/controllers/expert-review.ts` - Expert assignment and review system
+- **Enhanced Analysis**: `backend/src/services/enhanced-analysis.ts` - Advanced image analysis processing
+- **Incident Analysis**: API routes for multi-camera incident correlation
+- **Live Dashboard**: `frontend/src/components/ExpertDashboard.tsx` - Expert interface
 
 **Architecture Docs**: Review `docs/ARCHITECTURE_ANALYSIS.md` for detailed design decisions and potential issues.

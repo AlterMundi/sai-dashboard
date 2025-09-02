@@ -249,14 +249,6 @@ export function SSEProvider({ children }: SSEProviderProps) {
           
           // Smart notification for batch completion
           notifyBatchComplete(data);
-          
-          // Add executions to live execution strip if they exist
-          if (data.executions && Array.isArray(data.executions)) {
-            data.executions.forEach((execution: any) => {
-              // Trigger individual execution event for live strip
-              setLastEvent({ type: 'execution:new', data: { execution }, timestamp: new Date() });
-            });
-          }
         } catch (error) {
           console.warn('SSE Context: Failed to parse execution:batch event:', error);
         }
