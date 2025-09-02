@@ -51,28 +51,27 @@ export class NodeController {
         ORDER BY mn.region, mn.node_name
       `;
       
-      const result = await pool.query(query, params);
-      const nodes = result.rows;
+      const nodes = await pool.query(query, params);
       
       // Include camera details if requested
       if (include_cameras === 'true' && nodes.length > 0) {
-        const nodeIds = nodes.map(node => node.node_id);
+        const nodeIds = nodes.map((node: any) => node.node_id);
         const camerasQuery = `
           SELECT * FROM node_cameras 
           WHERE node_id = ANY($1)
           ORDER BY node_id, camera_name
         `;
-        const camerasResult = await pool.query(camerasQuery, [nodeIds]);
+        const cameras = await pool.query(camerasQuery, [nodeIds]);
         
         // Group cameras by node_id
-        const camerasByNode = camerasResult.rows.reduce((acc, camera) => {
+        const camerasByNode = cameras.reduce((acc: Record<string, any[]>, camera: any) => {
           if (!acc[camera.node_id]) acc[camera.node_id] = [];
           acc[camera.node_id].push(camera);
           return acc;
         }, {} as Record<string, any[]>);
         
         // Attach cameras to nodes
-        nodes.forEach(node => {
+        nodes.forEach((node: any) => {
           node.cameras = camerasByNode[node.node_id] || [];
         });
       }
@@ -81,7 +80,7 @@ export class NodeController {
         data: nodes,
         meta: {
           total: nodes.length,
-          regions: [...new Set(nodes.map(n => n.region))]
+          regions: [...new Set(nodes.map((n: any) => n.region))]
         }
       });
       
@@ -114,9 +113,9 @@ export class NodeController {
         GROUP BY mn.node_id
       `;
       
-      const nodeResult = await pool.query(nodeQuery, [nodeId]);
+      const nodeRows = await pool.query(nodeQuery, [nodeId]);
       
-      if (nodeResult.rows.length === 0) {
+      if (nodeRows.length === 0) {
         res.status(404).json({
           error: {
             message: 'Node not found',
@@ -126,7 +125,7 @@ export class NodeController {
         return;
       }
       
-      const node = nodeResult.rows[0];
+      const node = nodeRows[0];
       
       // Get cameras for this node
       const camerasQuery = `
@@ -134,8 +133,8 @@ export class NodeController {
         WHERE node_id = $1
         ORDER BY camera_name
       `;
-      const camerasResult = await pool.query(camerasQuery, [nodeId]);
-      node.cameras = camerasResult.rows;
+      const cameras = await pool.query(camerasQuery, [nodeId]);
+      node.cameras = cameras;
       
       // Get recent executions if requested
       if (include_recent_executions === 'true') {
@@ -154,8 +153,8 @@ export class NodeController {
           ORDER BY e.execution_timestamp DESC
           LIMIT 20
         `;
-        const executionsResult = await pool.query(executionsQuery, [nodeId]);
-        node.recent_executions = executionsResult.rows;
+        const executions = await pool.query(executionsQuery, [nodeId]);
+        node.recent_executions = executions;
       }
       
       res.json({
@@ -259,11 +258,11 @@ export class NodeController {
         countQuery += ` AND ${conditions.join(' AND ')}`;
       }
       
-      const countResult = await pool.query(countQuery, params.slice(0, -2));
-      const total = parseInt(countResult.rows[0].total);
+      const countRows = await pool.query<{total: string}>(countQuery, params.slice(0, -2));
+      const total = parseInt(countRows[0].total);
       
       res.json({
-        data: result.rows,
+        data: result,
         meta: {
           total,
           limit: parseInt(limit as string),
@@ -294,12 +293,12 @@ export class NodeController {
         ORDER BY region
       `;
       
-      const result = await pool.query(query);
+      const rows = await pool.query(query);
       
       res.json({
-        data: result.rows,
+        data: rows,
         meta: {
-          total_regions: result.rows.length,
+          total_regions: rows.length,
           timestamp: new Date().toISOString()
         }
       });
@@ -350,12 +349,11 @@ export class NodeController {
         ORDER BY mn.region, mn.node_name
       `;
       
-      const result = await pool.query(query, params);
-      const mapData = result.rows;
+      const mapData = await pool.query(query, params);
       
       // Include recent execution counts if requested
       if (include_executions === 'true' && mapData.length > 0) {
-        const nodeIds = mapData.map(node => node.node_id);
+        const nodeIds = mapData.map((node: any) => node.node_id);
         const executionsQuery = `
           SELECT 
             e.node_id,
@@ -369,14 +367,14 @@ export class NodeController {
           GROUP BY e.node_id
         `;
         
-        const executionsResult = await pool.query(executionsQuery, [nodeIds]);
-        const executionsByNode = executionsResult.rows.reduce((acc, exec) => {
+        const executionRows = await pool.query(executionsQuery, [nodeIds]);
+        const executionsByNode = executionRows.reduce((acc: Record<string, any>, exec: any) => {
           acc[exec.node_id] = exec;
           return acc;
         }, {} as Record<string, any>);
         
         // Attach execution data to nodes
-        mapData.forEach(node => {
+        mapData.forEach((node: any) => {
           const execData = executionsByNode[node.node_id] || {
             executions_24h: 0,
             high_risk_24h: 0,
@@ -390,12 +388,12 @@ export class NodeController {
         data: mapData,
         meta: {
           total_nodes: mapData.length,
-          regions: [...new Set(mapData.map(n => n.region))],
+          regions: [...new Set(mapData.map((n: any) => n.region))],
           bounds: {
-            min_lat: Math.min(...mapData.map(n => parseFloat(n.latitude))),
-            max_lat: Math.max(...mapData.map(n => parseFloat(n.latitude))),
-            min_lng: Math.min(...mapData.map(n => parseFloat(n.longitude))),
-            max_lng: Math.max(...mapData.map(n => parseFloat(n.longitude)))
+            min_lat: Math.min(...mapData.map((n: any) => parseFloat(n.latitude))),
+            max_lat: Math.max(...mapData.map((n: any) => parseFloat(n.latitude))),
+            min_lng: Math.min(...mapData.map((n: any) => parseFloat(n.longitude))),
+            max_lng: Math.max(...mapData.map((n: any) => parseFloat(n.longitude)))
           }
         }
       });
@@ -436,9 +434,9 @@ export class NodeController {
       const result = await pool.query(query, params);
       
       res.json({
-        data: result.rows,
+        data: result,
         meta: {
-          total: result.rows.length,
+          total: result.length,
           timestamp: new Date().toISOString()
         }
       });
@@ -477,12 +475,11 @@ export class NodeController {
       
       query += ` ORDER BY camera_name`;
       
-      const result = await pool.query(query, params);
-      const cameras = result.rows;
+      const cameras = await pool.query(query, params);
       
       // Include recent image information if requested
       if (include_recent_images === 'true' && cameras.length > 0) {
-        const cameraIds = cameras.map(camera => camera.camera_id);
+        const cameraIds = cameras.map((camera: any) => camera.camera_id);
         const imagesQuery = `
           SELECT 
             e.camera_id,
@@ -496,14 +493,14 @@ export class NodeController {
           GROUP BY e.camera_id
         `;
         
-        const imagesResult = await pool.query(imagesQuery, [cameraIds]);
-        const imagesByCamera = imagesResult.rows.reduce((acc, img) => {
+        const imagesRows = await pool.query(imagesQuery, [cameraIds]);
+        const imagesByCamera = imagesRows.reduce((acc: Record<string, any>, img: any) => {
           acc[img.camera_id] = img;
           return acc;
         }, {} as Record<string, any>);
         
         // Attach image data to cameras
-        cameras.forEach(camera => {
+        cameras.forEach((camera: any) => {
           const imgData = imagesByCamera[camera.camera_id] || {
             images_24h: 0,
             last_image: null,
