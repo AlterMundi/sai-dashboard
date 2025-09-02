@@ -271,6 +271,194 @@ export const getExecutionImage = asyncHandler(async (req: Request, res: Response
   }
 });
 
+/**
+ * Serve WebP variant of execution image (optimized for web display)
+ * GET /api/executions/:executionId/image/webp
+ */
+export const getExecutionImageWebP = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+  const { executionId } = req.params;
+
+  if (!executionId) {
+    res.status(400).json({
+      error: {
+        message: 'Execution ID is required',
+        code: 'MISSING_EXECUTION_ID'
+      }
+    });
+    return;
+  }
+
+  try {
+    // First verify execution exists and has image
+    const execution = await executionService.getExecutionById(executionId);
+    
+    if (!execution) {
+      res.status(404).json({
+        error: {
+          message: 'Execution not found',
+          code: 'EXECUTION_NOT_FOUND'
+        }
+      });
+      return;
+    }
+
+    // Get WebP image data
+    const imageData = await imageService.getImageWebP(executionId);
+
+    if (!imageData) {
+      // Fallback to JPEG original if WebP not available
+      logger.debug('WebP not available, falling back to JPEG:', { executionId });
+      const jpegData = await imageService.getImage(executionId, false);
+      
+      if (!jpegData) {
+        res.status(404).json({
+          error: {
+            message: 'Image data not found',
+            code: 'IMAGE_DATA_ERROR'
+          }
+        });
+        return;
+      }
+
+      res.setHeader('Content-Type', jpegData.contentType);
+      res.setHeader('Content-Length', jpegData.size);
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+      res.setHeader('ETag', `"${executionId}-jpeg-fallback"`);
+      
+      jpegData.stream.pipe(res);
+      return;
+    }
+
+    // Set WebP headers
+    res.setHeader('Content-Type', 'image/webp');
+    res.setHeader('Content-Length', imageData.size);
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    res.setHeader('ETag', `"${executionId}-webp"`);
+    res.setHeader('Vary', 'Accept');
+
+    // Handle conditional requests
+    const ifNoneMatch = req.get('If-None-Match');
+    if (ifNoneMatch === res.get('ETag')) {
+      res.status(304).end();
+      return;
+    }
+
+    // Stream the WebP image
+    imageData.stream.pipe(res);
+
+    logger.debug('WebP image served successfully:', {
+      executionId,
+      contentType: 'image/webp',
+      size: imageData.size
+    });
+
+  } catch (error) {
+    logger.error('Failed to serve WebP image:', { executionId, error });
+    res.status(500).json({
+      error: {
+        message: 'Failed to serve WebP image',
+        code: 'WEBP_SERVE_ERROR'
+      }
+    });
+  }
+});
+
+/**
+ * Serve WebP thumbnail for execution image
+ * GET /api/executions/:executionId/thumbnail?size=150|300
+ */
+export const getExecutionThumbnail = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+  const { executionId } = req.params;
+  const { size = '300' } = req.query;
+
+  if (!executionId) {
+    res.status(400).json({
+      error: {
+        message: 'Execution ID is required',
+        code: 'MISSING_EXECUTION_ID'
+      }
+    });
+    return;
+  }
+
+  const thumbnailSize = size === '150' ? '150px' : '300px';
+
+  try {
+    // First verify execution exists and has image
+    const execution = await executionService.getExecutionById(executionId);
+    
+    if (!execution) {
+      res.status(404).json({
+        error: {
+          message: 'Execution not found',
+          code: 'EXECUTION_NOT_FOUND'
+        }
+      });
+      return;
+    }
+
+    // Get WebP thumbnail data
+    const thumbnailData = await imageService.getThumbnail(executionId, thumbnailSize);
+
+    if (!thumbnailData) {
+      // Fallback to original image if thumbnail not available
+      logger.debug('Thumbnail not available, falling back to original:', { executionId, size: thumbnailSize });
+      const originalData = await imageService.getImage(executionId, true); // Use legacy thumbnail
+      
+      if (!originalData) {
+        res.status(404).json({
+          error: {
+            message: 'Thumbnail data not found',
+            code: 'THUMBNAIL_DATA_ERROR'
+          }
+        });
+        return;
+      }
+
+      res.setHeader('Content-Type', originalData.contentType);
+      res.setHeader('Content-Length', originalData.size);
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+      res.setHeader('ETag', `"${executionId}-thumb-fallback"`);
+      
+      originalData.stream.pipe(res);
+      return;
+    }
+
+    // Set WebP thumbnail headers
+    res.setHeader('Content-Type', 'image/webp');
+    res.setHeader('Content-Length', thumbnailData.size);
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    res.setHeader('ETag', `"${executionId}-thumb-${thumbnailSize}-webp"`);
+    res.setHeader('Vary', 'Accept');
+
+    // Handle conditional requests
+    const ifNoneMatch = req.get('If-None-Match');
+    if (ifNoneMatch === res.get('ETag')) {
+      res.status(304).end();
+      return;
+    }
+
+    // Stream the WebP thumbnail
+    thumbnailData.stream.pipe(res);
+
+    logger.debug('WebP thumbnail served successfully:', {
+      executionId,
+      size: thumbnailSize,
+      contentType: 'image/webp',
+      fileSize: thumbnailData.size
+    });
+
+  } catch (error) {
+    logger.error('Failed to serve WebP thumbnail:', { executionId, size: thumbnailSize, error });
+    res.status(500).json({
+      error: {
+        message: 'Failed to serve WebP thumbnail',
+        code: 'THUMBNAIL_SERVE_ERROR'
+      }
+    });
+  }
+});
+
 export const getExecutionData = asyncHandler(async (req: Request, res: Response): Promise<void> => {
   const { executionId } = req.params;
   const { nodeId } = req.query;

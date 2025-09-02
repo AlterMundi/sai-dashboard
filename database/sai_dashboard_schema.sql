@@ -400,6 +400,176 @@ INSERT INTO users (username, email, password_hash, role, full_name) VALUES
 ('admin', 'admin@sai-dashboard.local', '$2b$12$LQv3c1yqBwEHxkVxMJzU5.MZ4hOJnPmKmKCjjqgqYQZ5qhcQ9jP5m', 'admin', 'System Administrator');
 
 -- ============================================================================
+-- NODE-BASED REGIONAL MONITORING SYSTEM
+-- ============================================================================
+
+-- Monitoring nodes (physical locations with multiple cameras)
+CREATE TABLE monitoring_nodes (
+    node_id VARCHAR(50) PRIMARY KEY,            -- NODE_001, NODE_002, etc.
+    node_name VARCHAR(100) NOT NULL,            -- "Córdoba Centro", "Villa Carlos Paz"
+    region VARCHAR(50) NOT NULL,                -- "Córdoba", "Buenos Aires", "Mendoza"
+    node_type VARCHAR(30) DEFAULT 'fixed',      -- fixed, mobile, temporary
+    
+    -- Geographic Location
+    latitude DECIMAL(10,7) NOT NULL,            -- -31.4135000
+    longitude DECIMAL(10,7) NOT NULL,           -- -64.1811000
+    elevation_meters INTEGER,                   -- Altitude above sea level
+    coverage_radius_meters INTEGER DEFAULT 5000, -- Monitoring radius
+    
+    -- Node Status
+    status ENUM('active', 'maintenance', 'offline', 'testing') DEFAULT 'active',
+    installation_date DATE,
+    last_maintenance DATE,
+    next_maintenance_due DATE,
+    
+    -- Contact Information
+    contact_person VARCHAR(100),
+    contact_phone VARCHAR(20),
+    contact_email VARCHAR(100),
+    
+    -- Technical Specifications
+    power_source ENUM('grid', 'solar', 'battery', 'hybrid') DEFAULT 'grid',
+    connectivity ENUM('fiber', 'cellular', 'satellite', 'wifi') DEFAULT 'fiber',
+    backup_power_hours INTEGER DEFAULT 0,
+    
+    -- Metadata
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW(),
+    
+    -- Performance Indexes
+    INDEX idx_region (region),
+    INDEX idx_status_region (status, region),
+    INDEX idx_location (latitude, longitude),
+    INDEX idx_coverage (coverage_radius_meters),
+    INDEX idx_next_maintenance (next_maintenance_due)
+);
+
+-- Cameras associated with monitoring nodes
+CREATE TABLE node_cameras (
+    camera_id VARCHAR(50) PRIMARY KEY,          -- CAM_NODE001_01, CAM_NODE001_02
+    node_id VARCHAR(50) NOT NULL,               -- References monitoring_nodes
+    camera_name VARCHAR(100) NOT NULL,          -- "North Tower Cam", "East Valley View"
+    
+    -- Camera Position (relative to node)
+    direction_degrees INTEGER,                   -- 0-359, North = 0
+    tilt_degrees INTEGER,                        -- -90 to +90, 0 = horizontal
+    zoom_level DECIMAL(4,2),                     -- 1.00 to 50.00
+    field_of_view_degrees INTEGER,               -- Horizontal FOV
+    
+    -- Camera Specifications
+    resolution_width INTEGER DEFAULT 1920,
+    resolution_height INTEGER DEFAULT 1080,
+    max_fps INTEGER DEFAULT 30,
+    night_vision_capable BOOLEAN DEFAULT FALSE,
+    ptz_capable BOOLEAN DEFAULT FALSE,           -- Pan/Tilt/Zoom capability
+    
+    -- Camera Status
+    status ENUM('active', 'inactive', 'maintenance', 'error') DEFAULT 'active',
+    last_image_timestamp TIMESTAMP,
+    image_quality_score DECIMAL(3,2),           -- 0.00-1.00, recent average
+    uptime_percent DECIMAL(5,2),                -- 0.00-100.00
+    
+    -- Detection Configuration
+    fire_detection_enabled BOOLEAN DEFAULT TRUE,
+    smoke_detection_enabled BOOLEAN DEFAULT TRUE,
+    motion_detection_enabled BOOLEAN DEFAULT TRUE,
+    vehicle_detection_enabled BOOLEAN DEFAULT FALSE,
+    people_detection_enabled BOOLEAN DEFAULT FALSE,
+    
+    -- Alert Settings
+    alert_threshold_confidence DECIMAL(3,2) DEFAULT 0.70, -- Min confidence for alerts
+    cooldown_minutes INTEGER DEFAULT 5,         -- Minutes between alerts
+    priority_multiplier DECIMAL(3,2) DEFAULT 1.00, -- Alert priority adjustment
+    
+    -- Metadata
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW(),
+    
+    -- Performance Indexes
+    INDEX idx_node_id (node_id),
+    INDEX idx_status_node (status, node_id),
+    INDEX idx_last_image (last_image_timestamp DESC),
+    INDEX idx_quality (image_quality_score DESC),
+    FOREIGN KEY (node_id) REFERENCES monitoring_nodes(node_id) ON DELETE CASCADE
+);
+
+-- Add node references to existing tables
+ALTER TABLE executions ADD COLUMN node_id VARCHAR(50);
+ALTER TABLE executions ADD COLUMN camera_id VARCHAR(50);
+ALTER TABLE execution_analysis ADD COLUMN node_id VARCHAR(50);
+
+-- Add indexes for node-based queries
+ALTER TABLE executions ADD INDEX idx_node_timestamp (node_id, execution_timestamp DESC);
+ALTER TABLE executions ADD INDEX idx_camera_timestamp (camera_id, execution_timestamp DESC);
+ALTER TABLE execution_analysis ADD INDEX idx_node_risk (node_id, risk_level);
+
+-- Foreign key constraints for node references
+ALTER TABLE executions ADD FOREIGN KEY (node_id) REFERENCES monitoring_nodes(node_id);
+ALTER TABLE executions ADD FOREIGN KEY (camera_id) REFERENCES node_cameras(camera_id);
+ALTER TABLE execution_analysis ADD FOREIGN KEY (node_id) REFERENCES monitoring_nodes(node_id);
+
+-- Regional coverage statistics view
+CREATE OR REPLACE VIEW regional_coverage_stats AS
+SELECT 
+    mn.region,
+    COUNT(mn.node_id) as total_nodes,
+    COUNT(nc.camera_id) as total_cameras,
+    COUNT(CASE WHEN mn.status = 'active' THEN 1 END) as active_nodes,
+    COUNT(CASE WHEN nc.status = 'active' THEN 1 END) as active_cameras,
+    AVG(nc.image_quality_score) as avg_image_quality,
+    AVG(nc.uptime_percent) as avg_uptime_percent,
+    SUM(mn.coverage_radius_meters) / COUNT(mn.node_id) as avg_coverage_radius
+FROM monitoring_nodes mn
+LEFT JOIN node_cameras nc ON mn.node_id = nc.node_id
+GROUP BY mn.region
+ORDER BY mn.region;
+
+-- Node performance statistics view
+CREATE OR REPLACE VIEW node_performance_stats AS
+SELECT 
+    mn.node_id,
+    mn.node_name,
+    mn.region,
+    mn.status as node_status,
+    COUNT(nc.camera_id) as camera_count,
+    COUNT(CASE WHEN nc.status = 'active' THEN 1 END) as active_cameras,
+    AVG(nc.image_quality_score) as avg_image_quality,
+    AVG(nc.uptime_percent) as avg_uptime,
+    COUNT(e.id) as total_executions_24h,
+    COUNT(CASE WHEN ea.risk_level IN ('high', 'critical') THEN 1 END) as high_risk_detections_24h,
+    MAX(e.execution_timestamp) as last_detection
+FROM monitoring_nodes mn
+LEFT JOIN node_cameras nc ON mn.node_id = nc.node_id
+LEFT JOIN executions e ON mn.node_id = e.node_id 
+    AND e.execution_timestamp >= NOW() - INTERVAL '24 HOURS'
+LEFT JOIN execution_analysis ea ON e.id = ea.execution_id
+GROUP BY mn.node_id, mn.node_name, mn.region, mn.status
+ORDER BY high_risk_detections_24h DESC, total_executions_24h DESC;
+
+-- Insert sample monitoring nodes for testing
+INSERT INTO monitoring_nodes (node_id, node_name, region, latitude, longitude, coverage_radius_meters, status) VALUES
+('NODE_001', 'Córdoba Centro', 'Córdoba', -31.4135000, -64.1811000, 8000, 'active'),
+('NODE_002', 'Villa Carlos Paz', 'Córdoba', -31.4241000, -64.4987000, 6000, 'active'),
+('NODE_003', 'La Calera', 'Córdoba', -31.3476000, -64.3316000, 5000, 'active'),
+('NODE_004', 'Sierras Chicas Norte', 'Córdoba', -31.2500000, -64.2500000, 12000, 'active'),
+('NODE_005', 'Valle de Punilla', 'Córdoba', -31.4000000, -64.5000000, 15000, 'maintenance'),
+('NODE_006', 'Mendoza Este', 'Mendoza', -32.8895000, -68.8458000, 10000, 'active'),
+('NODE_007', 'San Rafael', 'Mendoza', -34.6177000, -68.3301000, 8000, 'testing');
+
+-- Insert sample cameras for testing
+INSERT INTO node_cameras (camera_id, node_id, camera_name, direction_degrees, resolution_width, resolution_height, status) VALUES
+('CAM_NODE001_01', 'NODE_001', 'Centro Norte', 0, 1920, 1080, 'active'),
+('CAM_NODE001_02', 'NODE_001', 'Centro Este', 90, 1920, 1080, 'active'),
+('CAM_NODE001_03', 'NODE_001', 'Centro Sur', 180, 1920, 1080, 'active'),
+('CAM_NODE001_04', 'NODE_001', 'Centro Oeste', 270, 1920, 1080, 'active'),
+('CAM_NODE002_01', 'NODE_002', 'VCP Panorámica', 45, 2560, 1440, 'active'),
+('CAM_NODE002_02', 'NODE_002', 'VCP Valle', 180, 1920, 1080, 'active'),
+('CAM_NODE003_01', 'NODE_003', 'La Calera Principal', 0, 1920, 1080, 'active'),
+('CAM_NODE004_01', 'NODE_004', 'Sierras Norte Alto', 315, 1920, 1080, 'active'),
+('CAM_NODE004_02', 'NODE_004', 'Sierras Norte Bajo', 135, 1920, 1080, 'active'),
+('CAM_NODE006_01', 'NODE_006', 'Mendoza Este Panorámica', 0, 2560, 1440, 'active');
+
+-- ============================================================================
 -- DATABASE OPTIMIZATION
 -- ============================================================================
 

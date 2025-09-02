@@ -17,6 +17,8 @@ import {
   getExecutions,
   getExecutionById,
   getExecutionImage,
+  getExecutionImageWebP,
+  getExecutionThumbnail,
   getExecutionData,
   getDailySummary,
   getExecutionStats,
@@ -47,6 +49,7 @@ import {
   readiness,
   liveness
 } from '@/controllers/health';
+import { NodeController } from '@/controllers/node';
 
 const router = Router();
 
@@ -138,8 +141,10 @@ executionRouter.get('/:executionId', getExecutionById);
 // Execution raw data (for debugging)
 executionRouter.get('/:executionId/data', getExecutionData);
 
-// Execution image serving (original and thumbnails)
-executionRouter.get('/:executionId/image', getExecutionImage);
+// Execution image serving (hybrid JPEG+WebP approach)
+executionRouter.get('/:executionId/image', getExecutionImage);          // JPEG original
+executionRouter.get('/:executionId/image/webp', getExecutionImageWebP); // WebP variant  
+executionRouter.get('/:executionId/thumbnail', getExecutionThumbnail);  // WebP thumbnails
 
 // Enhanced analysis endpoints
 executionRouter.get('/:executionId/analysis', getComprehensiveAnalysis);
@@ -402,5 +407,20 @@ router.use('*', (req, res) => {
     }
   });
 });
+
+// =================================================================
+// NODE-BASED REGIONAL MONITORING ROUTES (NEW)
+// =================================================================
+
+// Regional node management
+router.get('/nodes', requireAuth, NodeController.getAllNodes);
+router.get('/nodes/performance', requireAuth, NodeController.getNodePerformance);
+router.get('/nodes/:nodeId', requireAuth, NodeController.getNodeDetails);
+router.get('/nodes/:nodeId/executions', requireAuth, NodeController.getNodeExecutions);
+router.get('/nodes/:nodeId/cameras', requireAuth, NodeController.getNodeCameras);
+
+// Coverage and geographic data
+router.get('/coverage/regional', requireAuth, NodeController.getRegionalCoverage);
+router.get('/coverage/map', requireAuth, NodeController.getCoverageMap);
 
 export default router;

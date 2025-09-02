@@ -73,6 +73,8 @@ interface ExtractedImage {
   format: string;
   originalPath: string;
   thumbnailPath: string | null;
+  nodeId?: string;
+  cameraId?: string;
 }
 
 interface NotificationData {
@@ -335,6 +337,11 @@ export class ETLService {
         return;
       }
 
+      // Update execution with node assignment if available
+      if (imageData.nodeId || imageData.cameraId) {
+        await this.updateExecutionNodeAssignment(executionId, imageData.nodeId, imageData.cameraId);
+      }
+
       // Process and cache image
       await this.cacheImage(imageData);
       
@@ -343,12 +350,52 @@ export class ETLService {
 
       logger.info('Image processed and cached', {
         executionId,
+        nodeId: imageData.nodeId,
+        cameraId: imageData.cameraId,
         sizeBytes: imageData.sizeBytes,
         format: imageData.format
       });
 
     } catch (error) {
       logger.error('Image processing failed:', { executionId, error });
+    }
+  }
+
+  /**
+   * Update execution with node and camera assignment
+   */
+  private async updateExecutionNodeAssignment(executionId: number, nodeId?: string, cameraId?: string): Promise<void> {
+    try {
+      if (nodeId || cameraId) {
+        await this.saiPool.query(`
+          UPDATE executions 
+          SET 
+            node_id = COALESCE($2, node_id),
+            camera_id = COALESCE($3, camera_id),
+            updated_at = NOW()
+          WHERE id = $1
+        `, [executionId, nodeId, cameraId]);
+
+        // Also update the analysis table if it exists
+        await this.saiPool.query(`
+          UPDATE execution_analysis 
+          SET node_id = COALESCE($2, node_id)
+          WHERE execution_id = $1
+        `, [executionId, nodeId]);
+
+        logger.debug('Updated execution node assignment', { 
+          executionId, 
+          nodeId, 
+          cameraId 
+        });
+      }
+    } catch (error) {
+      logger.error('Failed to update execution node assignment:', { 
+        executionId, 
+        nodeId, 
+        cameraId, 
+        error 
+      });
     }
   }
 
@@ -376,13 +423,18 @@ export class ETLService {
       const sizeBytes = Buffer.byteLength(base64Data, 'base64');
       const executionId = executionData.executionId;
 
+      // Extract node and camera information for regional assignment
+      const nodeAssignment = this.extractNodeAssignment(parsedData);
+
       return {
         executionId,
         base64Data,
         sizeBytes,
         format: 'jpeg', // Assume JPEG for SAI images
         originalPath: `/mnt/raid1/n8n/backup/images/by-execution/${executionId}/original.jpg`,
-        thumbnailPath: `/mnt/raid1/n8n/backup/images/by-execution/${executionId}/thumb.jpg`
+        thumbnailPath: `/mnt/raid1/n8n/backup/images/by-execution/${executionId}/thumb.jpg`,
+        nodeId: nodeAssignment?.nodeId,
+        cameraId: nodeAssignment?.cameraId
       };
 
     } catch (error) {
@@ -392,30 +444,182 @@ export class ETLService {
   }
 
   /**
-   * Cache image to filesystem with Sharp optimization
+   * Extract node and camera assignment from execution data
+   * Implements multiple detection strategies for robust node assignment
+   */
+  private extractNodeAssignment(parsedData: any): { nodeId?: string; cameraId?: string } | null {
+    try {
+      // Strategy 1: Direct node/camera IDs in webhook payload
+      const webhookData = parsedData?.nodeInputData?.Webhook?.[0]?.json?.body;
+      if (webhookData?.nodeId || webhookData?.cameraId) {
+        return {
+          nodeId: webhookData.nodeId,
+          cameraId: webhookData.cameraId
+        };
+      }
+
+      // Strategy 2: Extract from webhook URL or headers
+      const webhookHeaders = parsedData?.nodeInputData?.Webhook?.[0]?.json?.headers;
+      const userAgent = webhookHeaders?.['user-agent'] || webhookHeaders?.['User-Agent'];
+      if (userAgent) {
+        const nodeMatch = userAgent.match(/Node[_-]?(\w+)/i);
+        const cameraMatch = userAgent.match(/Cam[_-]?(\w+)/i);
+        
+        if (nodeMatch || cameraMatch) {
+          return {
+            nodeId: nodeMatch ? `NODE_${nodeMatch[1].toUpperCase()}` : undefined,
+            cameraId: cameraMatch ? `CAM_${cameraMatch[1].toUpperCase()}` : undefined
+          };
+        }
+      }
+
+      // Strategy 3: Location-based assignment using IP geolocation
+      const clientIp = webhookHeaders?.['x-forwarded-for'] || 
+                       webhookHeaders?.['X-Forwarded-For'] ||
+                       webhookHeaders?.['x-real-ip'] ||
+                       webhookHeaders?.['X-Real-IP'];
+                       
+      if (clientIp) {
+        return this.assignNodeByIPLocation(clientIp);
+      }
+
+      // Strategy 4: Timestamp-based assignment for testing
+      const timestamp = new Date();
+      const hour = timestamp.getHours();
+      
+      // Simulate different nodes based on time (for development/testing)
+      if (process.env.NODE_ENV === 'development') {
+        const testNodes = ['NODE_001', 'NODE_002', 'NODE_003'];
+        const testCameras = [
+          'CAM_NODE001_01', 'CAM_NODE001_02', 
+          'CAM_NODE002_01', 'CAM_NODE003_01'
+        ];
+        
+        const nodeIndex = hour % testNodes.length;
+        const cameraIndex = hour % testCameras.length;
+        
+        return {
+          nodeId: testNodes[nodeIndex],
+          cameraId: testCameras[cameraIndex]
+        };
+      }
+
+      logger.debug('No node assignment strategy matched, using default');
+      return {
+        nodeId: 'NODE_001', // Default fallback node
+        cameraId: 'CAM_NODE001_01' // Default fallback camera
+      };
+
+    } catch (error) {
+      logger.error('Failed to extract node assignment:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Assign node based on IP geolocation (placeholder implementation)
+   * In production, this would use a geolocation service
+   */
+  private assignNodeByIPLocation(clientIp: string): { nodeId?: string; cameraId?: string } {
+    // Remove IPv6 prefix if present
+    const cleanIp = clientIp.replace(/^::ffff:/, '');
+    
+    // Simple IP-based assignment logic (placeholder)
+    // In production, you would use a geolocation service like MaxMind
+    if (cleanIp.startsWith('192.168.')) {
+      // Local network - development
+      return { nodeId: 'NODE_001', cameraId: 'CAM_NODE001_01' };
+    }
+    
+    // Hash IP to deterministically assign nodes
+    const ipHash = this.hashString(cleanIp);
+    const nodeNumbers = ['001', '002', '003', '004', '005', '006', '007'];
+    const nodeIndex = ipHash % nodeNumbers.length;
+    
+    const selectedNode = `NODE_${nodeNumbers[nodeIndex]}`;
+    const selectedCamera = `CAM_${selectedNode}_01`; // Default to first camera
+    
+    logger.debug('IP-based node assignment', { 
+      clientIp: cleanIp, 
+      nodeId: selectedNode, 
+      cameraId: selectedCamera 
+    });
+    
+    return { nodeId: selectedNode, cameraId: selectedCamera };
+  }
+
+  /**
+   * Simple string hash function for deterministic node assignment
+   */
+  private hashString(str: string): number {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32-bit integer
+    }
+    return Math.abs(hash);
+  }
+
+  /**
+   * Cache image to filesystem with hybrid JPEG+WebP optimization
+   * Implements hybrid approach: JPEG originals + WebP variants for optimal performance
    */
   private async cacheImage(imageData: ExtractedImage): Promise<void> {
     try {
       const imageBuffer = Buffer.from(imageData.base64Data, 'base64');
+      const executionId = imageData.executionId;
+      const timestamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
       
-      // Ensure directory exists
-      const executionDir = path.dirname(imageData.originalPath);
-      await fs.mkdir(executionDir, { recursive: true });
-
-      // Save original image
-      await fs.writeFile(imageData.originalPath, imageBuffer);
-
-      // Generate optimized thumbnail if enabled
-      if (this.config.imageCache.generateThumbnails && imageData.thumbnailPath) {
-        const thumbnailBuffer = await sharp(imageBuffer)
-          .resize(300, 200, { fit: 'cover' })
-          .jpeg({ quality: 80 })
-          .toBuffer();
-
-        await fs.writeFile(imageData.thumbnailPath, thumbnailBuffer);
+      // Create hybrid directory structure
+      const baseImagePath = this.config.imageCache.basePath;
+      const originalsDir = path.join(baseImagePath, 'originals', timestamp.slice(0, 4), timestamp.slice(4, 6), timestamp.slice(6, 8));
+      const webpDir = path.join(baseImagePath, 'webp', timestamp.slice(0, 4), timestamp.slice(4, 6), timestamp.slice(6, 8));
+      const thumbsDir150 = path.join(baseImagePath, 'thumbnails', '150px');
+      const thumbsDir300 = path.join(baseImagePath, 'thumbnails', '300px');
+      
+      // Ensure all directories exist
+      await fs.mkdir(originalsDir, { recursive: true });
+      await fs.mkdir(webpDir, { recursive: true });
+      await fs.mkdir(thumbsDir150, { recursive: true });
+      await fs.mkdir(thumbsDir300, { recursive: true });
+      
+      const fileBaseName = `${executionId}_${Date.now()}`;
+      
+      // 1. Save JPEG original (preserve quality for expert review)
+      const jpegPath = path.join(originalsDir, `${fileBaseName}.jpg`);
+      await sharp(imageBuffer)
+        .jpeg({ quality: 95, progressive: true })
+        .toFile(jpegPath);
+      
+      // 2. Generate WebP variant (optimized for web display)
+      const webpPath = path.join(webpDir, `${fileBaseName}.webp`);
+      await sharp(imageBuffer)
+        .webp({ quality: 85, effort: 6 })
+        .toFile(webpPath);
+      
+      // 3. Generate WebP thumbnails if enabled
+      if (this.config.imageCache.generateThumbnails) {
+        // 150px thumbnail (small)
+        const thumb150Path = path.join(thumbsDir150, `${fileBaseName}.webp`);
+        await sharp(imageBuffer)
+          .resize(150, 150, { fit: 'cover', position: 'center' })
+          .webp({ quality: 75, effort: 4 })
+          .toFile(thumb150Path);
+        
+        // 300px thumbnail (medium)
+        const thumb300Path = path.join(thumbsDir300, `${fileBaseName}.webp`);
+        await sharp(imageBuffer)
+          .resize(300, 300, { fit: 'cover', position: 'center' })
+          .webp({ quality: 80, effort: 4 })
+          .toFile(thumb300Path);
       }
-
-      // Create symlinks for fast access patterns
+      
+      // Update image data paths for database storage
+      imageData.originalPath = jpegPath;
+      imageData.thumbnailPath = path.join(thumbsDir300, `${fileBaseName}.webp`);
+      
+      // Create symlinks for fast access patterns (legacy compatibility)
       await this.createImageSymlinks(imageData);
 
     } catch (error) {
@@ -459,7 +663,7 @@ export class ETLService {
 
     } catch (error) {
       // Don't fail the main process if symlink creation fails
-      logger.warn('Failed to create image symlinks:', { executionId: imageData.executionId, error: error.message });
+      logger.warn('Failed to create image symlinks:', { executionId: imageData.executionId, error: (error as Error).message });
     }
   }
 
