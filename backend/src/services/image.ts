@@ -426,6 +426,134 @@ export class ImageService {
     
     return { size: totalSize, dirs: dirCount, files: fileCount };
   }
+
+  /**
+   * Get WebP variant of execution image
+   * Used by hybrid JPEG+WebP serving approach
+   */
+  async getImageWebP(executionId: string): Promise<{stream: NodeJS.ReadableStream, size: number} | null> {
+    try {
+      // First check if WebP variant exists in new hybrid structure
+      const date = new Date(); // In production, get from execution timestamp
+      const webpPattern = this.getHybridImagePath(executionId, 'webp', date);
+      const webpPath = await this.findHybridFile(webpPattern);
+      
+      if (webpPath && existsSync(webpPath)) {
+        const stats = await fs.stat(webpPath);
+        const stream = createReadStream(webpPath);
+        
+        logger.debug('Serving WebP variant:', { 
+          executionId, 
+          path: webpPath,
+          size: stats.size 
+        });
+        
+        return {
+          stream,
+          size: stats.size
+        };
+      }
+
+      // WebP variant not found
+      logger.debug('WebP variant not found:', { executionId, pattern: webpPattern });
+      return null;
+
+    } catch (error) {
+      logger.error('Error getting WebP image:', { executionId, error });
+      return null;
+    }
+  }
+
+  /**
+   * Get WebP thumbnail for execution image
+   */
+  async getThumbnail(executionId: string, size: '150px' | '300px'): Promise<{stream: NodeJS.ReadableStream, size: number} | null> {
+    try {
+      const thumbnailPattern = this.getHybridThumbnailPath(executionId, size);
+      const thumbnailPath = await this.findHybridFile(thumbnailPattern);
+      
+      if (thumbnailPath && existsSync(thumbnailPath)) {
+        const stats = await fs.stat(thumbnailPath);
+        const stream = createReadStream(thumbnailPath);
+        
+        logger.debug('Serving WebP thumbnail:', { 
+          executionId, 
+          size,
+          path: thumbnailPath,
+          fileSize: stats.size 
+        });
+        
+        return {
+          stream,
+          size: stats.size
+        };
+      }
+
+      // Thumbnail not found
+      logger.debug('WebP thumbnail not found:', { executionId, size, pattern: thumbnailPattern });
+      return null;
+
+    } catch (error) {
+      logger.error('Error getting WebP thumbnail:', { executionId, size, error });
+      return null;
+    }
+  }
+
+  /**
+   * Get hybrid image path based on new directory structure
+   * /mnt/raid1/n8n/backup/images/originals/YYYY/MM/DD/executionId_timestamp.jpg
+   * /mnt/raid1/n8n/backup/images/webp/YYYY/MM/DD/executionId_timestamp.webp
+   */
+  private getHybridImagePath(executionId: string, format: 'jpeg' | 'webp', date: Date): string {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    
+    const baseDir = format === 'jpeg' ? 'originals' : 'webp';
+    const extension = format === 'jpeg' ? 'jpg' : 'webp';
+    
+    // Pattern: executionId_timestamp.ext (timestamp will be generated during processing)
+    // For now, we'll use a glob pattern to find the file
+    return join(this.cachePath, baseDir, year.toString(), month, day, `${executionId}_*.${extension}`);
+  }
+
+  /**
+   * Get hybrid thumbnail path
+   * /mnt/raid1/n8n/backup/images/thumbnails/150px/executionId_timestamp.webp
+   */
+  private getHybridThumbnailPath(executionId: string, size: '150px' | '300px'): string {
+    // Pattern: executionId_timestamp.webp (timestamp will be generated during processing)
+    // For now, we'll use a glob pattern to find the file
+    return join(this.cachePath, 'thumbnails', size, `${executionId}_*.webp`);
+  }
+
+  /**
+   * Find actual file path from glob pattern (helper for hybrid structure)
+   */
+  private async findHybridFile(globPattern: string): Promise<string | null> {
+    try {
+      const glob = require('glob');
+      const files = glob.sync(globPattern);
+      
+      if (files.length > 0) {
+        // Return the most recent file if multiple matches
+        const fileStats = await Promise.all(
+          files.map(async (file: string) => ({
+            path: file,
+            mtime: (await fs.stat(file)).mtime
+          }))
+        );
+        
+        fileStats.sort((a, b) => b.mtime.getTime() - a.mtime.getTime());
+        return fileStats[0].path;
+      }
+      
+      return null;
+    } catch (error) {
+      logger.error('Error finding hybrid file:', { globPattern, error });
+      return null;
+    }
+  }
 }
 
 export const imageService = new ImageService();

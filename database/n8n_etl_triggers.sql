@@ -90,10 +90,10 @@ BEGIN
             FALSE
         );
         
-        -- Insert into sai_dashboard.executions
+        -- Insert into sai_dashboard.executions (including node/camera placeholders)
         INSERT INTO sai_dashboard.executions (
             id, workflow_id, execution_timestamp, completion_timestamp, 
-            duration_ms, status, mode, retry_of
+            duration_ms, status, mode, retry_of, node_id, camera_id
         ) VALUES (
             NEW.id,
             NEW."workflowId"::text,
@@ -102,7 +102,9 @@ BEGIN
             processing_time,
             NEW.status,
             NEW.mode,
-            NEW."retryOf"
+            NEW."retryOf",
+            NULL,  -- Node assignment will be updated by ETL service during image processing
+            NULL   -- Camera assignment will be updated by ETL service during image processing
         );
         
         -- Insert image metadata if image exists
@@ -124,12 +126,12 @@ BEGIN
             )::text);
         END IF;
         
-        -- Insert analysis results
+        -- Insert analysis results (including node_id placeholder)
         INSERT INTO sai_dashboard.execution_analysis (
             execution_id, risk_level, confidence_score, overall_assessment,
             model_version, processing_time_ms, raw_response, analysis_timestamp,
             smoke_detected, flame_detected, heat_signature_detected,
-            alert_priority, response_required
+            alert_priority, response_required, node_id
         ) VALUES (
             NEW.id,
             risk_level::sai_dashboard.execution_analysis_risk_level_enum,
@@ -149,7 +151,8 @@ BEGIN
                 WHEN risk_level = 'medium' THEN 'normal'
                 ELSE 'low'
             END::sai_dashboard.execution_analysis_alert_priority_enum,
-            risk_level IN ('high', 'critical') AND COALESCE(confidence, 0) >= 0.85
+            risk_level IN ('high', 'critical') AND COALESCE(confidence, 0) >= 0.85,
+            NULL  -- Node assignment will be updated by ETL service during image processing
         );
         
         -- Insert notification status
@@ -192,9 +195,9 @@ BEGIN
         
         -- Insert minimal record to prevent reprocessing
         INSERT INTO sai_dashboard.executions (
-            id, workflow_id, execution_timestamp, status
+            id, workflow_id, execution_timestamp, status, node_id, camera_id
         ) VALUES (
-            NEW.id, NEW."workflowId"::text, NEW."startedAt", 'error'
+            NEW.id, NEW."workflowId"::text, NEW."startedAt", 'error', NULL, NULL
         ) ON CONFLICT (id) DO NOTHING;
         
         -- Notify about processing error
@@ -289,12 +292,27 @@ BEGIN
     END IF;
     
     -- Look for similar high-risk detections in the last 30 minutes
+    -- Prioritize same node/region correlations for incident grouping
     SELECT COUNT(*) INTO similar_count
     FROM sai_dashboard.execution_analysis ea
     JOIN sai_dashboard.executions e ON ea.execution_id = e.id
     WHERE ea.risk_level IN ('high', 'critical')
     AND e.execution_timestamp > NOW() - INTERVAL '30 minutes'
-    AND ea.execution_id != NEW.execution_id;
+    AND ea.execution_id != NEW.execution_id
+    AND (
+        -- Same node correlations (strongest)
+        ea.node_id IS NOT NULL AND ea.node_id = NEW.node_id
+        OR
+        -- Regional correlations (weaker but still relevant)
+        EXISTS (
+            SELECT 1 FROM sai_dashboard.monitoring_nodes mn1, sai_dashboard.monitoring_nodes mn2
+            WHERE mn1.node_id = ea.node_id AND mn2.node_id = NEW.node_id 
+            AND mn1.region = mn2.region
+        )
+        OR
+        -- Fallback: any high-risk detection if no node data
+        (ea.node_id IS NULL OR NEW.node_id IS NULL)
+    );
     
     -- If multiple high-risk detections, create or update incident
     IF similar_count >= 1 THEN
