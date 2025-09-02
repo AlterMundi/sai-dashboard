@@ -289,7 +289,9 @@ pre_build_checks() {
     if [ "$DRY_RUN" = true ]; then
         info "[DRY RUN] Would validate backend TypeScript"
     else
-        if [ "$VERBOSE" = true ]; then
+        if [ "$NO_TYPE_CHECK" = "1" ]; then
+            warning "Skipping TypeScript validation (NO_TYPE_CHECK=1)"
+        elif [ "$VERBOSE" = true ]; then
             npm run type-check || error "Backend TypeScript validation failed"
         else
             if ! npm run type-check >/dev/null 2>&1; then
