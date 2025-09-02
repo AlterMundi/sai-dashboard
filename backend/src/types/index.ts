@@ -314,7 +314,12 @@ export interface SSEClient {
 }
 
 export interface SSEMessage {
-  type: 'execution:new' | 'execution:error' | 'execution:progress' | 'execution:batch' | 'heartbeat' | 'connection' | 'system:stats' | 'system:health' | 'expert:assigned' | 'expert:review_completed' | 'incident:created' | 'emergency:response_required';
+  type: 'execution:new' | 'execution:error' | 'execution:progress' | 'execution:batch' | 'heartbeat' | 'connection' | 
+        'system:stats' | 'system:health' | 'system:notification' |
+        'expert:assigned' | 'expert:review_completed' | 'expert:review' |
+        'incident:created' | 'incident:update' |
+        'alert:critical' | 'emergency:response_required' |
+        string; // Allow dynamic system messages
   data?: Record<string, unknown>;
   id?: string;
   retry?: number;

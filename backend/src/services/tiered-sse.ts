@@ -375,7 +375,7 @@ export class TieredSSEManager extends EventEmitter {
 
     logger.debug('Message batch flushed', { 
       batchKey, 
-      count: batchMessage.data.count 
+      count: batchMessage.data?.count || 0
     });
   }
 
@@ -391,10 +391,10 @@ export class TieredSSEManager extends EventEmitter {
     for (const [clientId, client] of this.clients) {
       try {
         const sseFormatted = this.formatSSEMessage(message);
-        client.response.write(sseFormatted);
+        (client.response as any).write(sseFormatted);
         successCount++;
       } catch (error) {
-        logger.warn('Failed to send to SSE client', { clientId, error: error.message });
+        logger.warn('Failed to send to SSE client', { clientId, error: (error as Error).message });
         deadClients.push(clientId);
       }
     }
