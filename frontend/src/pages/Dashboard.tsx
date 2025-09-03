@@ -282,9 +282,9 @@ export function Dashboard() {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Telegram Delivery</label>
                   <select
-                    value={filters.telegramDelivered === undefined ? '' : filters.telegramDelivered.toString()}
+                    value={filters.telegramSent === undefined ? '' : filters.telegramSent.toString()}
                     onChange={(e) => applyQuickFilter({ 
-                      telegramDelivered: e.target.value === '' ? undefined : e.target.value === 'true' 
+                      telegramSent: e.target.value === '' ? undefined : e.target.value === 'true' 
                     })}
                     className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                   >
@@ -390,7 +390,7 @@ export function Dashboard() {
                   High Risk Only
                 </button>
                 <button
-                  onClick={() => applyQuickFilter({ telegramDelivered: true })}
+                  onClick={() => applyQuickFilter({ telegramSent: true })}
                   className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm hover:bg-blue-200 transition-colors"
                 >
                   Telegram Delivered
@@ -412,7 +412,8 @@ export function Dashboard() {
         {/* Main Gallery */}
         <ImageGallery 
           initialFilters={filters}
-          key={`${JSON.stringify(filters)}-${refreshTrigger}`} // Force re-render on filters change or refresh trigger
+          refreshTrigger={refreshTrigger}
+          key={JSON.stringify(filters)} // Only re-render on filter changes
         />
       </div>
     </Layout>

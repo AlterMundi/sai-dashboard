@@ -195,16 +195,45 @@ export interface FireIncident {
   updatedAt: Date;
 }
 
-export interface ExecutionWithImage extends SaiExecution {
-  imageUrl?: string;
-  thumbnailUrl?: string;
-  analysis?: ImageAnalysis;
-  telegramDelivered?: boolean;
-  telegramMessageId?: string;
+export interface ExecutionWithImage {
+  // Core execution data
+  id: number;
+  workflowId: string;
+  executionTimestamp: Date;
+  completionTimestamp: Date | null;
+  durationMs: number | null;
+  status: 'success' | 'error' | 'canceled' | 'running';
+  mode: string;
   
-  // Enhanced analysis data (optional for backward compatibility)
-  enhancedAnalysis?: SaiEnhancedAnalysis;
-  expertReview?: ExpertReview;
+  // Node and Camera data (NEW)
+  nodeId: string | null;
+  cameraId: string | null;
+
+  // Analysis data
+  riskLevel: 'critical' | 'high' | 'medium' | 'low' | 'none';
+  confidenceScore: number | null;
+  overallAssessment: string | null;
+  smokeDetected: boolean;
+  flameDetected: boolean;
+  heatSignatureDetected: boolean;
+  alertPriority: 'critical' | 'high' | 'normal' | 'low';
+  responseRequired: boolean;
+
+  // Image data
+  hasImage: boolean;
+  imagePath: string | null;
+  imageSizeBytes: number | null;
+  imageFormat: string | null;
+
+  // Notification data
+  telegramSent: boolean;
+  telegramMessageId: number | null;
+  telegramSentAt: Date | null;
+
+  // Metadata
+  modelVersion: string | null;
+  processingTimeMs: number | null;
+  extractedAt: Date | null;
 }
 
 export interface ApiResponse<T> {
@@ -235,15 +264,17 @@ export interface ExecutionFilters extends PaginationQuery {
   search?: string;
   hasImage?: boolean;
   riskLevel?: 'high' | 'medium' | 'low' | 'none';
-  telegramDelivered?: boolean;
+  telegramSent?: boolean;
   datePreset?: 'today' | 'yesterday' | 'last7days' | 'last30days' | 'thisMonth' | 'lastMonth';
   sortBy?: 'date' | 'risk' | 'status' | 'confidence' | 'camera' | 'priority';
   sortOrder?: 'asc' | 'desc';
   
   // Enhanced filters for new analysis fields
   cameraId?: string;
-  nodeType?: string;
   nodeId?: string;
+  searchQuery?: string;
+  pageSize?: number;
+  nodeType?: string;
   alertPriority?: 'critical' | 'high' | 'normal' | 'low';
   responseRequired?: boolean;
   verifiedByHuman?: boolean;
@@ -332,6 +363,13 @@ export interface DailySummary {
   failedExecutions: number;
   successRate: number;
   avgExecutionTime: number | null;
+  // New fields for enhanced daily summary
+  highRiskDetections: number;
+  criticalDetections: number;
+  executionsWithImages: number;
+  telegramNotificationsSent: number;
+  avgProcessingTimeMs: number;
+  avgConfidenceScore: number;
 }
 
 export interface HealthStatus {

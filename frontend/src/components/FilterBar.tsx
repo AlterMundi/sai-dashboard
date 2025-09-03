@@ -211,8 +211,8 @@ export function FilterBar({
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Telegram Delivered</label>
               <Select 
-                value={filters.telegramDelivered !== undefined ? filters.telegramDelivered.toString() : ''} 
-                onValueChange={(value) => handleFilterChange('telegramDelivered', value === '' ? undefined : value === 'true')}
+                value={filters.telegramSent !== undefined ? filters.telegramSent.toString() : ''} 
+                onValueChange={(value) => handleFilterChange('telegramSent', value === '' ? undefined : value === 'true')}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Any" />
