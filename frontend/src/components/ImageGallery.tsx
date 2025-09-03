@@ -12,9 +12,10 @@ import { Grid, List, RefreshCw, ArrowUp, Filter } from 'lucide-react';
 interface ImageGalleryProps {
   initialFilters?: ExecutionFilters;
   className?: string;
+  refreshTrigger?: number;
 }
 
-export function ImageGallery({ initialFilters = {}, className }: ImageGalleryProps) {
+export function ImageGallery({ initialFilters = {}, className, refreshTrigger }: ImageGalleryProps) {
   const [selectedExecution, setSelectedExecution] = useState<ExecutionWithImage | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -31,7 +32,7 @@ export function ImageGallery({ initialFilters = {}, className }: ImageGalleryPro
     refresh,
     updateFilters,
     filters,
-  } = useExecutions(initialFilters);
+  } = useExecutions(initialFilters, refreshTrigger);
 
   // Intersection observer for infinite scroll
   const { ref: loadMoreRef, inView } = useInView({

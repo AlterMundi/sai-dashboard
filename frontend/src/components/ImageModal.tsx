@@ -65,8 +65,8 @@ export function ImageModal({ execution, isOpen, onClose }: ImageModalProps) {
     ? executionsApi.getImageUrl(execution.id, false)
     : undefined;
 
-  const duration = execution.stoppedAt 
-    ? Math.round((new Date(execution.stoppedAt).getTime() - new Date(execution.startedAt).getTime()) / 1000)
+  const duration = execution.durationMs 
+    ? Math.round(execution.durationMs / 1000)
     : null;
 
   const handleImageLoad = () => {
@@ -104,7 +104,7 @@ export function ImageModal({ execution, isOpen, onClose }: ImageModalProps) {
       try {
         await navigator.share({
           title: `SAI Execution ${execution.id}`,
-          text: execution.analysis?.description || 'SAI image analysis result',
+          text: execution.overallAssessment || 'SAI image analysis result',
           url: window.location.href,
         });
       } catch (error) {
@@ -245,8 +245,8 @@ export function ImageModal({ execution, isOpen, onClose }: ImageModalProps) {
                     <Calendar className="h-4 w-4 text-gray-400 mr-2" />
                     <div>
                       <p className="text-gray-500">Started</p>
-                      <p className="font-medium">{formatDate(execution.startedAt, 'MMM d, HH:mm')}</p>
-                      <p className="text-xs text-gray-400"><DynamicTimeAgo date={execution.startedAt} /></p>
+                      <p className="font-medium">{formatDate(execution.executionTimestamp, 'MMM d, HH:mm')}</p>
+                      <p className="text-xs text-gray-400"><DynamicTimeAgo date={execution.executionTimestamp} /></p>
                     </div>
                   </div>
                   
@@ -282,7 +282,7 @@ export function ImageModal({ execution, isOpen, onClose }: ImageModalProps) {
               </div>
 
               {/* Analysis Results */}
-              {execution.analysis && (
+              {execution.overallAssessment && (
                 <div className="space-y-3">
                   <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
                     AI Analysis
@@ -293,48 +293,39 @@ export function ImageModal({ execution, isOpen, onClose }: ImageModalProps) {
                       <div>
                         <p className="text-sm font-medium text-gray-700 mb-2">Risk Assessment</p>
                         <p className="text-gray-900 leading-relaxed">
-                          {execution.analysis.riskAssessment || execution.analysis.description}
+                          {execution.overallAssessment}
                         </p>
                       </div>
                       
-                      {execution.analysis.confidence && (
+                      {execution.confidenceScore && (
                         <div>
                           <div className="flex justify-between text-sm mb-1">
                             <span className="text-gray-600">Confidence</span>
                             <span className="font-medium">
-                              {Math.round(execution.analysis.confidence * 100)}%
+                              {Math.round(execution.confidenceScore * 100)}%
                             </span>
                           </div>
                           <div className="w-full bg-gray-200 rounded-full h-2">
                             <div
                               className={cn(
                                 'h-2 rounded-full transition-all duration-500',
-                                execution.analysis.confidence > 0.8 ? 'bg-success-500' :
-                                execution.analysis.confidence > 0.6 ? 'bg-warning-500' : 'bg-danger-500'
+                                execution.confidenceScore > 0.8 ? 'bg-success-500' :
+                                execution.confidenceScore > 0.6 ? 'bg-warning-500' : 'bg-danger-500'
                               )}
-                              style={{ width: `${execution.analysis.confidence * 100}%` }}
+                              style={{ width: `${execution.confidenceScore * 100}%` }}
                             />
                           </div>
                         </div>
                       )}
 
-                      {execution.analysis.recommendations && execution.analysis.recommendations.length > 0 && (
-                        <div>
-                          <p className="text-sm font-medium text-gray-700 mb-2">Recommendations</p>
-                          <ul className="list-disc list-inside space-y-1 text-sm text-gray-600">
-                            {execution.analysis.recommendations.map((rec, index) => (
-                              <li key={index}>{rec}</li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
+                      {/* Recommendations section removed - not available in new ETL structure */}
                     </div>
                   </div>
                 </div>
               )}
 
               {/* Telegram Status */}
-              {execution.telegramDelivered && (
+              {execution.telegramSent && (
                 <div className="space-y-3">
                   <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
                     Notifications
@@ -377,14 +368,7 @@ export function ImageModal({ execution, isOpen, onClose }: ImageModalProps) {
                     </code>
                   </div>
 
-                  {execution.retryOf && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Retry of</span>
-                      <code className="font-mono text-xs bg-gray-100 px-2 py-1 rounded">
-                        {execution.retryOf}
-                      </code>
-                    </div>
-                  )}
+                  {/* retryOf field removed - not available in new ETL structure */}
                 </div>
               </div>
             </div>

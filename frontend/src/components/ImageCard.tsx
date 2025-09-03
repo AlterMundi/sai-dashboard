@@ -11,7 +11,8 @@ export function ImageCard({ execution, onClick, loading = false }: ImageCardProp
   const [imageLoading, setImageLoading] = useState(true);
   const [imageError, setImageError] = useState(false);
 
-  const thumbnailUrl = execution.thumbnailUrl 
+  // Use hasImage from the execution data directly
+  const thumbnailUrl = (execution as any).hasImage
     ? executionsApi.getImageUrl(execution.id, true)
     : undefined;
 
@@ -33,8 +34,8 @@ export function ImageCard({ execution, onClick, loading = false }: ImageCardProp
   };
 
   // Calculate execution duration
-  const duration = execution.stoppedAt 
-    ? Math.round((new Date(execution.stoppedAt).getTime() - new Date(execution.startedAt).getTime()) / 1000)
+  const duration = execution.durationMs 
+    ? Math.round(execution.durationMs / 1000)
     : null;
 
   return (
@@ -89,7 +90,7 @@ export function ImageCard({ execution, onClick, loading = false }: ImageCardProp
         </div>
 
         {/* Telegram Delivered Indicator */}
-        {execution.telegramDelivered && (
+        {execution.telegramSent && (
           <div className="absolute top-2 left-2">
             <div className="bg-success-600 text-white rounded-full p-1">
               <MessageCircle className="h-3 w-3" />
@@ -104,7 +105,7 @@ export function ImageCard({ execution, onClick, loading = false }: ImageCardProp
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center text-xs text-gray-500">
             <Calendar className="h-3 w-3 mr-1" />
-            <DynamicTimeAgo date={execution.startedAt} />
+            <DynamicTimeAgo date={execution.executionTimestamp} />
           </div>
           {duration && (
             <div className="flex items-center text-xs text-gray-500">
@@ -115,27 +116,27 @@ export function ImageCard({ execution, onClick, loading = false }: ImageCardProp
         </div>
 
         {/* Analysis Summary */}
-        {execution.analysis && (
+        {execution.overallAssessment && (
           <div className="mb-3">
             <p className="text-sm text-gray-700 leading-relaxed">
-              {truncateText(execution.analysis.riskAssessment || execution.analysis.description, 120)}
+              {truncateText(execution.overallAssessment, 120)}
             </p>
             
-            {execution.analysis.confidence && (
+            {execution.confidenceScore && (
               <div className="flex items-center mt-2">
                 <span className="text-xs text-gray-500 mr-2">Confidence:</span>
                 <div className="flex-1 bg-gray-200 rounded-full h-1.5">
                   <div
                     className={cn(
                       'h-1.5 rounded-full transition-all duration-300',
-                      execution.analysis.confidence > 0.8 ? 'bg-success-500' :
-                      execution.analysis.confidence > 0.6 ? 'bg-warning-500' : 'bg-danger-500'
+                      execution.confidenceScore > 0.8 ? 'bg-success-500' :
+                      execution.confidenceScore > 0.6 ? 'bg-warning-500' : 'bg-danger-500'
                     )}
-                    style={{ width: `${execution.analysis.confidence * 100}%` }}
+                    style={{ width: `${execution.confidenceScore * 100}%` }}
                   />
                 </div>
                 <span className="text-xs text-gray-600 ml-2">
-                  {Math.round(execution.analysis.confidence * 100)}%
+                  {Math.round(execution.confidenceScore * 100)}%
                 </span>
               </div>
             )}
@@ -145,7 +146,7 @@ export function ImageCard({ execution, onClick, loading = false }: ImageCardProp
         {/* Footer */}
         <div className="flex items-center justify-between text-xs text-gray-500">
           <span className="font-mono">
-            #{execution.id.slice(-8)}
+            #{String(execution.id).slice(-8)}
           </span>
           <div className="flex items-center space-x-1">
             {execution.status === 'success' && <CheckCircle className="h-3 w-3 text-success-600" />}
