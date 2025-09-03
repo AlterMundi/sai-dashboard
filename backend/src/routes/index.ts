@@ -108,6 +108,47 @@ sseRouter.get('/status', authenticateToken, requireAuth, getSSEStatus);
 router.use('/events', sseRouter);
 
 // =================================================================
+// Secure Image Routes (Token-based Authentication)
+// =================================================================
+const secureImageRouter = Router();
+
+// Secure image endpoints with token-based auth (for HTML img tags with ?token=xxx)
+secureImageRouter.get('/:executionId/image', (req, res, next) => {
+  const token = req.query.token as string;
+  if (token) {
+    req.headers.authorization = `Bearer ${token}`;
+  }
+  authenticateToken(req, res, (err) => {
+    if (err) return next(err);
+    requireAuth(req, res, next);
+  });
+}, getExecutionImage);
+
+secureImageRouter.get('/:executionId/image/webp', (req, res, next) => {
+  const token = req.query.token as string;
+  if (token) {
+    req.headers.authorization = `Bearer ${token}`;
+  }
+  authenticateToken(req, res, (err) => {
+    if (err) return next(err);
+    requireAuth(req, res, next);
+  });
+}, getExecutionImageWebP);
+
+secureImageRouter.get('/:executionId/thumbnail', (req, res, next) => {
+  const token = req.query.token as string;
+  if (token) {
+    req.headers.authorization = `Bearer ${token}`;
+  }
+  authenticateToken(req, res, (err) => {
+    if (err) return next(err);
+    requireAuth(req, res, next);
+  });
+}, getExecutionThumbnail);
+
+router.use('/executions', secureImageRouter);
+
+// =================================================================
 // Protected Routes - Require Authentication
 // =================================================================
 
@@ -141,10 +182,7 @@ executionRouter.get('/:executionId', getExecutionById);
 // Execution raw data (for debugging)
 executionRouter.get('/:executionId/data', getExecutionData);
 
-// Execution image serving (hybrid JPEG+WebP approach)
-executionRouter.get('/:executionId/image', getExecutionImage);          // JPEG original
-executionRouter.get('/:executionId/image/webp', getExecutionImageWebP); // WebP variant  
-executionRouter.get('/:executionId/thumbnail', getExecutionThumbnail);  // WebP thumbnails
+// Image routes moved to public section above for HTML <img> tag compatibility
 
 // Enhanced analysis endpoints
 executionRouter.get('/:executionId/analysis', getComprehensiveAnalysis);
@@ -276,6 +314,21 @@ incidentRouter.get('/', async (req, res) => {
 router.use('/incidents', incidentRouter);
 
 // =================================================================
+// NODE-BASED REGIONAL MONITORING ROUTES (NEW)
+// =================================================================
+
+// Regional node management
+router.get('/nodes', NodeController.getAllNodes);
+router.get('/nodes/performance', NodeController.getNodePerformance);
+router.get('/nodes/:nodeId', NodeController.getNodeDetails);
+router.get('/nodes/:nodeId/executions', NodeController.getNodeExecutions);
+router.get('/nodes/:nodeId/cameras', NodeController.getNodeCameras);
+
+// Coverage and geographic data
+router.get('/coverage/regional', NodeController.getRegionalCoverage);
+router.get('/coverage/map', NodeController.getCoverageMap);
+
+// =================================================================
 // Optional Routes (With Optional Auth)
 // =================================================================
 
@@ -291,8 +344,8 @@ router.get('/public/stats', optionalAuth, async (req, res) => {
 
     // Enhanced stats for authenticated users
     if (req.user?.isAuthenticated) {
-      const executionService = require('@/services/execution').executionService;
-      const detailedStats = await executionService.getExecutionStats();
+      const { newExecutionService } = require('@/services/new-execution-service');
+      const detailedStats = await newExecutionService.getExecutionStats();
       
       res.json({
         data: {
@@ -407,20 +460,5 @@ router.use('*', (req, res) => {
     }
   });
 });
-
-// =================================================================
-// NODE-BASED REGIONAL MONITORING ROUTES (NEW)
-// =================================================================
-
-// Regional node management
-router.get('/nodes', requireAuth, NodeController.getAllNodes);
-router.get('/nodes/performance', requireAuth, NodeController.getNodePerformance);
-router.get('/nodes/:nodeId', requireAuth, NodeController.getNodeDetails);
-router.get('/nodes/:nodeId/executions', requireAuth, NodeController.getNodeExecutions);
-router.get('/nodes/:nodeId/cameras', requireAuth, NodeController.getNodeCameras);
-
-// Coverage and geographic data
-router.get('/coverage/regional', requireAuth, NodeController.getRegionalCoverage);
-router.get('/coverage/map', requireAuth, NodeController.getCoverageMap);
 
 export default router;
