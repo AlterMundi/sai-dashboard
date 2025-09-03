@@ -34,22 +34,41 @@ export const createMockExecution = (overrides?: Partial<ExecutionWithImage>): Ex
   id: 'exec-123',
   workflowId: 'workflow-456',
   status: 'success',
-  startedAt: '2025-08-29T10:00:00Z',
-  stoppedAt: '2025-08-29T10:00:30Z',
+  executionTimestamp: '2025-08-29T10:00:00Z',
+  completionTimestamp: '2025-08-29T10:00:30Z',
+  durationMs: 30000,
   mode: 'webhook',
-  finished: true,
-  retryOf: null,
-  retrySuccessId: null,
+  nodeId: 'NODE_001',
+  cameraId: 'CAM_001',
+  
+  // Analysis fields from new ETL structure
+  riskLevel: 'low',
+  confidenceScore: 0.85,
+  overallAssessment: 'Low risk detected - Image analysis completed successfully',
+  smokeDetected: false,
+  flameDetected: false,
+  heatSignatureDetected: false,
+  alertPriority: 'normal',
+  responseRequired: false,
+  
+  // Image fields
+  hasImage: true,
+  imagePath: '/mnt/raid1/n8n-backup/images/by-execution/exec-123/original.jpg',
+  imageSizeBytes: 1024000,
+  imageFormat: 'jpeg',
   imageUrl: '/api/executions/exec-123/image',
   thumbnailUrl: '/api/executions/exec-123/image?thumbnail=true',
-  analysis: {
-    riskAssessment: 'Low risk detected',
-    confidence: 0.85,
-    description: 'Image analysis completed successfully',
-    recommendations: ['No immediate action required'],
-  },
-  telegramDelivered: true,
+  
+  // Notification fields
+  telegramSent: true,
   telegramMessageId: 'msg-789',
+  telegramSentAt: '2025-08-29T10:00:35Z',
+  
+  // Metadata
+  modelVersion: 'v1.2.3',
+  processingTimeMs: 5000,
+  extractedAt: '2025-08-29T10:00:15Z',
+  
   ...overrides,
 });
 

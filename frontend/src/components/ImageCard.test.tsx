@@ -34,8 +34,8 @@ describe('ImageCard', () => {
     // Check for execution ID
     expect(screen.getByText(/#exec-123/i)).toBeInTheDocument();
     
-    // Check for status badge
-    expect(screen.getByText(/success/i)).toBeInTheDocument();
+    // Check for status badge - use more specific selector
+    expect(screen.getByText('Success')).toBeInTheDocument();
     
     // Check for mode
     expect(screen.getByText(/webhook/i)).toBeInTheDocument();
@@ -154,7 +154,7 @@ describe('ImageCard', () => {
 
   it('does not show telegram indicator when not delivered', () => {
     const executionNotDelivered = createMockExecution({
-      telegramDelivered: false,
+      telegramSent: false,
     });
 
     const { container } = renderWithProviders(
@@ -204,11 +204,8 @@ describe('ImageCard', () => {
 
   it('truncates long analysis text', () => {
     const longAnalysis = createMockExecution({
-      analysis: {
-        riskAssessment: 'A'.repeat(200),
-        confidence: 0.5,
-        description: 'A'.repeat(200),
-      },
+      overallAssessment: 'A'.repeat(200),
+      confidenceScore: 0.5,
     });
 
     renderWithProviders(
