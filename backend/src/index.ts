@@ -5,6 +5,7 @@ import compression from 'compression';
 import morgan from 'morgan';
 import { appConfig, isDevelopment } from '@/config';
 import { logger, expressLogger } from '@/utils/logger';
+import { simpleETLService } from '@/services/simple-etl-service';
 
 const app = express();
 
@@ -89,6 +90,9 @@ app.use('*', (req, res) => {
   });
 });
 
+// Global ETL service instance
+let etlService: any = null;
+
 const startServer = async (): Promise<void> => {
   try {
     app.listen(appConfig.port, () => {
@@ -97,15 +101,53 @@ const startServer = async (): Promise<void> => {
       logger.info(`CORS origin: ${appConfig.cors.origin}`);
     });
 
-    process.on('SIGTERM', () => {
-      logger.info('SIGTERM received, shutting down gracefully');
-      process.exit(0);
-    });
+    // Start NEW Simple ETL service (always enabled in development)
+    const enableETL = process.env.ENABLE_ETL_SERVICE !== 'false';
+    if (enableETL) {
+      try {
+        logger.info('🚀 Starting Simple ETL Service alongside API...');
+        etlService = simpleETLService;
+        
+        etlService.on('started', () => {
+          logger.info('✅ ETL: Service started and listening for notifications');
+        });
 
-    process.on('SIGINT', () => {
-      logger.info('SIGINT received, shutting down gracefully');
+        etlService.on('execution_processed', ({ execution_id, status, imageProcessed }: any) => {
+          logger.info(`✅ ETL: Processed execution ${execution_id} (status: ${status}, image: ${imageProcessed ? 'yes' : 'no'})`);
+        });
+
+        etlService.on('stopped', () => {
+          logger.info('🛑 ETL: Service stopped');
+        });
+
+        await etlService.start();
+        logger.info('✅ Simple ETL Service started successfully');
+      } catch (error) {
+        logger.error('⚠️ Failed to start Simple ETL Service (continuing without it):', error);
+      }
+    } else {
+      logger.info('ℹ️ ETL Service disabled (set ENABLE_ETL_SERVICE=true to enable)');
+    }
+
+    // Graceful shutdown handlers
+    const gracefulShutdown = async (signal: string) => {
+      logger.info(`${signal} received, shutting down gracefully`);
+      
+      if (etlService) {
+        try {
+          logger.info('🛑 Stopping ETL Service...');
+          await etlService.stop();
+          logger.info('✅ ETL Service stopped');
+        } catch (error) {
+          logger.error('❌ Error stopping ETL Service:', error);
+        }
+      }
+      
       process.exit(0);
-    });
+    };
+
+    process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+    process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
   } catch (error) {
     logger.error('Failed to start server:', error);
