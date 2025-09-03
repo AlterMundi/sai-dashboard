@@ -52,7 +52,7 @@ export function LiveExecutionCard({ execution, onRemove, className }: LiveExecut
 
         {/* Glowing border for high-risk executions */}
         <div className={cn(
-          execution.analysis?.riskAssessment === 'high' &&
+          execution.riskLevel === 'high' &&
           "ring-2 ring-red-400 ring-opacity-75 animate-pulse"
         )}>
           <ImageCard execution={execution} onClick={() => {}} />

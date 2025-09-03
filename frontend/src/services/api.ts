@@ -201,18 +201,21 @@ export const executionsApi = {
   getImageUrl(executionId: string, thumbnail = false): string {
     const baseUrl = import.meta.env.VITE_API_URL || '/api';
     const token = tokenManager.get();
-    const params = new URLSearchParams();
     
+    if (!token) {
+      console.warn('No authentication token available for image request');
+      return '';
+    }
+    
+    // Use proper endpoint based on image type
+    let endpoint = '';
     if (thumbnail) {
-      params.append('thumbnail', 'true');
+      endpoint = `/executions/${executionId}/thumbnail`;
+    } else {
+      endpoint = `/executions/${executionId}/image/webp`; // Prefer WebP for better performance
     }
     
-    if (token) {
-      params.append('token', token);
-    }
-    
-    const queryString = params.toString();
-    return `${baseUrl}/executions/${executionId}/image${queryString ? '?' + queryString : ''}`;
+    return `${baseUrl}${endpoint}?token=${encodeURIComponent(token)}`;
   },
 
   async triggerAnalysis(batchSize = 50): Promise<{

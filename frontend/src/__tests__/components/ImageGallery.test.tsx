@@ -3,6 +3,7 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ImageGallery } from '../../components/ImageGallery';
 import { executionsApi } from '../../services/api';
+import { createMockExecution } from '../../test/test-utils';
 
 // Mock the API functions
 vi.mock('../../services/api');
@@ -49,35 +50,22 @@ describe('ImageGallery', () => {
   });
 
   const mockExecutions = [
-    {
+    createMockExecution({
       id: '1',
-      workflowId: 'test-workflow',
-      mode: 'webhook' as const,
-      finished: true,
-      startedAt: '2025-08-29T10:00:00Z',
-      stoppedAt: '2025-08-29T10:05:00Z',
-      status: 'success' as const,
-      retryOf: null,
-      retrySuccessId: null,
+      status: 'success',
+      executionTimestamp: '2025-08-29T10:00:00Z',
+      completionTimestamp: '2025-08-29T10:05:00Z',
+      overallAssessment: 'Low risk detected',
+      confidenceScore: 0.95,
       imageUrl: '/api/executions/1/image',
       thumbnailUrl: '/api/executions/1/thumbnail',
-      analysis: {
-        riskAssessment: 'Low risk',
-        confidence: 0.95,
-        description: 'Test analysis'
-      }
-    },
-    {
+    }),
+    createMockExecution({
       id: '2',
-      workflowId: 'test-workflow',
-      mode: 'webhook' as const,
-      finished: true,
-      startedAt: '2025-08-29T10:10:00Z',
-      stoppedAt: '2025-08-29T10:15:00Z',
-      status: 'error' as const,
-      retryOf: null,
-      retrySuccessId: null
-    }
+      status: 'error',
+      executionTimestamp: '2025-08-29T10:10:00Z',
+      completionTimestamp: '2025-08-29T10:15:00Z',
+    })
   ];
 
   it('should render loading state initially', () => {
