@@ -2,7 +2,10 @@ import { useState, useEffect, useCallback } from 'react';
 import { executionsApi } from '@/services/api';
 import { ExecutionWithImage, ExecutionFilters, UseExecutionsReturn, ExecutionStats, DailySummary, AnalysisStatus, AnalysisAlert } from '@/types';
 
-export function useExecutions(initialFilters: ExecutionFilters = {}): UseExecutionsReturn {
+export function useExecutions(
+  initialFilters: ExecutionFilters = {},
+  refreshTrigger?: number
+): UseExecutionsReturn {
   const [executions, setExecutions] = useState<ExecutionWithImage[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -88,6 +91,14 @@ export function useExecutions(initialFilters: ExecutionFilters = {}): UseExecuti
   useEffect(() => {
     fetchExecutions(filters, true);
   }, []); // Only run on mount
+
+  // Handle external refresh triggers (from SSE updates)
+  useEffect(() => {
+    if (refreshTrigger !== undefined && refreshTrigger > 0) {
+      console.log('🔄 useExecutions: External refresh trigger activated:', refreshTrigger);
+      fetchExecutions(filters, true);
+    }
+  }, [refreshTrigger, filters, fetchExecutions]);
 
   return {
     executions,
