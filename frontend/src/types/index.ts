@@ -20,12 +20,38 @@ export interface SaiExecution {
   id: string;
   workflowId: string;
   status: 'success' | 'error' | 'waiting' | 'running' | 'canceled';
-  startedAt: string;
-  stoppedAt: string | null;
+  executionTimestamp: string;
+  completionTimestamp: string | null;
+  durationMs: number | null;
   mode: 'webhook' | 'manual' | 'retry';
-  finished: boolean;
-  retryOf: string | null;
-  retrySuccessId: string | null;
+  nodeId?: string;
+  cameraId?: string;
+  
+  // Analysis fields from new ETL structure
+  riskLevel?: 'high' | 'medium' | 'low' | 'none';
+  confidenceScore?: number | null;
+  overallAssessment?: string | null;
+  smokeDetected?: boolean;
+  flameDetected?: boolean;
+  heatSignatureDetected?: boolean;
+  alertPriority?: 'critical' | 'high' | 'normal' | 'low';
+  responseRequired?: boolean;
+  
+  // Image fields
+  hasImage?: boolean;
+  imagePath?: string | null;
+  imageSizeBytes?: number | null;
+  imageFormat?: string | null;
+  
+  // Notification fields
+  telegramSent?: boolean;
+  telegramMessageId?: string | null;
+  telegramSentAt?: string | null;
+  
+  // Metadata
+  modelVersion?: string | null;
+  processingTimeMs?: number | null;
+  extractedAt?: string | null;
 }
 
 export interface ImageAnalysis {
@@ -55,7 +81,7 @@ export interface SaiEnhancedAnalysis {
   imageQualityScore?: number;
   alertPriority: 'critical' | 'high' | 'normal' | 'low';
   responseRequired: boolean;
-  telegramDelivered: boolean;
+  telegramSent: boolean;
   telegramMessageId?: string;
   telegramChatId?: string;
   latitude?: number;
@@ -99,11 +125,7 @@ export interface ExpertReview {
 export interface ExecutionWithImage extends SaiExecution {
   imageUrl?: string;
   thumbnailUrl?: string;
-  analysis?: ImageAnalysis;
-  enhancedAnalysis?: SaiEnhancedAnalysis;
   expertReview?: ExpertReview;
-  telegramDelivered?: boolean;
-  telegramMessageId?: string;
 }
 
 // Filter and Pagination Types
@@ -118,7 +140,7 @@ export interface ExecutionFilters {
   endDate?: string;
   search?: string;
   hasImage?: boolean;
-  telegramDelivered?: boolean;
+  telegramSent?: boolean;
   
   // Enhanced analysis filters
   riskLevel?: 'high' | 'medium' | 'low' | 'none';
@@ -264,11 +286,13 @@ export interface SSEExecutionEvent {
   execution: {
     id: string;
     status: string;
-    startedAt: string;
+    executionTimestamp: string;
     hasImage: boolean;
     imageUrl?: string;
     thumbnailUrl?: string;
-    analysis?: ImageAnalysis;
+    overallAssessment?: string;
+    confidenceScore?: number;
+    riskLevel?: string;
   };
   timestamp: string;
 }
