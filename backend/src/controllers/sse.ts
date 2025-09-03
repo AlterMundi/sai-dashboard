@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { executionService } from '@/services/execution';
+import { newExecutionService } from '@/services/new-execution-service';
 import { appConfig } from '@/config';
 import { logger } from '@/utils/logger';
 import { SSEClient, SSEMessage } from '@/types';
@@ -299,7 +299,7 @@ export const getSSEStatus = asyncHandler(async (req: Request, res: Response): Pr
 // Function to notify SSE clients of new executions
 export const notifyNewExecution = async (executionId: string): Promise<void> => {
   try {
-    const execution = await executionService.getExecutionById(executionId);
+    const execution = await newExecutionService.getExecutionById(parseInt(executionId));
     
     if (execution && execution.status === 'success') {
       const message: SSEMessage = {
@@ -309,11 +309,13 @@ export const notifyNewExecution = async (executionId: string): Promise<void> => 
           execution: {
             id: execution.id,
             status: execution.status,
-            startedAt: execution.startedAt.toISOString(),
-            hasImage: !!execution.imageUrl,
-            imageUrl: execution.imageUrl,
-            thumbnailUrl: execution.thumbnailUrl,
-            analysis: execution.analysis
+            executionTimestamp: execution.executionTimestamp.toISOString(),
+            hasImage: execution.hasImage,
+            imageUrl: execution.imagePath,
+            thumbnailUrl: `/mnt/raid1/n8n-backup/images/by-execution/${execution.id}/thumb.webp`,
+            overallAssessment: execution.overallAssessment || '',
+            confidenceScore: execution.confidenceScore || 0,
+            riskLevel: execution.riskLevel || 'none'
           },
           timestamp: new Date().toISOString()
         }
@@ -476,7 +478,7 @@ let executionPollingInterval: NodeJS.Timeout | null = null;
 
 // Batch execution tracking
 let pendingExecutions: any[] = [];
-let lastKnownExecutionId: string | null = null;
+let lastKnownExecutionId: number | null = null;
 
 // Poll for new executions every 10 seconds
 const pollForNewExecutions = async (): Promise<void> => {
@@ -484,10 +486,10 @@ const pollForNewExecutions = async (): Promise<void> => {
     // Only poll if there are active clients
     if (sseManager.getClientCount() === 0) return;
 
-    const { executionService } = await import('@/services/execution');
+    const { newExecutionService } = await import('@/services/new-execution-service');
     
     // Get latest execution for SAI workflow
-    const latestExecutions = await executionService.getExecutions({
+    const latestExecutions = await newExecutionService.getExecutions({
       limit: 10, // Check last 10 to catch any we missed
       page: 0,
     });
@@ -628,8 +630,8 @@ export const stopSystemMonitoring = (): void => {
 // Real database-backed functions for system monitoring
 async function getTotalExecutionCount(): Promise<number> {
   try {
-    const { executionService } = await import('@/services/execution');
-    const stats = await executionService.getExecutionStats();
+    const { newExecutionService } = await import('@/services/new-execution-service');
+    const stats = await newExecutionService.getExecutionStats();
     return stats.totalExecutions;
   } catch (error) {
     logger.warn('Failed to get total execution count:', error);
@@ -639,8 +641,8 @@ async function getTotalExecutionCount(): Promise<number> {
 
 async function getSuccessRate(): Promise<number> {
   try {
-    const { executionService } = await import('@/services/execution');
-    const stats = await executionService.getExecutionStats();
+    const { newExecutionService } = await import('@/services/new-execution-service');
+    const stats = await newExecutionService.getExecutionStats();
     return stats.successRate;
   } catch (error) {
     logger.warn('Failed to get success rate:', error);
@@ -655,11 +657,10 @@ function getQueueSize(): number {
 
 async function getAverageProcessingTime(): Promise<number> {
   try {
-    const { executionService } = await import('@/services/execution');
-    const stats = await executionService.getExecutionStats();
-    // Calculate from daily average - rough approximation
-    const dailyAvg = stats.avgDailyExecutions;
-    return dailyAvg > 0 ? Math.round(86400 / dailyAvg) : 4.2; // seconds per execution
+    const { newExecutionService } = await import('@/services/new-execution-service');
+    const stats = await newExecutionService.getExecutionStats();
+    // Calculate from average processing time directly 
+    return stats.avgProcessingTime / 1000; // Convert ms to seconds
   } catch (error) {
     logger.warn('Failed to get average processing time:', error);
     return 4.2; // Fallback reasonable value in seconds
