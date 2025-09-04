@@ -18,10 +18,13 @@ export function LiveExecutionStrip() {
     });
   }, []);
 
-  // Handle SSE events for live execution updates
-  const { isConnected } = useSSEHandler({
-    onExecutionBatch: (data) => {
-      console.log('LiveExecutionStrip: Batch received with', data.count, 'executions');
+  // Handle SSE events for live execution updates using direct event listeners
+  const { isConnected } = useSSE();
+
+  useEffect(() => {
+    const handleBatch = (event: CustomEvent) => {
+      const data = event.detail;
+      console.log('🎯 LiveExecutionStrip: Batch received with', data.count, 'executions');
       
       // Add all new executions from the batch to the live strip
       if (data.executions && Array.isArray(data.executions)) {
@@ -29,16 +32,28 @@ export function LiveExecutionStrip() {
           addLiveExecution(execution);
         });
       }
-    },
-    onNewExecution: (data) => {
-      console.log('LiveExecutionStrip: New execution received:', data.execution.id);
+    };
+
+    const handleNewExecution = (event: CustomEvent) => {
+      const data = event.detail;
+      console.log('🎯 LiveExecutionStrip: New execution received:', data.execution.id);
       
       // Add individual execution to live strip
       if (data.execution) {
         addLiveExecution(data.execution);
       }
-    }
-  });
+    };
+
+    // Add event listeners
+    window.addEventListener('sai:execution:batch', handleBatch as EventListener);
+    window.addEventListener('sai:execution:new', handleNewExecution as EventListener);
+
+    return () => {
+      // Cleanup event listeners
+      window.removeEventListener('sai:execution:batch', handleBatch as EventListener);
+      window.removeEventListener('sai:execution:new', handleNewExecution as EventListener);
+    };
+  }, [addLiveExecution]);
 
   // Remove execution from live strip
   const removeLiveExecution = useCallback((executionId: string) => {

@@ -3,7 +3,7 @@
  * These routes provide manual triggers and debugging tools for SSE functionality
  */
 
-import { Router } from 'express';
+import { Router, Request, Response } from 'express';
 import {
   triggerTestEvent,
   triggerFakeExecution,
@@ -25,7 +25,7 @@ router.get('/sse/debug-info', getSSEDebugInfo);
 router.post('/sse/health-test', testSSEHealth);
 
 // Database trigger test - insert a real execution to test NOTIFY chain
-router.post('/sse/trigger-db-execution', asyncHandler(async (req, res) => {
+router.post('/sse/trigger-db-execution', asyncHandler(async (req: Request, res: Response) => {
   const { withImage = true } = req.body;
   
   logger.warn('🗄️ Triggering database test execution');
@@ -64,7 +64,7 @@ router.post('/sse/trigger-db-execution', asyncHandler(async (req, res) => {
 }));
 
 // Get current SSE connection details
-router.get('/sse/connections', asyncHandler(async (req, res) => {
+router.get('/sse/connections', asyncHandler(async (req: Request, res: Response) => {
   // This would need access to the SSE manager's internal state
   const debugData = {
     timestamp: new Date().toISOString(),
@@ -78,7 +78,7 @@ router.get('/sse/connections', asyncHandler(async (req, res) => {
 }));
 
 // Simulate various SSE scenarios
-router.post('/sse/simulate/:scenario', asyncHandler(async (req, res) => {
+router.post('/sse/simulate/:scenario', asyncHandler(async (req: Request, res: Response) => {
   const { scenario } = req.params;
   
   logger.warn(`🎭 Simulating SSE scenario: ${scenario}`);
@@ -122,7 +122,7 @@ router.post('/sse/simulate/:scenario', asyncHandler(async (req, res) => {
 }));
 
 // Get execution polling status
-router.get('/sse/polling-status', asyncHandler(async (req, res) => {
+router.get('/sse/polling-status', asyncHandler(async (req: Request, res: Response) => {
   const status = {
     pollingActive: true, // Would check actual status
     interval: 10000,
