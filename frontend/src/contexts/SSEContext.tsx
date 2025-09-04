@@ -182,7 +182,11 @@ export function SSEProvider({ children }: SSEProviderProps) {
         try {
           const data: SSEExecutionEvent = JSON.parse(event.data);
           console.log('SSE Context: New execution received:', data.execution.id);
-          setLastEvent({ type: 'execution:new', data, timestamp: new Date() });
+          const newEvent = { type: 'execution:new', data, timestamp: new Date() };
+          setLastEvent(newEvent);
+          
+          // Immediately trigger any registered new execution handlers
+          window.dispatchEvent(new CustomEvent('sai:execution:new', { detail: data }));
           
           // Use smart notification system instead of basic toast
           notifyNewExecution(data);
@@ -258,7 +262,11 @@ export function SSEProvider({ children }: SSEProviderProps) {
         try {
           const data = JSON.parse(event.data);
           console.log('✅ SSE Context: Batch completion received:', data);
-          setLastEvent({ type: 'execution:batch', data, timestamp: new Date() });
+          const batchEvent = { type: 'execution:batch', data, timestamp: new Date() };
+          setLastEvent(batchEvent);
+          
+          // Immediately trigger any registered batch handlers
+          window.dispatchEvent(new CustomEvent('sai:execution:batch', { detail: data }));
           
           // Smart notification for batch completion
           notifyBatchComplete(data);

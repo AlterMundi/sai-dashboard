@@ -229,8 +229,7 @@ class SSEManager {
 // Global SSE manager instance
 const sseManager = new SSEManager();
 
-// Export for external access (ETL service integration)
-export { sseManager };
+// Export for external access (ETL service integration) - moved to end of file
 
 // Debug mode flag
 const SSE_DEBUG = process.env.SSE_DEBUG === 'true';

@@ -1,19 +1,15 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { Layout } from '@/components/Layout';
 import { useSSE } from '@/contexts/SSEContext';
 import { api } from '@/services/api';
 import toast from 'react-hot-toast';
 import { 
   Activity, 
-  Wifi, 
-  WifiOff, 
   Send, 
-  RefreshCw,
   Database,
   Zap,
   AlertCircle,
   CheckCircle,
-  Clock,
   Server,
   Monitor,
   X,
@@ -45,7 +41,7 @@ interface ConnectionMetrics {
 }
 
 export function SSEDebugPage() {
-  const { isConnected, connectionStatus, lastEvent, clientCount, liveStats, systemHealth } = useSSE();
+  const { isConnected, connectionStatus, lastEvent, clientCount } = useSSE();
   const [events, setEvents] = useState<EventLog[]>([]);
   const [debugInfo, setDebugInfo] = useState<any>(null);
   const [isMonitoring, setIsMonitoring] = useState(true);
@@ -63,8 +59,6 @@ export function SSEDebugPage() {
     currentLatency: 0
   });
   const [isLoading, setIsLoading] = useState(false);
-  const metricsIntervalRef = useRef<NodeJS.Timeout>();
-  const eventSourceRef = useRef<EventSource | null>(null);
 
   // Track connection changes
   useEffect(() => {
@@ -238,7 +232,7 @@ export function SSEDebugPage() {
       if (response.data.data.success) {
         toast.success(response.data.data.message);
       } else {
-        toast.warning(response.data.data.message);
+        toast.error(response.data.data.message);
       }
     } catch (error) {
       console.error('Failed to test SSE health:', error);
