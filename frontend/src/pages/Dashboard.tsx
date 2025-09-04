@@ -38,10 +38,10 @@ export function Dashboard() {
     console.log('New execution received:', data.execution);
     setNewExecutionsCount(prev => prev + 1);
     
-    // Auto-refresh stats periodically
+    // Auto-refresh stats periodically (fast for testing)
     setTimeout(() => {
       setNewExecutionsCount(prev => Math.max(0, prev - 1));
-    }, 30000); // Remove notification after 30 seconds
+    }, 3000); // Remove notification after 3 seconds (fast for testing)
   }, []);
 
   const onExecutionError = useCallback((data: any) => {
@@ -63,10 +63,10 @@ export function Dashboard() {
       return prev + 1;
     });
     
-    // Clear counter after some time
+    // Clear counter after some time (fast for testing)
     setTimeout(() => {
       setNewExecutionsCount(prev => Math.max(0, prev - data.count));
-    }, 30000);
+    }, 3000); // 3 seconds for fast testing
   }, []);
   
   useSSEHandler({

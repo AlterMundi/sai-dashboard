@@ -559,10 +559,10 @@ export const startSystemMonitoring = (): void => {
     clearInterval(executionPollingInterval);
   }
 
-  // Start execution polling and immediate broadcast every 10 seconds
-  executionPollingInterval = setInterval(pollAndBroadcastExecutions, 10000);
+  // Start execution polling and immediate broadcast every 3 seconds (fast for testing)
+  executionPollingInterval = setInterval(pollAndBroadcastExecutions, 3000);
 
-  // Start system monitoring every 10 seconds (separate from execution updates)
+  // Start system monitoring every 3 seconds (fast for testing)
   systemMonitoringInterval = setInterval(async () => {
     try {
       // Only run if there are active clients
