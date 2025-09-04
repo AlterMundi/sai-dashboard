@@ -126,10 +126,10 @@ export function SSEDebugPage() {
     }
   };
 
-  // Initial fetch and periodic updates
+  // Initial fetch and periodic updates (fast for testing)
   useEffect(() => {
     fetchDebugInfo();
-    const interval = setInterval(fetchDebugInfo, 10000);
+    const interval = setInterval(fetchDebugInfo, 3000); // 3 seconds for fast testing
     return () => clearInterval(interval);
   }, []);
 

@@ -793,7 +793,7 @@ export class ETLService {
     
     // Update real-time statistics if needed
     const now = Date.now();
-    if (now - this.lastStatsUpdate > 30000) { // Update every 30 seconds
+    if (now - this.lastStatsUpdate > 3000) { // Update every 3 seconds (fast for testing)
       await this.updateStatistics();
       this.lastStatsUpdate = now;
     }
@@ -877,12 +877,12 @@ export class ETLService {
    * Start periodic statistics updater
    */
   private startStatisticsUpdater(): void {
-    // Update statistics every 30 seconds
+    // Update statistics every 3 seconds (fast for testing)
     setInterval(async () => {
       if (this.isRunning) {
         await this.updateStatistics();
       }
-    }, 30000);
+    }, 3000);
   }
 
   /**
