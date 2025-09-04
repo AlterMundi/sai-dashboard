@@ -283,17 +283,7 @@ export interface SSEStatus {
 }
 
 export interface SSEExecutionEvent {
-  execution: {
-    id: string;
-    status: string;
-    executionTimestamp: string;
-    hasImage: boolean;
-    imageUrl?: string;
-    thumbnailUrl?: string;
-    overallAssessment?: string;
-    confidenceScore?: number;
-    riskLevel?: string;
-  };
+  execution: ExecutionWithImage; // Now uses the complete ExecutionWithImage interface
   timestamp: string;
 }
 

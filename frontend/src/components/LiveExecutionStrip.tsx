@@ -1,15 +1,13 @@
 import { useState, useCallback } from 'react';
 import { LiveExecutionCard } from './LiveExecutionCard';
 import { ExecutionWithImage } from '@/types';
-import { useSSE } from '@/contexts/SSEContext';
+import { useSSEHandler } from '@/contexts/SSEContext';
 import { Activity, X } from 'lucide-react';
 import { cn } from '@/utils';
 
 export function LiveExecutionStrip() {
   const [liveExecutions, setLiveExecutions] = useState<ExecutionWithImage[]>([]);
   const [isCollapsed, setIsCollapsed] = useState(false);
-  
-  const { isConnected } = useSSE();
 
   // Add new execution to live strip
   const addLiveExecution = useCallback((execution: ExecutionWithImage) => {
@@ -20,8 +18,27 @@ export function LiveExecutionStrip() {
     });
   }, []);
 
-  // Use addLiveExecution for logging purposes
-  console.log('Live execution handler available:', addLiveExecution);
+  // Handle SSE events for live execution updates
+  const { isConnected } = useSSEHandler({
+    onExecutionBatch: (data) => {
+      console.log('LiveExecutionStrip: Batch received with', data.count, 'executions');
+      
+      // Add all new executions from the batch to the live strip
+      if (data.executions && Array.isArray(data.executions)) {
+        data.executions.forEach((execution: ExecutionWithImage) => {
+          addLiveExecution(execution);
+        });
+      }
+    },
+    onNewExecution: (data) => {
+      console.log('LiveExecutionStrip: New execution received:', data.execution.id);
+      
+      // Add individual execution to live strip
+      if (data.execution) {
+        addLiveExecution(data.execution);
+      }
+    }
+  });
 
   // Remove execution from live strip
   const removeLiveExecution = useCallback((executionId: string) => {

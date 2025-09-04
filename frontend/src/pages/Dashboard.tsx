@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { Layout } from '@/components/Layout';
 import { ImageGallery } from '@/components/ImageGallery';
 import { LoadingState } from '@/components/ui/LoadingSpinner';
@@ -33,34 +33,46 @@ export function Dashboard() {
   // Get live SSE data
   const { isConnected, systemHealth } = useSSE();
 
-  // Handle real-time updates via SSE
+  // Handle real-time updates via SSE - FIXED: Memoize individual handlers to prevent useEffect dependency issues
+  const onNewExecution = useCallback((data: any) => {
+    console.log('New execution received:', data.execution);
+    setNewExecutionsCount(prev => prev + 1);
+    
+    // Auto-refresh stats periodically
+    setTimeout(() => {
+      setNewExecutionsCount(prev => Math.max(0, prev - 1));
+    }, 30000); // Remove notification after 30 seconds
+  }, []);
+
+  const onExecutionError = useCallback((data: any) => {
+    console.log('Execution error received:', data);
+  }, []);
+
+  const onExecutionBatch = useCallback((data: any) => {
+    console.log('🎉 Dashboard: Batch received with', data.count, 'new executions', data);
+    
+    // Update new executions counter
+    setNewExecutionsCount(prev => {
+      console.log('🔢 Dashboard: Updating execution count from', prev, 'to', prev + data.count);
+      return prev + data.count;
+    });
+    
+    // Trigger gallery refresh by changing the key
+    setRefreshTrigger(prev => {
+      console.log('🔄 Dashboard: Triggering gallery refresh from', prev, 'to', prev + 1);
+      return prev + 1;
+    });
+    
+    // Clear counter after some time
+    setTimeout(() => {
+      setNewExecutionsCount(prev => Math.max(0, prev - data.count));
+    }, 30000);
+  }, []);
+  
   useSSEHandler({
-    onNewExecution: (data) => {
-      console.log('New execution received:', data.execution);
-      setNewExecutionsCount(prev => prev + 1);
-      
-      // Auto-refresh stats periodically
-      setTimeout(() => {
-        setNewExecutionsCount(prev => Math.max(0, prev - 1));
-      }, 30000); // Remove notification after 30 seconds
-    },
-    onExecutionError: (data) => {
-      console.log('Execution error received:', data);
-    },
-    onExecutionBatch: (data) => {
-      console.log('Batch received with', data.count, 'new executions');
-      
-      // Update new executions counter
-      setNewExecutionsCount(prev => prev + data.count);
-      
-      // Trigger gallery refresh by changing the key
-      setRefreshTrigger(prev => prev + 1);
-      
-      // Clear counter after some time
-      setTimeout(() => {
-        setNewExecutionsCount(prev => Math.max(0, prev - data.count));
-      }, 30000);
-    },
+    onNewExecution,
+    onExecutionError,
+    onExecutionBatch,
   });
 
   // Search handler

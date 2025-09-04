@@ -6,6 +6,7 @@ import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { SSEProvider } from '@/contexts/SSEContext';
 import { Dashboard } from '@/pages/Dashboard';
 import { Login } from '@/pages/Login';
+import { SSEDebugPage } from '@/pages/SSEDebugPage';
 import './index.css';
 
 // Protected Route Component
@@ -46,6 +47,18 @@ function App() {
                 <ProtectedRoute>
                   <SSEProvider>
                     <Dashboard />
+                  </SSEProvider>
+                </ProtectedRoute>
+              } 
+            />
+            
+            {/* SSE Debug Page */}
+            <Route 
+              path="/sse-debug" 
+              element={
+                <ProtectedRoute>
+                  <SSEProvider>
+                    <SSEDebugPage />
                   </SSEProvider>
                 </ProtectedRoute>
               } 

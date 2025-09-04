@@ -373,6 +373,15 @@ router.get('/public/stats', optionalAuth, async (req, res) => {
 });
 
 // =================================================================
+// Debug Routes (Development Only or SSE_DEBUG enabled)
+// =================================================================
+if (process.env.NODE_ENV === 'development' || process.env.SSE_DEBUG === 'true') {
+  const debugRouter = require('./debug').default;
+  router.use('/debug', debugRouter);
+  console.log('🐛 SSE Debug routes enabled at /dashboard/api/debug/*');
+}
+
+// =================================================================
 // API Documentation (Development Only)
 // =================================================================
 if (process.env.NODE_ENV === 'development' || process.env.ENABLE_API_DOCS === 'true') {

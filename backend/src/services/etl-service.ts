@@ -908,15 +908,41 @@ export class ETLService {
   }
 
   /**
-   * Broadcast SSE updates (placeholder - will integrate with existing SSE manager)
+   * Broadcast SSE updates using the actual SSE manager
    */
   private broadcastSSEUpdate(type: string, data: any): void {
-    // This will integrate with the existing SSE manager
-    // For now, just log the events
-    logger.debug('SSE Broadcast', { type, data });
-
-    // TODO: Integrate with existing sseManager from backend/src/controllers/sse.ts
-    // Example: sseManager.broadcast({ type, data });
+    try {
+      // Import the SSE manager from the controllers
+      const { sseManager } = require('@/controllers/sse');
+      
+      if (!sseManager) {
+        logger.warn('SSE Manager not available for broadcast', { type });
+        return;
+      }
+      
+      const message = {
+        type,
+        data: {
+          ...data,
+          source: 'etl-service',
+          timestamp: new Date().toISOString()
+        }
+      };
+      
+      const clientCount = sseManager.broadcast(message);
+      
+      logger.info('📢 ETL → SSE Broadcast', { 
+        type, 
+        clientsNotified: clientCount,
+        dataKeys: Object.keys(data)
+      });
+      
+    } catch (error) {
+      logger.error('Failed to broadcast SSE update from ETL service:', { 
+        type, 
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
   }
 
   /**
