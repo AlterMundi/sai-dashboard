@@ -101,10 +101,12 @@ class SSEManager {
     deadClients.forEach(clientId => this.removeClient(clientId));
 
     if (successCount > 0) {
-      logger.debug('SSE message broadcasted', {
+      // Temporarily change to INFO for debugging
+      logger.info('📡 SSE message broadcasted', {
         type: message.type,
         successCount,
-        totalClients: this.clients.size
+        totalClients: this.clients.size,
+        data: message.type === 'execution:batch' ? JSON.stringify(message.data) : 'other'
       });
     }
 
@@ -227,7 +229,24 @@ class SSEManager {
 // Global SSE manager instance
 const sseManager = new SSEManager();
 
+// Export for external access (ETL service integration)
+export { sseManager };
+
+// Debug mode flag
+const SSE_DEBUG = process.env.SSE_DEBUG === 'true';
+
 export const connectSSE = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+  // Debug logging
+  if (SSE_DEBUG) {
+    logger.info('🔵 SSE Connection attempt', {
+      origin: req.get('origin'),
+      userAgent: req.get('user-agent'),
+      ip: req.ip,
+      headers: req.headers,
+      query: req.query
+    });
+  }
+
   // Check client limit
   if (sseManager.getClientCount() >= appConfig.sse.maxClients) {
     res.status(503).json({
@@ -246,7 +265,8 @@ export const connectSSE = asyncHandler(async (req: Request, res: Response): Prom
     // DON'T set Connection header - let nginx proxy handle it with Connection: ''
     'Access-Control-Allow-Origin': req.get('origin') || '*',
     'Access-Control-Allow-Credentials': 'true',
-    'X-Accel-Buffering': 'no' // Disable nginx buffering
+    'X-Accel-Buffering': 'no', // Disable nginx buffering
+    'X-SSE-Debug': SSE_DEBUG ? 'enabled' : 'disabled'
   });
 
   // Send initial data to trigger browser onopen event
@@ -306,17 +326,7 @@ export const notifyNewExecution = async (executionId: string): Promise<void> => 
         type: 'execution:new',
         id: executionId,
         data: {
-          execution: {
-            id: execution.id,
-            status: execution.status,
-            executionTimestamp: execution.executionTimestamp.toISOString(),
-            hasImage: execution.hasImage,
-            imageUrl: execution.imagePath,
-            thumbnailUrl: `/mnt/raid1/n8n-backup/images/by-execution/${execution.id}/thumb.webp`,
-            overallAssessment: execution.overallAssessment || '',
-            confidenceScore: execution.confidenceScore || 0,
-            riskLevel: execution.riskLevel || 'none'
-          },
+          execution: execution, // Send the complete ExecutionWithImage object
           timestamp: new Date().toISOString()
         }
       };
@@ -476,21 +486,20 @@ export const notifyExecutionProgress = async (executionId: string, progress: {
 let systemMonitoringInterval: NodeJS.Timeout | null = null;
 let executionPollingInterval: NodeJS.Timeout | null = null;
 
-// Batch execution tracking
-let pendingExecutions: any[] = [];
+// Execution tracking - no more batching, immediate broadcast
 let lastKnownExecutionId: number | null = null;
 
-// Poll for new executions every 10 seconds
-const pollForNewExecutions = async (): Promise<void> => {
+// Poll for new executions and broadcast immediately
+const pollAndBroadcastExecutions = async (): Promise<void> => {
   try {
     // Only poll if there are active clients
     if (sseManager.getClientCount() === 0) return;
 
     const { newExecutionService } = await import('@/services/new-execution-service');
     
-    // Get latest execution for SAI workflow
+    // Get latest executions - increase limit to handle higher throughput
     const latestExecutions = await newExecutionService.getExecutions({
-      limit: 10, // Check last 10 to catch any we missed
+      limit: 50, // Check last 50 to ensure we don't miss any during high activity
       page: 0,
     });
 
@@ -510,62 +519,37 @@ const pollForNewExecutions = async (): Promise<void> => {
       // Update last known execution
       lastKnownExecutionId = newExecutions[0].id;
       
-      // Add to pending batch
-      pendingExecutions.push(...newExecutions);
-      
-      logger.debug('New executions detected', {
+      // Broadcast immediately - no batching delay
+      const batchData = {
         count: newExecutions.length,
-        pendingTotal: pendingExecutions.length,
+        executions: newExecutions.slice().reverse(), // Show newest first, send ALL executions
+        successful: newExecutions.filter(e => e.status === 'success').length,
+        highRisk: newExecutions.filter(e => e.riskLevel === 'high').length,
+        timestamp: new Date().toISOString()
+      };
+
+      const message: SSEMessage = {
+        type: 'execution:batch',
+        data: batchData
+      };
+
+      const clientCount = sseManager.broadcast(message);
+      
+      logger.info('New executions broadcasted immediately', {
+        executionCount: batchData.count,
+        successful: batchData.successful,
+        highRisk: batchData.highRisk,
+        clientCount,
         latestId: lastKnownExecutionId
       });
     }
   } catch (error) {
-    logger.warn('Failed to poll for new executions:', error);
+    logger.warn('Failed to poll and broadcast executions:', error);
   }
 };
 
-// Broadcast batched executions every 30 seconds
-const broadcastExecutionBatch = async (): Promise<void> => {
-  try {
-    if (pendingExecutions.length === 0) return;
-
-    // Only broadcast if there are active clients
-    if (sseManager.getClientCount() === 0) {
-      // Clear pending executions if no clients
-      pendingExecutions = [];
-      return;
-    }
-
-    // Prepare batch data
-    const batchData = {
-      count: pendingExecutions.length,
-      executions: pendingExecutions.slice(0, 6).reverse(), // Show newest first, limit to 6 for live strip
-      successful: pendingExecutions.filter(e => e.status === 'success').length,
-      highRisk: pendingExecutions.filter(e => e.analysis?.riskAssessment === 'high').length,
-      timestamp: new Date().toISOString()
-    };
-
-    // Broadcast batch notification
-    const message: SSEMessage = {
-      type: 'execution:batch',
-      data: batchData
-    };
-
-    const clientCount = sseManager.broadcast(message);
-    
-    logger.info('Execution batch notification sent', {
-      executionCount: batchData.count,
-      successful: batchData.successful,
-      highRisk: batchData.highRisk,
-      clientCount
-    });
-
-    // Clear pending executions
-    pendingExecutions = [];
-  } catch (error) {
-    logger.error('Failed to broadcast execution batch:', error);
-  }
-};
+// Legacy batch function - no longer needed since we broadcast immediately
+// Kept for reference but unused
 
 export const startSystemMonitoring = (): void => {
   // Clear existing intervals
@@ -576,19 +560,16 @@ export const startSystemMonitoring = (): void => {
     clearInterval(executionPollingInterval);
   }
 
-  // Start execution polling every 10 seconds
-  executionPollingInterval = setInterval(pollForNewExecutions, 10000);
+  // Start execution polling and immediate broadcast every 10 seconds
+  executionPollingInterval = setInterval(pollAndBroadcastExecutions, 10000);
 
-  // Start system monitoring every 10 seconds (includes batch broadcasting)  
+  // Start system monitoring every 10 seconds (separate from execution updates)
   systemMonitoringInterval = setInterval(async () => {
     try {
       // Only run if there are active clients
       if (sseManager.getClientCount() === 0) return;
 
-      // Broadcast execution batch first
-      await broadcastExecutionBatch();
-
-      // Then system metrics
+      // System metrics
       const stats = {
         totalExecutions: await getTotalExecutionCount(),
         successRate: await getSuccessRate(),
@@ -612,7 +593,7 @@ export const startSystemMonitoring = (): void => {
     }
   }, 10000); // Every 10 seconds
 
-  logger.info('System monitoring started with execution polling');
+  logger.info('System monitoring started with immediate execution broadcasting');
 };
 
 export const stopSystemMonitoring = (): void => {
@@ -724,6 +705,226 @@ process.on('SIGTERM', () => {
 process.on('SIGINT', () => {
   stopSystemMonitoring();
   sseManager.shutdown();
+});
+
+// ============================================================================
+// DEBUG AND TEST ENDPOINTS
+// ============================================================================
+
+/**
+ * Manually trigger SSE events for testing
+ */
+export const triggerTestEvent = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+  const { type = 'test', data } = req.body;
+  
+  logger.warn('🧪 Manual SSE test event triggered', { type, data });
+  
+  const testData = data || {
+    message: 'This is a test event',
+    timestamp: new Date().toISOString(),
+    triggeredBy: req.user?.id || 'manual'
+  };
+  
+  const message: SSEMessage = {
+    type,
+    data: testData,
+    id: `test-${Date.now()}`
+  };
+  
+  const clientCount = sseManager.broadcast(message);
+  
+  res.json({
+    data: {
+      success: true,
+      type,
+      clientsNotified: clientCount,
+      testData
+    }
+  });
+});
+
+/**
+ * Trigger a fake new execution event
+ */
+export const triggerFakeExecution = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+  const fakeExecution = {
+    id: `fake-${Date.now()}`,
+    workflowId: 'yDbfhooKemfhMIkC',
+    status: 'success',
+    mode: 'test',
+    executionTimestamp: new Date().toISOString(),
+    completionTimestamp: new Date().toISOString(),
+    durationMs: Math.floor(Math.random() * 10000),
+    hasImage: true,
+    imageUrl: '/api/test/placeholder.jpg',
+    riskLevel: ['none', 'low', 'medium', 'high'][Math.floor(Math.random() * 4)],
+    confidenceScore: Math.random(),
+    overallAssessment: 'This is a test execution triggered manually for debugging SSE',
+    smokeDetected: Math.random() > 0.5,
+    flameDetected: Math.random() > 0.8,
+    telegramSent: false
+  };
+  
+  logger.warn('🧪 Triggering fake execution SSE event', { executionId: fakeExecution.id });
+  
+  // Send as execution:new event
+  const newMessage: SSEMessage = {
+    type: 'execution:new',
+    id: fakeExecution.id,
+    data: {
+      execution: fakeExecution,
+      timestamp: new Date().toISOString()
+    }
+  };
+  
+  const newClients = sseManager.broadcast(newMessage);
+  
+  // Also send as batch event
+  const batchMessage: SSEMessage = {
+    type: 'execution:batch',
+    data: {
+      count: 1,
+      executions: [fakeExecution],
+      successful: 1,
+      highRisk: fakeExecution.riskLevel === 'high' ? 1 : 0,
+      timestamp: new Date().toISOString()
+    }
+  };
+  
+  const batchClients = sseManager.broadcast(batchMessage);
+  
+  res.json({
+    data: {
+      success: true,
+      execution: fakeExecution,
+      notifications: {
+        'execution:new': newClients,
+        'execution:batch': batchClients
+      }
+    }
+  });
+});
+
+/**
+ * Get detailed SSE debug information
+ */
+export const getSSEDebugInfo = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+  const stats = sseManager.getClientStats();
+  
+  // Collect additional debug info
+  const debugInfo = {
+    enabled: true,
+    debugMode: SSE_DEBUG,
+    clients: {
+      current: stats.total,
+      max: appConfig.sse.maxClients,
+      oldest: stats.oldest?.toISOString() || null,
+      newest: stats.newest?.toISOString() || null
+    },
+    config: {
+      heartbeatInterval: appConfig.sse.heartbeatInterval,
+      timeout: appConfig.sse.timeout,
+      maxClients: appConfig.sse.maxClients
+    },
+    monitoring: {
+      systemMonitoring: systemMonitoringInterval !== null,
+      executionPolling: executionPollingInterval !== null,
+      lastKnownExecutionId,
+      pollingInterval: 10000
+    },
+    environment: {
+      NODE_ENV: process.env.NODE_ENV,
+      SSE_DEBUG: process.env.SSE_DEBUG,
+      baseUrl: process.env.API_BASE_URL || 'http://localhost:3001'
+    },
+    timestamp: new Date().toISOString()
+  };
+  
+  logger.info('SSE Debug info requested', debugInfo);
+  
+  res.json({ data: debugInfo });
+});
+
+/**
+ * Force broadcast a batch of test executions
+ */
+export const triggerTestBatch = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+  const { count = 5 } = req.body;
+  
+  const testExecutions = Array.from({ length: count }, (_, i) => ({
+    id: `test-batch-${Date.now()}-${i}`,
+    workflowId: 'yDbfhooKemfhMIkC',
+    status: 'success',
+    mode: 'test',
+    executionTimestamp: new Date(Date.now() - i * 60000).toISOString(),
+    completionTimestamp: new Date().toISOString(),
+    durationMs: Math.floor(Math.random() * 10000),
+    hasImage: true,
+    imageUrl: `/api/test/placeholder-${i}.jpg`,
+    riskLevel: ['none', 'low', 'medium', 'high'][Math.floor(Math.random() * 4)],
+    confidenceScore: Math.random(),
+    overallAssessment: `Test execution ${i + 1} of ${count}`,
+    smokeDetected: Math.random() > 0.5,
+    flameDetected: Math.random() > 0.8,
+    telegramSent: false
+  }));
+  
+  logger.warn('🧪 Triggering test batch SSE event', { count });
+  
+  const message: SSEMessage = {
+    type: 'execution:batch',
+    data: {
+      count: testExecutions.length,
+      executions: testExecutions,
+      successful: testExecutions.filter(e => e.status === 'success').length,
+      highRisk: testExecutions.filter(e => e.riskLevel === 'high').length,
+      timestamp: new Date().toISOString()
+    }
+  };
+  
+  const clientCount = sseManager.broadcast(message);
+  
+  res.json({
+    data: {
+      success: true,
+      executionsCreated: count,
+      clientsNotified: clientCount,
+      executions: testExecutions
+    }
+  });
+});
+
+/**
+ * Test SSE connection health
+ */
+export const testSSEHealth = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+  const testId = `health-${Date.now()}`;
+  
+  logger.info('🏥 SSE Health test initiated', { testId });
+  
+  // Send a health test event
+  const healthMessage: SSEMessage = {
+    type: 'health:test',
+    id: testId,
+    data: {
+      testId,
+      timestamp: new Date().toISOString(),
+      message: 'SSE connection health check'
+    }
+  };
+  
+  const clientCount = sseManager.broadcast(healthMessage);
+  
+  res.json({
+    data: {
+      testId,
+      clientsReached: clientCount,
+      success: clientCount > 0,
+      message: clientCount > 0 
+        ? `Health check sent to ${clientCount} clients` 
+        : 'No clients connected to receive health check'
+    }
+  });
 });
 
 export { sseManager };

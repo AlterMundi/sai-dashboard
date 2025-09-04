@@ -54,19 +54,22 @@ export function SSEProvider({ children }: SSEProviderProps) {
   const connect = useCallback(() => {
     // Prevent concurrent connection attempts
     if (isConnectingRef.current) {
-      console.log('🚫 SSE Context: Connection already in progress, skipping');
+      console.log('🚫 [SSE] Connection already in progress, skipping');
       return;
     }
     
     // Don't create multiple connections - be more strict
     if (eventSourceRef.current) {
       if (eventSourceRef.current.readyState === EventSource.CONNECTING || eventSourceRef.current.readyState === EventSource.OPEN) {
-        console.log('🚫 SSE Context: EventSource already exists and active, readyState:', eventSourceRef.current.readyState);
+        console.log('🚫 [SSE] EventSource already exists and active', {
+          readyState: eventSourceRef.current.readyState,
+          readyStateName: ['CONNECTING', 'OPEN', 'CLOSED'][eventSourceRef.current.readyState]
+        });
         return;
       }
       // Only cleanup if it's closed
       if (eventSourceRef.current.readyState === EventSource.CLOSED) {
-        console.log('🗑️ SSE Context: Cleaning up closed EventSource');
+        console.log('🗑️ [SSE] Cleaning up closed EventSource');
         eventSourceRef.current = null;
       }
     }
@@ -80,8 +83,12 @@ export function SSEProvider({ children }: SSEProviderProps) {
       const eventSource = sseApi.createEventSource();
       eventSourceRef.current = eventSource;
 
-      console.log(`🔌 SSE Context: Creating EventSource #${connectionId}:`, eventSource.url);
-      console.log(`🔌 SSE Context: Initial readyState #${connectionId}:`, eventSource.readyState);
+      console.log(`🔌 [SSE] Creating EventSource #${connectionId}`, {
+        url: eventSource.url,
+        readyState: eventSource.readyState,
+        withCredentials: eventSource.withCredentials,
+        timestamp: new Date().toISOString()
+      });
       
       // Monitor readyState changes every second for debugging
       const readyStateMonitor = setInterval(() => {
@@ -240,17 +247,23 @@ export function SSEProvider({ children }: SSEProviderProps) {
         }
       });
 
-      // Batch completion event
+      // Batch completion event - ENHANCED DEBUGGING
       eventSource.addEventListener('execution:batch', (event) => {
+        console.log('🚀 SSE Context: execution:batch event received!', {
+          type: event.type,
+          data: event.data,
+          lastEventId: event.lastEventId
+        });
+        
         try {
           const data = JSON.parse(event.data);
-          console.log('SSE Context: Batch completion received:', data);
+          console.log('✅ SSE Context: Batch completion received:', data);
           setLastEvent({ type: 'execution:batch', data, timestamp: new Date() });
           
           // Smart notification for batch completion
           notifyBatchComplete(data);
         } catch (error) {
-          console.warn('SSE Context: Failed to parse execution:batch event:', error);
+          console.warn('❌ SSE Context: Failed to parse execution:batch event:', error);
         }
       });
 
@@ -267,8 +280,15 @@ export function SSEProvider({ children }: SSEProviderProps) {
         }
       });
 
-      // Generic message handler (fallback)
+      // Generic message handler (fallback) - ENHANCED DEBUGGING
       eventSource.onmessage = (event) => {
+        console.log('🔔 SSE Context: Raw event received:', {
+          type: event.type,
+          data: event.data,
+          lastEventId: event.lastEventId,
+          origin: event.origin
+        });
+        
         try {
           // Skip empty data messages (initial SSE connection messages)
           if (!event.data || event.data.trim() === '') {
@@ -277,10 +297,10 @@ export function SSEProvider({ children }: SSEProviderProps) {
           }
           
           const data = JSON.parse(event.data);
-          console.log('SSE Context: Generic message:', data);
+          console.log('🎯 SSE Context: Parsed generic message:', data);
           setLastEvent({ type: 'message', data, timestamp: new Date() });
         } catch (error) {
-          console.warn('SSE Context: Failed to parse SSE message:', error, 'Raw data:', event.data);
+          console.warn('❌ SSE Context: Failed to parse SSE message:', error, 'Raw data:', event.data);
         }
       };
 
@@ -305,26 +325,12 @@ export function SSEProvider({ children }: SSEProviderProps) {
   }, [connect, cleanup]);
 
   // Handle visibility change (reconnect when tab becomes visible)
+  // DISABLED: Tab visibility detection was too sensitive and causing constant reconnects
+  // TODO: Implement more robust visibility detection or remove entirely
   useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.hidden) {
-        // Tab is hidden, close connection to save resources
-        if (eventSourceRef.current && eventSourceRef.current.readyState === EventSource.OPEN) {
-          console.log('SSE Context: Tab hidden, closing connection');
-          eventSourceRef.current.close();
-        }
-      } else {
-        // Tab is visible, reconnect if needed
-        if (!eventSourceRef.current || eventSourceRef.current.readyState === EventSource.CLOSED) {
-          console.log('SSE Context: Tab visible, reconnecting');
-          setTimeout(connect, 100); // Small delay to ensure tab is fully visible
-        }
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [connect]);
+    // Temporarily disabled to fix constant SSE disconnections
+    console.log('SSE Context: Tab visibility management disabled to prevent connection issues');
+  }, []);
 
   // Handle online/offline status
   useEffect(() => {
@@ -391,22 +397,29 @@ export function useSSEHandler(handlers: {
   const { lastEvent, ...sseState } = useSSE();
 
   useEffect(() => {
+    console.log('🔄 useSSEHandler: lastEvent changed:', lastEvent);
     if (!lastEvent) return;
 
+    console.log('🎯 useSSEHandler: Processing event type:', lastEvent.type);
     switch (lastEvent.type) {
       case 'execution:new':
+        console.log('📨 useSSEHandler: Calling onNewExecution');
         handlers.onNewExecution?.(lastEvent.data);
         break;
       case 'execution:error':
+        console.log('📨 useSSEHandler: Calling onExecutionError');
         handlers.onExecutionError?.(lastEvent.data);
         break;
       case 'execution:batch':
+        console.log('📨 useSSEHandler: Calling onExecutionBatch with data:', lastEvent.data);
         handlers.onExecutionBatch?.(lastEvent.data);
         break;
       case 'connection':
+        console.log('📨 useSSEHandler: Calling onConnection');
         handlers.onConnection?.(lastEvent.data);
         break;
       case 'heartbeat':
+        console.log('📨 useSSEHandler: Calling onHeartbeat');
         handlers.onHeartbeat?.(lastEvent.data);
         break;
     }
