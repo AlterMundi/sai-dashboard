@@ -1,7 +1,7 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { LiveExecutionCard } from './LiveExecutionCard';
 import { ExecutionWithImage } from '@/types';
-import { useSSEHandler } from '@/contexts/SSEContext';
+import { useSSE } from '@/contexts/SSEContext';
 import { Activity, X } from 'lucide-react';
 import { cn } from '@/utils';
 
