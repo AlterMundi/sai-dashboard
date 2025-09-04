@@ -24,8 +24,10 @@ interface EventLog {
   timestamp: Date;
   type: string;
   data: any;
-  source: 'sse' | 'manual' | 'system';
+  source: 'onmessage' | 'manual' | 'system' | 'specific-listener' | 'custom-event';
   status: 'received' | 'sent' | 'error';
+  rawMessage?: string;
+  eventName?: string;
 }
 
 interface ConnectionMetrics {
@@ -46,7 +48,7 @@ export function SSEDebugPage() {
   const [debugInfo, setDebugInfo] = useState<any>(null);
   const [isMonitoring, setIsMonitoring] = useState(true);
   const [selectedEvent, setSelectedEvent] = useState<EventLog | null>(null);
-  const [eventFilter, setEventFilter] = useState<string>('all');
+  const [activeFilters, setActiveFilters] = useState<string[]>(['heartbeat', 'system:stats', 'system:health', 'execution:new', 'execution:batch', 'connection']);
   const [connectionMetrics, setConnectionMetrics] = useState<ConnectionMetrics>({
     connectionAttempts: 0,
     successfulConnections: 0,
@@ -77,31 +79,62 @@ export function SSEDebugPage() {
     }
   }, [isConnected]);
 
-  // Track events
+  // Track events using lastEvent from SSE Context
   useEffect(() => {
     if (lastEvent && isMonitoring) {
+      // Determine event source and analysis
+      let eventSource: EventLog['source'] = 'onmessage';
+      let eventAnalysis = '';
+      
+      if (lastEvent.type === 'message') {
+        eventSource = 'onmessage';
+        eventAnalysis = 'Generic onmessage handler';
+      } else if (['heartbeat', 'system:stats', 'system:health', 'execution:new', 'execution:batch', 'execution:error', 'connection'].includes(lastEvent.type)) {
+        eventSource = 'specific-listener';
+        eventAnalysis = `Event processed by specific listener and onmessage`;
+      }
+      
       const newEvent: EventLog = {
         id: `evt-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        timestamp: new Date(),
+        timestamp: lastEvent.timestamp || new Date(),
         type: lastEvent.type,
         data: lastEvent.data,
-        source: 'sse',
-        status: 'received'
+        source: eventSource,
+        status: 'received',
+        eventName: lastEvent.type,
+        rawMessage: eventAnalysis
       };
 
-      setEvents(prev => [newEvent, ...prev].slice(0, 100)); // Keep last 100 events
+      setEvents(prev => {
+        // Prevent duplicates
+        const isDuplicate = prev.some(e => 
+          e.type === newEvent.type && 
+          e.source === newEvent.source &&
+          Math.abs((e.timestamp?.getTime() || 0) - (newEvent.timestamp?.getTime() || 0)) < 2000
+        );
+        
+        if (!isDuplicate) {
+          return [newEvent, ...prev].slice(0, 100);
+        }
+        return prev;
+      });
+      
+      // Update connection metrics
       setConnectionMetrics(prev => ({
         ...prev,
-        totalEventsReceived: prev.totalEventsReceived + 1
+        totalEventsReceived: prev.totalEventsReceived + 1,
+        lastConnectedAt: isConnected ? new Date() : prev.lastConnectedAt
       }));
     }
   }, [lastEvent, isMonitoring]);
+
+  // REMOVED: Complex custom DOM event listeners - using direct SSE context instead
 
   // Calculate events per minute
   useEffect(() => {
     const interval = setInterval(() => {
       const oneMinuteAgo = new Date(Date.now() - 60000);
-      const recentEvents = events.filter(e => e.timestamp > oneMinuteAgo && e.source === 'sse').length;
+      const recentEvents = events.filter(e => e.timestamp > oneMinuteAgo && ['onmessage', 'specific-listener', 'custom-event'].includes(e.source)).length;
       
       setConnectionMetrics(prev => ({
         ...prev,
@@ -251,10 +284,37 @@ export function SSEDebugPage() {
     }));
   };
 
-  // Filter events
-  const filteredEvents = eventFilter === 'all' 
+  // Filter events with additive logic
+  const filteredEvents = activeFilters.length === 0 
     ? events 
-    : events.filter(e => e.type.includes(eventFilter));
+    : events.filter(e => activeFilters.includes(e.type));
+
+  // Available event types for filtering
+  const eventTypes = [
+    { key: 'heartbeat', label: 'Heartbeat', color: 'bg-green-100 text-green-700' },
+    { key: 'system:stats', label: 'System Stats', color: 'bg-purple-100 text-purple-700' },
+    { key: 'system:health', label: 'Health', color: 'bg-purple-100 text-purple-700' },
+    { key: 'connection', label: 'Connection', color: 'bg-blue-100 text-blue-700' },
+    { key: 'execution:new', label: 'New Exec', color: 'bg-blue-100 text-blue-700' },
+    { key: 'execution:batch', label: 'Batch', color: 'bg-blue-100 text-blue-700' },
+    { key: 'execution:error', label: 'Error', color: 'bg-red-100 text-red-700' },
+    { key: 'message', label: 'Generic', color: 'bg-gray-100 text-gray-700' }
+  ];
+
+  // Toggle filter function
+  const toggleFilter = (eventType: string) => {
+    setActiveFilters(prev => 
+      prev.includes(eventType)
+        ? prev.filter(t => t !== eventType)
+        : [...prev, eventType]
+    );
+  };
+
+  // Clear all filters
+  const clearFilters = () => setActiveFilters([]);
+  
+  // Select all filters
+  const selectAllFilters = () => setActiveFilters(eventTypes.map(t => t.key));
 
   // Get connection status color
   const getConnectionColor = () => {
@@ -289,7 +349,7 @@ export function SSEDebugPage() {
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               )}
             >
-              {isMonitoring ? <Play className="w-4 h-4 mr-2" /> : <Pause className="w-4 h-4 mr-2" />}
+              {isMonitoring ? <Pause className="w-4 h-4 mr-2" /> : <Play className="w-4 h-4 mr-2" />}
               {isMonitoring ? 'Monitoring' : 'Paused'}
             </button>
             
@@ -510,19 +570,42 @@ export function SSEDebugPage() {
               <h3 className="font-semibold text-gray-900">Event Log</h3>
               
               <div className="flex items-center space-x-2">
-                <label className="text-sm text-gray-600">Filter:</label>
-                <select
-                  value={eventFilter}
-                  onChange={(e) => setEventFilter(e.target.value)}
-                  className="text-sm border border-gray-300 rounded px-2 py-1"
+                <button
+                  onClick={selectAllFilters}
+                  className="text-xs px-2 py-1 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
                 >
-                  <option value="all">All Events</option>
-                  <option value="execution">Executions</option>
-                  <option value="heartbeat">Heartbeats</option>
-                  <option value="system">System</option>
-                  <option value="test">Tests</option>
-                  <option value="error">Errors</option>
-                </select>
+                  All
+                </button>
+                <button
+                  onClick={clearFilters}
+                  className="text-xs px-2 py-1 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
+                >
+                  None
+                </button>
+              </div>
+            </div>
+            
+            {/* Event Type Filter Buttons */}
+            <div className="flex flex-wrap gap-2 mt-4">
+              {eventTypes.map(eventType => (
+                <button
+                  key={eventType.key}
+                  onClick={() => toggleFilter(eventType.key)}
+                  className={cn(
+                    'text-xs px-3 py-1 rounded-full border transition-all duration-200',
+                    activeFilters.includes(eventType.key)
+                      ? `${eventType.color} border-current shadow-sm` 
+                      : 'bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100'
+                  )}
+                >
+                  {eventType.label}
+                  {activeFilters.includes(eventType.key) && (
+                    <span className="ml-1 font-medium">✓</span>
+                  )}
+                </button>
+              ))}
+              <div className="text-xs text-gray-500 self-center ml-2">
+                {filteredEvents.length} events
               </div>
             </div>
           </div>
@@ -568,11 +651,13 @@ export function SSEDebugPage() {
                       </td>
                       <td className="px-4 py-2">
                         <span className={cn('text-xs px-2 py-1 rounded', {
-                          'bg-blue-50 text-blue-600': event.source === 'sse',
-                          'bg-orange-50 text-orange-600': event.source === 'manual',
+                          'bg-orange-50 text-orange-600': event.source === 'onmessage',
+                          'bg-green-50 text-green-600': event.source === 'specific-listener',
+                          'bg-blue-50 text-blue-600': event.source === 'custom-event',
+                          'bg-yellow-50 text-yellow-600': event.source === 'manual',
                           'bg-gray-50 text-gray-600': event.source === 'system'
                         })}>
-                          {event.source}
+                          {event.source === 'specific-listener' ? 'specific' : event.source}
                         </span>
                       </td>
                       <td className="px-4 py-2">
@@ -631,6 +716,9 @@ export function SSEDebugPage() {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Source</label>
                     <p className="text-sm text-gray-900">{selectedEvent.source}</p>
+                    {selectedEvent.rawMessage && (
+                      <p className="text-xs text-gray-600 mt-1 italic">{selectedEvent.rawMessage}</p>
+                    )}
                   </div>
                   
                   <div>

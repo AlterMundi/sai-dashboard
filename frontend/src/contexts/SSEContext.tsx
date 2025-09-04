@@ -90,29 +90,21 @@ export function SSEProvider({ children }: SSEProviderProps) {
         timestamp: new Date().toISOString()
       });
       
-      // Monitor readyState changes every second for debugging
+      // Monitor readyState changes (reduced frequency for production)
       const readyStateMonitor = setInterval(() => {
-        console.log(`🔍 SSE Context: EventSource #${connectionId} readyState check:`, {
-          readyState: eventSource.readyState,
-          url: eventSource.url,
-          timestamp: new Date().toISOString()
-        });
-        
-        // Stop monitoring if connection opened or closed
-        if (eventSource.readyState !== EventSource.CONNECTING) {
+        if (eventSource.readyState === EventSource.CONNECTING) {
+          console.log(`🔍 SSE Context: Still connecting #${connectionId}...`);
+        } else {
           clearInterval(readyStateMonitor);
         }
-      }, 1000);
+      }, 5000);
 
       eventSource.onopen = () => {
-        console.log(`✅ SSE Context: Connection #${connectionId} opened - onopen fired!`);
-        console.log(`✅ SSE Context: EventSource #${connectionId} readyState:`, eventSource.readyState);
-        console.log(`✅ SSE Context: EventSource #${connectionId} URL:`, eventSource.url);
-        console.log(`✅ SSE Context: EventSource #${connectionId} withCredentials:`, eventSource.withCredentials);
+        console.log(`✅ SSE Context: Connection #${connectionId} opened successfully`);
         setIsConnected(true);
         setConnectionStatus('connected');
-        reconnectAttempts.current = 0; // Reset reconnect attempts on successful connection
-        isConnectingRef.current = false; // Connection attempt completed
+        reconnectAttempts.current = 0;
+        isConnectingRef.current = false;
       };
 
       // Fallback: Check connection after 3 seconds if onopen hasn't fired
@@ -215,7 +207,6 @@ export function SSEProvider({ children }: SSEProviderProps) {
           const data: SSEHeartbeatEvent = JSON.parse(event.data);
           setClientCount(data.clients);
           setLastEvent({ type: 'heartbeat', data, timestamp: new Date() });
-          console.debug('SSE Context: Heartbeat:', data);
         } catch (error) {
           console.warn('SSE Context: Failed to parse heartbeat event:', error);
         }
@@ -228,6 +219,8 @@ export function SSEProvider({ children }: SSEProviderProps) {
           console.log('SSE Context: System stats received:', data);
           setLastEvent({ type: 'system:stats', data, timestamp: new Date() });
           setLiveStats(data);
+          
+          // Events are captured directly via lastEvent state
           
           // Smart notification for significant stats changes
           notifySystemStats(data);
@@ -243,6 +236,8 @@ export function SSEProvider({ children }: SSEProviderProps) {
           console.log('SSE Context: System health received:', data);
           setLastEvent({ type: 'system:health', data, timestamp: new Date() });
           setSystemHealth(data);
+          
+          // Events are captured directly via lastEvent state
           
           // Smart notification for health issues
           notifySystemHealth(data);
@@ -288,29 +283,34 @@ export function SSEProvider({ children }: SSEProviderProps) {
         }
       });
 
-      // Generic message handler (fallback) - ENHANCED DEBUGGING
+      // Generic message handler (fallback)
       eventSource.onmessage = (event) => {
-        console.log('🔔 SSE Context: Raw event received:', {
-          type: event.type,
-          data: event.data,
-          lastEventId: event.lastEventId,
-          origin: event.origin
-        });
-        
         try {
-          // Skip empty data messages (initial SSE connection messages)
+          // Skip empty data messages (connection keepalive)
           if (!event.data || event.data.trim() === '') {
-            console.log('SSE Context: Received empty data message (connection keepalive)');
             return;
           }
           
           const data = JSON.parse(event.data);
-          console.log('🎯 SSE Context: Parsed generic message:', data);
           setLastEvent({ type: 'message', data, timestamp: new Date() });
+          
+          // Dispatch custom event for generic messages
+          window.dispatchEvent(new CustomEvent('sai:generic:message', { detail: data }));
         } catch (error) {
-          console.warn('❌ SSE Context: Failed to parse SSE message:', error, 'Raw data:', event.data);
+          console.warn('SSE Context: Failed to parse message:', error);
         }
       };
+
+      // Connection state monitoring (cleanup intervals on close)
+      const connectionMonitor = setInterval(() => {
+        if (eventSource.readyState === EventSource.CLOSED) {
+          clearInterval(connectionMonitor);
+        }
+      }, 10000);
+      
+      // Clear monitor when connection closes
+      eventSource.addEventListener('error', () => clearInterval(connectionMonitor));
+      eventSource.addEventListener('open', () => clearInterval(connectionMonitor));
 
     } catch (error) {
       console.error('SSE Context: Failed to create SSE connection:', error);
@@ -331,6 +331,7 @@ export function SSEProvider({ children }: SSEProviderProps) {
       cleanup();
     };
   }, [connect, cleanup]);
+
 
   // Handle visibility change (reconnect when tab becomes visible)
   // DISABLED: Tab visibility detection was too sensitive and causing constant reconnects

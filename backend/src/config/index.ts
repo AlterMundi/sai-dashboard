@@ -62,6 +62,7 @@ export const appConfig = {
     heartbeatInterval: parseInt(process.env.SSE_HEARTBEAT_INTERVAL || '30000', 10),
     maxClients: parseInt(process.env.SSE_MAX_CLIENTS || '100', 10),
     timeout: parseInt(process.env.SSE_TIMEOUT || '300000', 10),
+    debug: process.env.SSE_DEBUG === 'true',
   },
 
   health: {
