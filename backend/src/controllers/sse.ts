@@ -69,7 +69,22 @@ class SSEManager {
 
     try {
       const sseMessage = this.formatSSEMessage(message);
+      
+      // Log raw SSE messages occasionally for debugging (every 10th heartbeat)
+      if (appConfig.sse.debug && (message.type !== 'heartbeat' || Math.random() < 0.1)) {
+        logger.info(`📤 SSE message sent to client ${clientId}:`, {
+          type: message.type,
+          messageLength: sseMessage.length
+        });
+      }
+      
       (client.response as any).write(sseMessage);
+      
+      // CRITICAL: Flush the response to ensure immediate delivery
+      if (typeof (client.response as any).flush === 'function') {
+        (client.response as any).flush();
+      }
+      
       client.lastPing = new Date();
       return true;
 
@@ -101,13 +116,14 @@ class SSEManager {
     deadClients.forEach(clientId => this.removeClient(clientId));
 
     if (successCount > 0) {
-      // Temporarily change to INFO for debugging
-      logger.info('📡 SSE message broadcasted', {
-        type: message.type,
-        successCount,
-        totalClients: this.clients.size,
-        data: message.type === 'execution:batch' ? JSON.stringify(message.data) : 'other'
-      });
+      // Log broadcasts occasionally (not every heartbeat)
+      if (message.type !== 'heartbeat' || Math.random() < 0.05) {
+        logger.info('📡 SSE message broadcasted', {
+          type: message.type,
+          successCount,
+          totalClients: this.clients.size
+        });
+      }
     }
 
     return successCount;
