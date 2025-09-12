@@ -23,6 +23,14 @@ import {
   Zap,
   Eye,
   Share2,
+  Flame,
+  Wind,
+  Thermometer,
+  MapPin,
+  Camera,
+  Sun,
+  Moon,
+  Droplets,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -281,7 +289,108 @@ export function ImageModal({ execution, isOpen, onClose }: ImageModalProps) {
                 </div>
               </div>
 
-              {/* Analysis Results */}
+              {/* Risk Assessment */}
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
+                  Risk Assessment
+                </h3>
+                
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="p-3 bg-gray-50 rounded-lg">
+                    <p className="text-xs text-gray-500 mb-1">Risk Level</p>
+                    <div className={cn(
+                      "px-2 py-1 rounded text-sm font-medium text-center",
+                      execution.riskLevel === 'high' && 'bg-red-100 text-red-700',
+                      execution.riskLevel === 'medium' && 'bg-orange-100 text-orange-700', 
+                      execution.riskLevel === 'low' && 'bg-yellow-100 text-yellow-700',
+                      execution.riskLevel === 'none' && 'bg-gray-100 text-gray-700'
+                    )}>
+                      {execution.riskLevel?.toUpperCase() || 'UNKNOWN'}
+                    </div>
+                  </div>
+                  
+                  <div className="p-3 bg-gray-50 rounded-lg">
+                    <p className="text-xs text-gray-500 mb-1">Alert Priority</p>
+                    <div className={cn(
+                      "px-2 py-1 rounded text-sm font-medium text-center",
+                      execution.alertPriority === 'critical' && 'bg-red-100 text-red-700',
+                      execution.alertPriority === 'high' && 'bg-orange-100 text-orange-700',
+                      execution.alertPriority === 'normal' && 'bg-blue-100 text-blue-700',
+                      execution.alertPriority === 'low' && 'bg-gray-100 text-gray-700'
+                    )}>
+                      {execution.alertPriority?.toUpperCase() || 'NORMAL'}
+                    </div>
+                  </div>
+                </div>
+
+                {execution.responseRequired && (
+                  <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <div className="flex items-center">
+                      <AlertTriangle className="h-5 w-5 text-red-600 mr-2" />
+                      <span className="text-sm font-medium text-red-800">Immediate Response Required</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Detection Results */}
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
+                  Detection Results
+                </h3>
+                
+                <div className="space-y-2">
+                  <div className={cn(
+                    "flex items-center justify-between p-3 rounded-lg border",
+                    execution.smokeDetected ? 'bg-gray-50 border-gray-300' : 'bg-gray-25 border-gray-200'
+                  )}>
+                    <div className="flex items-center">
+                      <Wind className={cn("h-4 w-4 mr-2", execution.smokeDetected ? 'text-gray-600' : 'text-gray-400')} />
+                      <span className="text-sm">Smoke Detection</span>
+                    </div>
+                    <span className={cn(
+                      "text-sm font-medium",
+                      execution.smokeDetected ? 'text-gray-700' : 'text-gray-500'
+                    )}>
+                      {execution.smokeDetected ? 'DETECTED' : 'Clear'}
+                    </span>
+                  </div>
+                  
+                  <div className={cn(
+                    "flex items-center justify-between p-3 rounded-lg border",
+                    execution.flameDetected ? 'bg-red-50 border-red-300' : 'bg-gray-25 border-gray-200'
+                  )}>
+                    <div className="flex items-center">
+                      <Flame className={cn("h-4 w-4 mr-2", execution.flameDetected ? 'text-red-600' : 'text-gray-400')} />
+                      <span className="text-sm">Flame Detection</span>
+                    </div>
+                    <span className={cn(
+                      "text-sm font-medium",
+                      execution.flameDetected ? 'text-red-700' : 'text-gray-500'
+                    )}>
+                      {execution.flameDetected ? 'DETECTED' : 'Clear'}
+                    </span>
+                  </div>
+                  
+                  <div className={cn(
+                    "flex items-center justify-between p-3 rounded-lg border",
+                    execution.heatSignatureDetected ? 'bg-orange-50 border-orange-300' : 'bg-gray-25 border-gray-200'
+                  )}>
+                    <div className="flex items-center">
+                      <Thermometer className={cn("h-4 w-4 mr-2", execution.heatSignatureDetected ? 'text-orange-600' : 'text-gray-400')} />
+                      <span className="text-sm">Heat Signature</span>
+                    </div>
+                    <span className={cn(
+                      "text-sm font-medium",
+                      execution.heatSignatureDetected ? 'text-orange-700' : 'text-gray-500'
+                    )}>
+                      {execution.heatSignatureDetected ? 'DETECTED' : 'Clear'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* AI Analysis Results */}
               {execution.overallAssessment && (
                 <div className="space-y-3">
                   <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
@@ -291,7 +400,7 @@ export function ImageModal({ execution, isOpen, onClose }: ImageModalProps) {
                   <div className="bg-gray-50 rounded-lg p-4">
                     <div className="space-y-3">
                       <div>
-                        <p className="text-sm font-medium text-gray-700 mb-2">Risk Assessment</p>
+                        <p className="text-sm font-medium text-gray-700 mb-2">Assessment</p>
                         <p className="text-gray-900 leading-relaxed">
                           {execution.overallAssessment}
                         </p>
@@ -318,7 +427,11 @@ export function ImageModal({ execution, isOpen, onClose }: ImageModalProps) {
                         </div>
                       )}
 
-                      {/* Recommendations section removed - not available in new ETL structure */}
+                      {(execution as any).modelVersion && (
+                        <div>
+                          <p className="text-xs text-gray-500">Model Version: {(execution as any).modelVersion}</p>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -347,6 +460,168 @@ export function ImageModal({ execution, isOpen, onClose }: ImageModalProps) {
                 </div>
               )}
 
+              {/* Environmental Conditions */}
+              {((execution as any).temperatureCelsius !== undefined || (execution as any).humidityPercent !== undefined || (execution as any).windSpeedKmh !== undefined || (execution as any).isDaylight !== undefined || (execution as any).weatherConditions) && (
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
+                    Environmental Conditions
+                  </h3>
+                  
+                  <div className="grid grid-cols-2 gap-3">
+                    {(execution as any).temperatureCelsius !== undefined && (
+                      <div className="p-3 bg-blue-50 rounded-lg">
+                        <div className="flex items-center">
+                          <Thermometer className="h-4 w-4 text-blue-600 mr-2" />
+                          <div>
+                            <p className="text-xs text-gray-500">Temperature</p>
+                            <p className="text-sm font-medium text-gray-900">{(execution as any).temperatureCelsius}°C</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {(execution as any).humidityPercent !== undefined && (
+                      <div className="p-3 bg-teal-50 rounded-lg">
+                        <div className="flex items-center">
+                          <Droplets className="h-4 w-4 text-teal-600 mr-2" />
+                          <div>
+                            <p className="text-xs text-gray-500">Humidity</p>
+                            <p className="text-sm font-medium text-gray-900">{(execution as any).humidityPercent}%</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {(execution as any).windSpeedKmh !== undefined && (
+                      <div className="p-3 bg-green-50 rounded-lg">
+                        <div className="flex items-center">
+                          <Wind className="h-4 w-4 text-green-600 mr-2" />
+                          <div>
+                            <p className="text-xs text-gray-500">Wind Speed</p>
+                            <p className="text-sm font-medium text-gray-900">{(execution as any).windSpeedKmh} km/h</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {(execution as any).isDaylight !== undefined && (
+                      <div className="p-3 bg-yellow-50 rounded-lg">
+                        <div className="flex items-center">
+                          {(execution as any).isDaylight ? (
+                            <Sun className="h-4 w-4 text-yellow-600 mr-2" />
+                          ) : (
+                            <Moon className="h-4 w-4 text-indigo-600 mr-2" />
+                          )}
+                          <div>
+                            <p className="text-xs text-gray-500">Time of Day</p>
+                            <p className="text-sm font-medium text-gray-900">
+                              {(execution as any).isDaylight ? 'Daylight' : 'Nighttime'}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {(execution as any).weatherConditions && (
+                    <div className="p-3 bg-gray-50 rounded-lg">
+                      <p className="text-xs text-gray-500 mb-1">Weather Conditions</p>
+                      <p className="text-sm text-gray-900">{(execution as any).weatherConditions}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Location Information */}
+              {(execution.cameraId || execution.nodeId || (execution as any).latitude !== undefined || (execution as any).fireZoneRisk) && (
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
+                    Location Information
+                  </h3>
+                  
+                  <div className="space-y-2">
+                    {execution.cameraId && (
+                      <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
+                        <div className="flex items-center">
+                          <Camera className="h-4 w-4 text-blue-600 mr-2" />
+                          <span className="text-sm text-gray-700">Camera ID</span>
+                        </div>
+                        <code className="font-mono text-sm bg-white px-2 py-1 rounded border">
+                          {execution.cameraId}
+                        </code>
+                      </div>
+                    )}
+                    
+                    {execution.nodeId && (
+                      <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
+                        <div className="flex items-center">
+                          <MapPin className="h-4 w-4 text-green-600 mr-2" />
+                          <span className="text-sm text-gray-700">Node ID</span>
+                        </div>
+                        <code className="font-mono text-sm bg-white px-2 py-1 rounded border">
+                          {execution.nodeId}
+                        </code>
+                      </div>
+                    )}
+                    
+                    {((execution as any).latitude !== undefined && (execution as any).longitude !== undefined) && (
+                      <div className="p-3 bg-gray-50 rounded-lg">
+                        <p className="text-xs text-gray-500 mb-1">GPS Coordinates</p>
+                        <p className="text-sm font-mono text-gray-900">
+                          {(execution as any).latitude.toFixed(6)}, {(execution as any).longitude.toFixed(6)}
+                        </p>
+                      </div>
+                    )}
+                    
+                    {(execution as any).fireZoneRisk && (
+                      <div className="p-3 bg-orange-50 rounded-lg">
+                        <p className="text-xs text-gray-500 mb-1">Fire Zone Risk</p>
+                        <p className="text-sm text-gray-900">{(execution as any).fireZoneRisk}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Image Information */}
+              {(execution.imageSizeBytes || execution.imageFormat || (execution as any).imageWidth) && (
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
+                    Image Details
+                  </h3>
+                  
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    {execution.imageFormat && (
+                      <div>
+                        <p className="text-gray-500">Format</p>
+                        <p className="font-medium uppercase">{execution.imageFormat}</p>
+                      </div>
+                    )}
+                    
+                    {execution.imageSizeBytes && (
+                      <div>
+                        <p className="text-gray-500">File Size</p>
+                        <p className="font-medium">{(execution.imageSizeBytes / 1024).toFixed(1)} KB</p>
+                      </div>
+                    )}
+                    
+                    {((execution as any).imageWidth && (execution as any).imageHeight) && (
+                      <div>
+                        <p className="text-gray-500">Dimensions</p>
+                        <p className="font-medium">{(execution as any).imageWidth} × {(execution as any).imageHeight}</p>
+                      </div>
+                    )}
+                    
+                    {(execution as any).imageQualityScore && (
+                      <div>
+                        <p className="text-gray-500">Quality Score</p>
+                        <p className="font-medium">{Math.round((execution as any).imageQualityScore * 100)}%</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {/* Technical Details */}
               <div className="space-y-3">
                 <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
@@ -368,7 +643,28 @@ export function ImageModal({ execution, isOpen, onClose }: ImageModalProps) {
                     </code>
                   </div>
 
-                  {/* retryOf field removed - not available in new ETL structure */}
+                  {(execution as any).processingTimeMs && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Processing Time</span>
+                      <span className="font-medium">{(execution as any).processingTimeMs}ms</span>
+                    </div>
+                  )}
+
+                  {(execution as any).extractedAt && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Data Extracted</span>
+                      <span className="font-medium">{formatDate((execution as any).extractedAt, 'MMM d, HH:mm')}</span>
+                    </div>
+                  )}
+
+                  {(execution as any).incidentId && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Incident ID</span>
+                      <code className="font-mono text-xs bg-gray-100 px-2 py-1 rounded">
+                        {(execution as any).incidentId}
+                      </code>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

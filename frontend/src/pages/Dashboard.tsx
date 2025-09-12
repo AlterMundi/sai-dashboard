@@ -1,10 +1,10 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { Layout } from '@/components/Layout';
 import { ImageGallery } from '@/components/ImageGallery';
 import { LoadingState } from '@/components/ui/LoadingSpinner';
-import { LiveExecutionStrip } from '@/components/LiveExecutionStrip';
 import { LiveStatsCard, SystemHealthIndicator } from '@/components/LiveStatsCard';
 import { useExecutionStats, useDailySummary, useExecutions } from '@/hooks/useExecutions';
+import { executionsApi } from '@/services/api';
 import { useSSEHandler, useSSE } from '@/contexts/SSEContext';
 import { ExecutionFilters } from '@/types';
 import { formatPercentage, cn } from '@/utils';
@@ -21,8 +21,9 @@ export function Dashboard() {
   const [filters, setFilters] = useState<ExecutionFilters>({});
   const [showFilters, setShowFilters] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [newExecutionsCount, setNewExecutionsCount] = useState(0);
-  const [refreshTrigger, setRefreshTrigger] = useState(0); // Force gallery refresh
+  const [batchUpdateTrigger, setBatchUpdateTrigger] = useState(0);
+  const galleryPrependRef = useRef<((executions: any[]) => void) | null>(null);
+  // Removed: newExecutionsCount - was debug UI, not useful for end users
   
   const { stats, isLoading: statsLoading, error: statsError } = useExecutionStats();
   useDailySummary(7);
@@ -33,41 +34,39 @@ export function Dashboard() {
   // Get live SSE data
   const { isConnected, systemHealth } = useSSE();
 
-  // Handle real-time updates via SSE - FIXED: Memoize individual handlers to prevent useEffect dependency issues
-  const onNewExecution = useCallback((data: any) => {
-    console.log('New execution received:', data.execution);
-    setNewExecutionsCount(prev => prev + 1);
-    
-    // Auto-refresh stats periodically (fast for testing)
-    setTimeout(() => {
-      setNewExecutionsCount(prev => Math.max(0, prev - 1));
-    }, 3000); // Remove notification after 3 seconds (fast for testing)
+  // Handle real-time updates via SSE - simplified without debug counters
+  const onNewExecution = useCallback(() => {
+    // New executions are handled automatically by the gallery's own data fetching
   }, []);
 
-  const onExecutionError = useCallback((data: any) => {
-    console.log('Execution error received:', data);
+  const onExecutionError = useCallback(() => {
+    // Handle execution errors if needed
   }, []);
 
-  const onExecutionBatch = useCallback((data: any) => {
-    console.log('🎉 Dashboard: Batch received with', data.count, 'new executions', data);
+  const onExecutionBatch = useCallback(async (batchData: any) => {
+    console.log('📦 Dashboard: Batch update received', batchData);
     
-    // Update new executions counter
-    setNewExecutionsCount(prev => {
-      console.log('🔢 Dashboard: Updating execution count from', prev, 'to', prev + data.count);
-      return prev + data.count;
-    });
-    
-    // Trigger gallery refresh by changing the key
-    setRefreshTrigger(prev => {
-      console.log('🔄 Dashboard: Triggering gallery refresh from', prev, 'to', prev + 1);
-      return prev + 1;
-    });
-    
-    // Clear counter after some time (fast for testing)
-    setTimeout(() => {
-      setNewExecutionsCount(prev => Math.max(0, prev - data.count));
-    }, 3000); // 3 seconds for fast testing
-  }, []);
+    // Try to fetch and prepend new executions if gallery prepend function is available
+    if (galleryPrependRef.current) {
+      try {
+        // Fetch the most recent executions (limiting to a small number)
+        const response = await executionsApi.getExecutions({ 
+          ...filters,
+          page: 0,
+          limit: Math.min(batchData.count || 10, 20) // Get at most 20 recent executions
+        });
+        
+        console.log(`📥 Dashboard: Prepending ${response.executions.length} new executions to gallery`);
+        galleryPrependRef.current(response.executions);
+      } catch (error) {
+        console.warn('Failed to fetch new executions for prepending, falling back to refresh trigger', error);
+        setBatchUpdateTrigger(prev => prev + 1);
+      }
+    } else {
+      // Fallback to refresh trigger
+      setBatchUpdateTrigger(prev => prev + 1);
+    }
+  }, [filters]);
   
   useSSEHandler({
     onNewExecution,
@@ -118,14 +117,6 @@ export function Dashboard() {
               <div className="flex items-center px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm">
                 <div className="h-2 w-2 bg-green-600 rounded-full mr-2 animate-pulse" />
                 Live Updates
-              </div>
-            )}
-            
-            {/* New Executions Counter */}
-            {newExecutionsCount > 0 && (
-              <div className="flex items-center px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
-                <Activity className="h-3 w-3 mr-1" />
-                {newExecutionsCount} new
               </div>
             )}
           </div>
@@ -418,13 +409,11 @@ export function Dashboard() {
           )}
         </div>
 
-        {/* Live Execution Strip */}
-        <LiveExecutionStrip />
-
         {/* Main Gallery */}
         <ImageGallery 
           initialFilters={filters}
-          refreshTrigger={refreshTrigger}
+          refreshTrigger={batchUpdateTrigger}
+          onPrependRegister={(prependFn) => { galleryPrependRef.current = prependFn; }}
           key={JSON.stringify(filters)} // Only re-render on filter changes
         />
       </div>

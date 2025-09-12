@@ -80,6 +80,22 @@ export function useExecutions(
     fetchExecutions(newFilters, true);
   }, [fetchExecutions]);
 
+  // Prepend new executions (for real-time updates)
+  const prependExecutions = useCallback((newExecutions: ExecutionWithImage[]) => {
+    if (!newExecutions || newExecutions.length === 0) return;
+    
+    setExecutions(prev => {
+      // Filter out duplicates based on ID
+      const existingIds = new Set(prev.map(exec => exec.id));
+      const uniqueNewExecutions = newExecutions.filter(exec => !existingIds.has(exec.id));
+      
+      if (uniqueNewExecutions.length === 0) return prev;
+      
+      console.log(`🆕 Prepending ${uniqueNewExecutions.length} new executions to gallery`);
+      return [...uniqueNewExecutions, ...prev];
+    });
+  }, []);
+
   // Trigger analysis function
   const triggerAnalysis = useCallback(async () => {
     await executionsApi.triggerAnalysis();
@@ -112,6 +128,7 @@ export function useExecutions(
     analysisStatus,
     alerts,
     triggerAnalysis,
+    prependExecutions,
   };
 }
 
