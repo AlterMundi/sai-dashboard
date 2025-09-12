@@ -13,9 +13,10 @@ interface ImageGalleryProps {
   initialFilters?: ExecutionFilters;
   className?: string;
   refreshTrigger?: number;
+  onPrependRegister?: (prependFn: (executions: ExecutionWithImage[]) => void) => void;
 }
 
-export function ImageGallery({ initialFilters = {}, className, refreshTrigger }: ImageGalleryProps) {
+export function ImageGallery({ initialFilters = {}, className, refreshTrigger, onPrependRegister }: ImageGalleryProps) {
   const [selectedExecution, setSelectedExecution] = useState<ExecutionWithImage | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -32,6 +33,7 @@ export function ImageGallery({ initialFilters = {}, className, refreshTrigger }:
     refresh,
     updateFilters,
     filters,
+    prependExecutions,
   } = useExecutions(initialFilters, refreshTrigger);
 
   // Intersection observer for infinite scroll
@@ -56,6 +58,14 @@ export function ImageGallery({ initialFilters = {}, className, refreshTrigger }:
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  // Register prepend function with parent for batch updates
+  useEffect(() => {
+    if (onPrependRegister && prependExecutions) {
+      onPrependRegister(prependExecutions);
+    }
+  }, [onPrependRegister, prependExecutions]);
+
 
   const handleCardClick = useCallback((execution: ExecutionWithImage) => {
     setSelectedExecution(execution);

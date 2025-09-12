@@ -11,15 +11,6 @@ SAI Dashboard is a **real-time fire monitoring system** for the SAI (Sistema de 
 ## 🚀 Development
 
 ```bash
-# Full stack development
-npm run dev
-
-# Backend only (port 3001)
-cd backend && npm run dev
-
-# Frontend only (port 3000)
-cd frontend && npm run dev
-
 # Production deployment
 ./install-production.sh
 ```

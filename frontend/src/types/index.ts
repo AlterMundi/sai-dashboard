@@ -126,6 +126,26 @@ export interface ExecutionWithImage extends SaiExecution {
   imageUrl?: string;
   thumbnailUrl?: string;
   expertReview?: ExpertReview;
+  
+  // Enhanced analysis properties from SaiEnhancedAnalysis
+  cameraLocation?: string;
+  nodeType?: string;
+  motionDetected?: boolean;
+  imageWidth?: number;
+  imageHeight?: number;
+  imageQualityScore?: number;
+  telegramChatId?: string;
+  latitude?: number;
+  longitude?: number;
+  fireZoneRisk?: string;
+  detectionTimestamp?: string;
+  isDaylight?: boolean;
+  weatherConditions?: string;
+  temperatureCelsius?: number;
+  humidityPercent?: number;
+  windSpeedKmh?: number;
+  incidentId?: string;
+  ollamaAnalysisText?: string;
 }
 
 // Filter and Pagination Types
@@ -353,6 +373,7 @@ export interface UseExecutionsReturn {
   analysisStatus: AnalysisStatus | null;
   alerts: AnalysisAlert[];
   triggerAnalysis: () => Promise<void>;
+  prependExecutions: (executions: ExecutionWithImage[]) => void;
 }
 
 export interface UseSSEReturn {

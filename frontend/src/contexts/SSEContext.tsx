@@ -177,8 +177,7 @@ export function SSEProvider({ children }: SSEProviderProps) {
           const newEvent = { type: 'execution:new', data, timestamp: new Date() };
           setLastEvent(newEvent);
           
-          // Immediately trigger any registered new execution handlers
-          window.dispatchEvent(new CustomEvent('sai:execution:new', { detail: data }));
+          // Events are handled through useSSEHandler hook
           
           // Use smart notification system instead of basic toast
           notifyNewExecution(data);
@@ -260,8 +259,7 @@ export function SSEProvider({ children }: SSEProviderProps) {
           const batchEvent = { type: 'execution:batch', data, timestamp: new Date() };
           setLastEvent(batchEvent);
           
-          // Immediately trigger any registered batch handlers
-          window.dispatchEvent(new CustomEvent('sai:execution:batch', { detail: data }));
+          // Events are handled through useSSEHandler hook
           
           // Smart notification for batch completion
           notifyBatchComplete(data);
@@ -294,8 +292,7 @@ export function SSEProvider({ children }: SSEProviderProps) {
           const data = JSON.parse(event.data);
           setLastEvent({ type: 'message', data, timestamp: new Date() });
           
-          // Dispatch custom event for generic messages
-          window.dispatchEvent(new CustomEvent('sai:generic:message', { detail: data }));
+          // Generic messages handled through lastEvent state
         } catch (error) {
           console.warn('SSE Context: Failed to parse message:', error);
         }
