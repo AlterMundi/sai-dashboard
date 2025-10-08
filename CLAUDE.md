@@ -4,7 +4,8 @@ This file provides guidance to Claude Code when working with this repository.
 
 ## 🎯 Project Overview
 
-SAI Dashboard is a **real-time fire monitoring system** for the SAI (Sistema de Alerta de Incendios) network. Processes images from distributed camera nodes with instant fire detection analysis.
+SAI Dashboard is a data analysis tool for the SAI (Sistema de Alerta de Incendios), a **real-time fire monitoring system** that processes images from distributed camera nodes with instant fire detection analysis.
+It is aimed to consume large amount of excecution's information, filter and extract processed data from the system by power users.
 
 **Stack**: React 18 + TypeScript, Node.js + Express, PostgreSQL, hybrid image storage (JPEG + WebP)
 
@@ -18,7 +19,6 @@ SAI Dashboard is a **real-time fire monitoring system** for the SAI (Sistema de 
 ## 📊 Architecture
 
 - **Monorepo** with npm workspaces (backend + frontend)
-- **Dual databases**: n8n (read-only) + sai_dashboard (optimized)
 - **ETL Pipeline**: PostgreSQL NOTIFY/LISTEN for real-time data processing
 - **API**: Self-contained under `/dashboard/api/*`
 - **SSE** for real-time updates
