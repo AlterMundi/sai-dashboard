@@ -37,7 +37,7 @@ export class SimpleETLService extends EventEmitter {
 
   constructor() {
     super();
-    this.imageCachePath = '/mnt/raid1/n8n-backup/images/by-execution';
+    this.imageCachePath = '/mnt/raid1/n8n-backup/images';
     
     // Initialize database pools
     this.n8nPool = new Pool({
@@ -346,48 +346,75 @@ export class SimpleETLService extends EventEmitter {
 
   /**
    * Process and save image from base64 data
+   *
+   * NEW STRUCTURE: Partitioned by 1000s to avoid filesystem hell
+   * /mnt/raid1/n8n-backup/images/original/185/185839.jpg
+   * /mnt/raid1/n8n-backup/images/webp/185/185839.webp
+   * /mnt/raid1/n8n-backup/images/thumb/185/185839.webp
    */
   private async processImage(executionId: number, imageBase64: string): Promise<void> {
     try {
-      // Ensure directory exists
-      const executionDir = path.join(this.imageCachePath, executionId.toString());
-      await fs.mkdir(executionDir, { recursive: true });
-      
+      // Calculate partition directory (group by 1000s)
+      const partition = Math.floor(executionId / 1000);
+
+      // Create directory structure (if not exists)
+      const originalDir = path.join(this.imageCachePath, 'original', partition.toString());
+      const webpDir = path.join(this.imageCachePath, 'webp', partition.toString());
+      const thumbDir = path.join(this.imageCachePath, 'thumb', partition.toString());
+
+      await Promise.all([
+        fs.mkdir(originalDir, { recursive: true }),
+        fs.mkdir(webpDir, { recursive: true }),
+        fs.mkdir(thumbDir, { recursive: true })
+      ]);
+
       // Decode base64 image
       const imageBuffer = Buffer.from(imageBase64, 'base64');
-      
+
+      // Define file paths
+      const originalPath = path.join(originalDir, `${executionId}.jpg`);
+      const webpPath = path.join(webpDir, `${executionId}.webp`);
+      const thumbPath = path.join(thumbDir, `${executionId}.webp`);
+
+      // Check if image already exists (idempotent)
+      try {
+        await fs.access(originalPath);
+        console.log(`⏭️  Image already exists for execution ${executionId}, skipping`);
+        return;
+      } catch {
+        // File doesn't exist, proceed with processing
+      }
+
       // Save original JPEG
-      const originalPath = path.join(executionDir, 'original.jpg');
       await sharp(imageBuffer)
         .jpeg({ quality: 95 })
         .toFile(originalPath);
-      
-      // Create WebP variants
-      const highWebPPath = path.join(executionDir, 'high.webp');
+
+      // Create WebP variant (high quality)
       await sharp(imageBuffer)
         .webp({ quality: 85 })
-        .toFile(highWebPPath);
-      
+        .toFile(webpPath);
+
       // Create thumbnail
-      const thumbPath = path.join(executionDir, 'thumb.webp');
       await sharp(imageBuffer)
         .resize(300, 300, { fit: 'inside', withoutEnlargement: true })
         .webp({ quality: 75 })
         .toFile(thumbPath);
-      
-      // Insert image metadata
+
+      // Insert image metadata with new paths
       await this.dashboardPool.query(`
         INSERT INTO execution_images (
           execution_id, original_path, size_bytes, format, extracted_at
         ) VALUES ($1, $2, $3, 'jpeg', NOW())
+        ON CONFLICT (execution_id) DO NOTHING
       `, [
         executionId,
         originalPath,
         imageBuffer.length
       ]);
-      
+
       console.log(`📸 Image processed for execution ${executionId}`);
-      
+
     } catch (error) {
       console.error(`❌ Failed to process image for execution ${executionId}:`, error);
       throw error;
