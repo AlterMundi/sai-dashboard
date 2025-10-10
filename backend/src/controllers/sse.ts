@@ -539,7 +539,7 @@ const pollAndBroadcastExecutions = async (): Promise<void> => {
         count: newExecutions.length,
         executions: newExecutions.slice().reverse(), // Show newest first, send ALL executions
         successful: newExecutions.filter(e => e.status === 'success').length,
-        highRisk: newExecutions.filter(e => e.riskLevel === 'high').length,
+        highAlert: newExecutions.filter(e => e.alertLevel === 'high').length,
         timestamp: new Date().toISOString()
       };
 
@@ -553,7 +553,7 @@ const pollAndBroadcastExecutions = async (): Promise<void> => {
       logger.info('New executions broadcasted immediately', {
         executionCount: batchData.count,
         successful: batchData.successful,
-        highRisk: batchData.highRisk,
+        highAlert: batchData.highAlert,
         clientCount,
         latestId: lastKnownExecutionId
       });
@@ -772,11 +772,10 @@ export const triggerFakeExecution = asyncHandler(async (req: Request, res: Respo
     durationMs: Math.floor(Math.random() * 10000),
     hasImage: true,
     imageUrl: '/api/test/placeholder.jpg',
-    riskLevel: ['none', 'low', 'medium', 'high'][Math.floor(Math.random() * 4)],
+    alertLevel: ['none', 'low', 'medium', 'high'][Math.floor(Math.random() * 4)],
     confidenceScore: Math.random(),
-    overallAssessment: 'This is a test execution triggered manually for debugging SSE',
-    smokeDetected: Math.random() > 0.5,
-    flameDetected: Math.random() > 0.8,
+    hasFire: Math.random() > 0.8,
+    hasSmoke: Math.random() > 0.5,
     telegramSent: false
   };
   
@@ -801,7 +800,7 @@ export const triggerFakeExecution = asyncHandler(async (req: Request, res: Respo
       count: 1,
       executions: [fakeExecution],
       successful: 1,
-      highRisk: fakeExecution.riskLevel === 'high' ? 1 : 0,
+      highAlert: fakeExecution.alertLevel === 'high' ? 1 : 0,
       timestamp: new Date().toISOString()
     }
   };
@@ -876,11 +875,10 @@ export const triggerTestBatch = asyncHandler(async (req: Request, res: Response)
     durationMs: Math.floor(Math.random() * 10000),
     hasImage: true,
     imageUrl: `/api/test/placeholder-${i}.jpg`,
-    riskLevel: ['none', 'low', 'medium', 'high'][Math.floor(Math.random() * 4)],
+    alertLevel: ['none', 'low', 'medium', 'high'][Math.floor(Math.random() * 4)],
     confidenceScore: Math.random(),
-    overallAssessment: `Test execution ${i + 1} of ${count}`,
-    smokeDetected: Math.random() > 0.5,
-    flameDetected: Math.random() > 0.8,
+    hasFire: Math.random() > 0.8,
+    hasSmoke: Math.random() > 0.5,
     telegramSent: false
   }));
   
@@ -892,7 +890,7 @@ export const triggerTestBatch = asyncHandler(async (req: Request, res: Response)
       count: testExecutions.length,
       executions: testExecutions,
       successful: testExecutions.filter(e => e.status === 'success').length,
-      highRisk: testExecutions.filter(e => e.riskLevel === 'high').length,
+      highAlert: testExecutions.filter(e => e.alertLevel === 'high').length,
       timestamp: new Date().toISOString()
     }
   };

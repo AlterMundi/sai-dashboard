@@ -31,7 +31,7 @@ export class NewExecutionService {
       page = 1,
       pageSize = 50,
       status,
-      riskLevel,
+      alertLevel,
       nodeId,
       cameraId,
       searchQuery,
@@ -52,11 +52,11 @@ export class NewExecutionService {
       queryParams.push(status);
     }
 
-    // Risk level filter
-    if (riskLevel) {
+    // Alert level filter
+    if (alertLevel) {
       paramCount++;
-      whereConditions.push(`ea.risk_level = $${paramCount}`);
-      queryParams.push(riskLevel);
+      whereConditions.push(`ea.alert_level = $${paramCount}`);
+      queryParams.push(alertLevel);
     }
 
     // Node-based filtering
@@ -86,10 +86,14 @@ export class NewExecutionService {
       queryParams.push(endDate);
     }
 
-    // Search query (analysis text)
+    // Search query (location, device, camera)
     if (searchQuery) {
       paramCount++;
-      whereConditions.push(`ea.overall_assessment ILIKE $${paramCount}`);
+      whereConditions.push(`(
+        e.location ILIKE $${paramCount} OR
+        e.device_id ILIKE $${paramCount} OR
+        e.camera_id ILIKE $${paramCount}
+      )`);
       queryParams.push(`%${searchQuery}%`);
     }
 
@@ -131,7 +135,7 @@ export class NewExecutionService {
     const normalizedPage = page < 1 ? 1 : page;
     const offset = (normalizedPage - 1) * pageSize;
     const executionsQuery = `
-      SELECT 
+      SELECT
         e.id,
         e.workflow_id,
         e.execution_timestamp,
@@ -141,23 +145,33 @@ export class NewExecutionService {
         e.mode,
         e.node_id,
         e.camera_id,
-        
-        -- Analysis data
-        ea.risk_level,
+        e.device_id,
+        e.location,
+        e.camera_type,
+        e.capture_timestamp,
+
+        -- YOLO Analysis data
+        ea.request_id,
+        ea.yolo_model_version,
+        ea.detection_count,
+        ea.has_fire,
+        ea.has_smoke,
+        ea.alert_level,
+        ea.detection_mode,
+        ea.active_classes,
+        ea.confidence_fire,
+        ea.confidence_smoke,
+        ea.yolo_processing_time_ms,
+
+        -- General confidence score
         ea.confidence_score,
-        ea.overall_assessment,
-        ea.smoke_detected,
-        ea.flame_detected,
-        ea.heat_signature_detected,
-        ea.alert_priority,
-        ea.response_required,
-        
+
         -- Image data
         ei.original_path,
         ei.size_bytes,
         ei.format,
-        
-        -- Notification data  
+
+        -- Notification data
         en.telegram_sent,
         en.telegram_message_id,
         en.telegram_sent_at
@@ -192,7 +206,7 @@ export class NewExecutionService {
    */
   async getExecutionById(id: number): Promise<ExecutionWithImage | null> {
     const query = `
-      SELECT 
+      SELECT
         e.id,
         e.workflow_id,
         e.execution_timestamp,
@@ -202,25 +216,33 @@ export class NewExecutionService {
         e.mode,
         e.node_id,
         e.camera_id,
-        
-        -- Analysis data
-        ea.risk_level,
+        e.device_id,
+        e.location,
+        e.camera_type,
+        e.capture_timestamp,
+
+        -- YOLO Analysis data
+        ea.request_id,
+        ea.yolo_model_version,
+        ea.detection_count,
+        ea.has_fire,
+        ea.has_smoke,
+        ea.alert_level,
+        ea.detection_mode,
+        ea.active_classes,
+        ea.confidence_fire,
+        ea.confidence_smoke,
+        ea.yolo_processing_time_ms,
+
+        -- General confidence score
         ea.confidence_score,
-        ea.overall_assessment,
-        ea.smoke_detected,
-        ea.flame_detected,
-        ea.heat_signature_detected,
-        ea.model_version,
-        ea.processing_time_ms,
-        ea.alert_priority,
-        ea.response_required,
-        
+
         -- Image data
         ei.original_path,
         ei.size_bytes,
         ei.format,
         ei.extracted_at,
-        
+
         -- Notification data
         en.telegram_sent,
         en.telegram_message_id,
@@ -248,12 +270,12 @@ export class NewExecutionService {
    */
   async getDailySummary(days: number = 7): Promise<DailySummary[]> {
     const query = `
-      SELECT 
+      SELECT
         DATE(e.execution_timestamp) as date,
         COUNT(*) as total_executions,
         COUNT(CASE WHEN e.status = 'success' THEN 1 END) as successful_executions,
-        COUNT(CASE WHEN ea.risk_level = 'high' THEN 1 END) as high_risk_detections,
-        COUNT(CASE WHEN ea.risk_level = 'critical' THEN 1 END) as critical_detections,
+        COUNT(CASE WHEN ea.alert_level = 'high' THEN 1 END) as high_alert_detections,
+        COUNT(CASE WHEN ea.alert_level = 'critical' THEN 1 END) as critical_detections,
         COUNT(CASE WHEN ei.execution_id IS NOT NULL THEN 1 END) as executions_with_images,
         COUNT(CASE WHEN en.telegram_sent = true THEN 1 END) as telegram_notifications_sent,
         AVG(e.duration_ms) as avg_processing_time_ms,
@@ -282,7 +304,7 @@ export class NewExecutionService {
         failedExecutions,
         successRate: totalExecutions > 0 ? (successfulExecutions / totalExecutions) * 100 : 0,
         avgExecutionTime: parseFloat(row.avg_processing_time_ms) / 1000 || null, // Convert to seconds
-        highRiskDetections: parseInt(row.high_risk_detections),
+        highRiskDetections: parseInt(row.high_alert_detections),
         criticalDetections: parseInt(row.critical_detections),
         executionsWithImages: parseInt(row.executions_with_images),
         telegramNotificationsSent: parseInt(row.telegram_notifications_sent),
@@ -304,7 +326,7 @@ export class NewExecutionService {
     avgProcessingTime: number;
     totalWithImages: number;
     totalAnalyzed: number;
-    riskLevelBreakdown: { [key: string]: number };
+    alertLevelBreakdown: { [key: string]: number };
     recentActivity: { hour: string; count: number }[];
   }> {
     // Basic statistics
@@ -325,17 +347,18 @@ export class NewExecutionService {
     const statsResult = await dualDb.query(statsQuery);
     const stats = statsResult[0];
 
-    // Risk level breakdown
-    const riskQuery = `
-      SELECT risk_level, COUNT(*) as count
+    // Alert level breakdown
+    const alertQuery = `
+      SELECT alert_level, COUNT(*) as count
       FROM execution_analysis
-      GROUP BY risk_level
+      WHERE alert_level IS NOT NULL
+      GROUP BY alert_level
     `;
 
-    const riskResults = await dualDb.query(riskQuery);
-    const riskLevelBreakdown: { [key: string]: number } = {};
-    riskResults.forEach((row: any) => {
-      riskLevelBreakdown[row.risk_level] = parseInt(row.count);
+    const alertResults = await dualDb.query(alertQuery);
+    const alertLevelBreakdown: { [key: string]: number } = {};
+    alertResults.forEach((row: any) => {
+      alertLevelBreakdown[row.alert_level] = parseInt(row.count);
     });
 
     // Recent activity (last 24 hours)
@@ -366,7 +389,7 @@ export class NewExecutionService {
       avgProcessingTime: parseFloat(stats.avg_processing_time) || 0,
       totalWithImages: parseInt(stats.total_with_images),
       totalAnalyzed: parseInt(stats.total_analyzed),
-      riskLevelBreakdown,
+      alertLevelBreakdown,
       recentActivity
     };
   }
@@ -377,7 +400,7 @@ export class NewExecutionService {
    */
   async searchExecutions(query: string, limit: number = 50): Promise<ExecutionWithImage[]> {
     const searchQuery = `
-      SELECT 
+      SELECT
         e.id,
         e.workflow_id,
         e.execution_timestamp,
@@ -387,22 +410,32 @@ export class NewExecutionService {
         e.mode,
         e.node_id,
         e.camera_id,
-        
-        -- Analysis data
-        ea.risk_level,
+        e.device_id,
+        e.location,
+        e.camera_type,
+        e.capture_timestamp,
+
+        -- YOLO Analysis data
+        ea.request_id,
+        ea.yolo_model_version,
+        ea.detection_count,
+        ea.has_fire,
+        ea.has_smoke,
+        ea.alert_level,
+        ea.detection_mode,
+        ea.active_classes,
+        ea.confidence_fire,
+        ea.confidence_smoke,
+        ea.yolo_processing_time_ms,
+
+        -- General confidence score
         ea.confidence_score,
-        ea.overall_assessment,
-        ea.smoke_detected,
-        ea.flame_detected,
-        ea.heat_signature_detected,
-        ea.alert_priority,
-        ea.response_required,
-        
+
         -- Image data
         ei.original_path,
         ei.size_bytes,
         ei.format,
-        
+
         -- Notification data
         en.telegram_sent,
         en.telegram_message_id,
@@ -412,7 +445,11 @@ export class NewExecutionService {
       LEFT JOIN execution_analysis ea ON e.id = ea.execution_id
       LEFT JOIN execution_images ei ON e.id = ei.execution_id
       LEFT JOIN execution_notifications en ON e.id = en.execution_id
-      WHERE ea.overall_assessment ILIKE $1
+      WHERE (
+        e.location ILIKE $1 OR
+        e.device_id ILIKE $1 OR
+        e.camera_id ILIKE $1
+      )
       ORDER BY e.execution_timestamp DESC
       LIMIT $2
     `;
@@ -438,29 +475,43 @@ export class NewExecutionService {
       nodeId: row.node_id,
       cameraId: row.camera_id,
 
-      // Analysis data
-      riskLevel: row.risk_level || 'none',
+      // YOLO Analysis data
+      requestId: row.request_id || null,
+      yoloModelVersion: row.yolo_model_version || null,
+      detectionCount: row.detection_count || 0,
+      hasFire: row.has_fire || false,
+      hasSmoke: row.has_smoke || false,
+      alertLevel: row.alert_level || null,
+      detectionMode: row.detection_mode || null,
+      activeClasses: row.active_classes || null,
+      detections: row.detections ? JSON.parse(row.detections) : null,
+
+      // Confidence scores
+      confidenceFire: parseFloat(row.confidence_fire) || null,
+      confidenceSmoke: parseFloat(row.confidence_smoke) || null,
       confidenceScore: parseFloat(row.confidence_score) || null,
-      overallAssessment: row.overall_assessment || null,
-      smokeDetected: row.smoke_detected || false,
-      flameDetected: row.flame_detected || false,
-      heatSignatureDetected: row.heat_signature_detected || false,
-      alertPriority: row.alert_priority || 'low',
-      responseRequired: row.response_required || false,
+
+      // Device and camera data
+      deviceId: row.device_id || null,
+      location: row.location || null,
+      cameraType: row.camera_type || null,
+      captureTimestamp: row.capture_timestamp || null,
 
       // Image data
       hasImage: !!row.original_path,
       imagePath: row.original_path || null,
       imageSizeBytes: row.size_bytes || null,
       imageFormat: row.format || null,
+      imageWidth: row.image_width || null,
+      imageHeight: row.image_height || null,
 
       // Notification data
       telegramSent: row.telegram_sent || false,
       telegramMessageId: row.telegram_message_id || null,
       telegramSentAt: row.telegram_sent_at || null,
 
-      // Metadata
-      modelVersion: row.model_version || null,
+      // Processing metadata
+      yoloProcessingTimeMs: parseFloat(row.yolo_processing_time_ms) || null,
       processingTimeMs: row.processing_time_ms || null,
       extractedAt: row.extracted_at || null
     };
@@ -502,7 +553,7 @@ export class NewExecutionService {
    */
   async getEnhancedStatistics(): Promise<{
     basicStats: any;
-    riskAnalysis: any;
+    alertAnalysis: any;
     timeAnalysis: any;
     nodeAnalysis: any;
     imageAnalysis: any;
@@ -510,28 +561,29 @@ export class NewExecutionService {
     // Basic statistics
     const basicStats = await this.getExecutionStats();
 
-    // Risk analysis over time
-    const riskQuery = `
-      SELECT 
+    // Alert level analysis over time
+    const alertQuery = `
+      SELECT
         DATE_TRUNC('day', e.execution_timestamp) as date,
-        ea.risk_level,
+        ea.alert_level,
         COUNT(*) as count,
         AVG(ea.confidence_score) as avg_confidence
       FROM executions e
       JOIN execution_analysis ea ON e.id = ea.execution_id
       WHERE e.execution_timestamp >= NOW() - INTERVAL '30 days'
-      GROUP BY DATE_TRUNC('day', e.execution_timestamp), ea.risk_level
-      ORDER BY date DESC, ea.risk_level
+        AND ea.alert_level IS NOT NULL
+      GROUP BY DATE_TRUNC('day', e.execution_timestamp), ea.alert_level
+      ORDER BY date DESC, ea.alert_level
     `;
 
-    const riskResults = await dualDb.query(riskQuery);
+    const alertResults = await dualDb.query(alertQuery);
 
     // Time analysis (hourly patterns)
     const timeQuery = `
-      SELECT 
+      SELECT
         EXTRACT(HOUR FROM execution_timestamp) as hour,
         COUNT(*) as total,
-        COUNT(CASE WHEN ea.risk_level IN ('high', 'critical') THEN 1 END) as high_risk
+        COUNT(CASE WHEN ea.alert_level IN ('high', 'critical') THEN 1 END) as high_alert
       FROM executions e
       LEFT JOIN execution_analysis ea ON e.id = ea.execution_id
       WHERE e.execution_timestamp >= NOW() - INTERVAL '7 days'
@@ -543,16 +595,16 @@ export class NewExecutionService {
 
     // Node analysis (if available)
     const nodeQuery = `
-      SELECT 
+      SELECT
         e.node_id,
         COUNT(*) as total_executions,
-        COUNT(CASE WHEN ea.risk_level IN ('high', 'critical') THEN 1 END) as high_risk,
+        COUNT(CASE WHEN ea.alert_level IN ('high', 'critical') THEN 1 END) as high_alert,
         AVG(ea.confidence_score) as avg_confidence
       FROM executions e
       LEFT JOIN execution_analysis ea ON e.id = ea.execution_id
       WHERE e.node_id IS NOT NULL
       GROUP BY e.node_id
-      ORDER BY high_risk DESC, total_executions DESC
+      ORDER BY high_alert DESC, total_executions DESC
     `;
 
     const nodeResults = await dualDb.query(nodeQuery);
@@ -572,7 +624,7 @@ export class NewExecutionService {
 
     return {
       basicStats,
-      riskAnalysis: riskResults,
+      alertAnalysis: alertResults,
       timeAnalysis: timeResults,
       nodeAnalysis: nodeResults,
       imageAnalysis: imageResults[0]
