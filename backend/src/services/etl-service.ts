@@ -178,8 +178,11 @@ export class ETLService {
    */
   private async testConnections(): Promise<void> {
     try {
+      // Import config to access workflow ID
+      const { appConfig } = await import('@/config');
+
       // Test n8n database
-      const n8nResult = await this.n8nPool.query('SELECT COUNT(*) as count FROM execution_entity WHERE "workflowId" = $1', ['yDbfhooKemfhMIkC']);
+      const n8nResult = await this.n8nPool.query('SELECT COUNT(*) as count FROM execution_entity WHERE "workflowId" = $1', [appConfig.sai.workflowId]);
       logger.info('N8N Database connected', { saiExecutions: n8nResult.rows[0].count });
 
       // Test sai_dashboard database
@@ -330,7 +333,7 @@ export class ETLService {
       }
 
       // Extract image from JSON payload
-      const imageData = this.extractImageFromPayload(executionData);
+      const imageData = await this.extractImageFromPayload(executionData);
       
       if (!imageData) {
         logger.debug('No image data found in execution', { executionId });
@@ -402,10 +405,10 @@ export class ETLService {
   /**
    * Extract image data from n8n execution payload
    */
-  private extractImageFromPayload(executionData: any): ExtractedImage | null {
+  private async extractImageFromPayload(executionData: any): Promise<ExtractedImage | null> {
     try {
-      const parsedData = typeof executionData.data === 'string' 
-        ? JSON.parse(executionData.data) 
+      const parsedData = typeof executionData.data === 'string'
+        ? JSON.parse(executionData.data)
         : executionData.data;
 
       // Try multiple locations for image data
@@ -426,13 +429,17 @@ export class ETLService {
       // Extract node and camera information for regional assignment
       const nodeAssignment = this.extractNodeAssignment(parsedData);
 
+      // Import config for image paths
+      const { cacheConfig } = await import('@/config');
+      const basePath = cacheConfig.basePath;
+
       return {
         executionId,
         base64Data,
         sizeBytes,
         format: 'jpeg', // Assume JPEG for SAI images
-        originalPath: `/mnt/raid1/n8n/backup/images/by-execution/${executionId}/original.jpg`,
-        thumbnailPath: `/mnt/raid1/n8n/backup/images/by-execution/${executionId}/thumb.jpg`,
+        originalPath: `${basePath}/by-execution/${executionId}/original.jpg`,
+        thumbnailPath: `${basePath}/by-execution/${executionId}/thumb.jpg`,
         nodeId: nodeAssignment?.nodeId,
         cameraId: nodeAssignment?.cameraId
       };
@@ -633,7 +640,9 @@ export class ETLService {
    */
   private async createImageSymlinks(imageData: ExtractedImage): Promise<void> {
     try {
-      const baseDir = '/mnt/raid1/n8n/backup/images';
+      // Import config for image paths
+      const { cacheConfig } = await import('@/config');
+      const baseDir = cacheConfig.basePath;
       const executionId = imageData.executionId;
       const timestamp = new Date();
       

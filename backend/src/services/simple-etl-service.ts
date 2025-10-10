@@ -9,6 +9,7 @@ import { EventEmitter } from 'events';
 import fs from 'fs/promises';
 import path from 'path';
 import sharp from 'sharp';
+import { n8nDatabaseConfig, saiDatabaseConfig, cacheConfig, appConfig } from '@/config';
 
 interface NotificationPayload {
   execution_id: number;
@@ -37,25 +38,25 @@ export class SimpleETLService extends EventEmitter {
 
   constructor() {
     super();
-    this.imageCachePath = '/mnt/raid1/n8n-backup/images';
-    
-    // Initialize database pools
+    this.imageCachePath = cacheConfig.path;
+
+    // Initialize database pools using centralized config
     this.n8nPool = new Pool({
-      host: process.env.N8N_DB_HOST || 'localhost',
-      port: parseInt(process.env.N8N_DB_PORT || '5432'),
-      database: process.env.N8N_DB_NAME || 'n8n',
-      user: process.env.N8N_DB_USER || 'n8n_user',
-      password: process.env.N8N_DB_PASSWORD || 'REDACTED',
+      host: n8nDatabaseConfig.host,
+      port: n8nDatabaseConfig.port,
+      database: n8nDatabaseConfig.database,
+      user: n8nDatabaseConfig.username,
+      password: n8nDatabaseConfig.password,
       max: 3, // Limited connections for read-only
       idleTimeoutMillis: 30000
     });
-    
+
     this.dashboardPool = new Pool({
-      host: process.env.SAI_DB_HOST || 'localhost',
-      port: parseInt(process.env.SAI_DB_PORT || '5432'),
-      database: process.env.SAI_DB_NAME || 'sai_dashboard',
-      user: process.env.SAI_DB_USER || 'n8n_user',
-      password: process.env.SAI_DB_PASSWORD || 'REDACTED',
+      host: saiDatabaseConfig.host,
+      port: saiDatabaseConfig.port,
+      database: saiDatabaseConfig.database,
+      user: saiDatabaseConfig.username,
+      password: saiDatabaseConfig.password,
       max: 5,
       idleTimeoutMillis: 30000
     });
@@ -113,7 +114,7 @@ export class SimpleETLService extends EventEmitter {
     // Test n8n database connection
     const n8nClient = await this.n8nPool.connect();
     try {
-      const result = await n8nClient.query('SELECT COUNT(*) as count FROM execution_entity WHERE "workflowId"::text = $1', ['yDbfhooKemfhMIkC']);
+      const result = await n8nClient.query('SELECT COUNT(*) as count FROM execution_entity WHERE "workflowId"::text = $1', [appConfig.sai.workflowId]);
       console.log(`✅ N8N Database: Connected (${result.rows[0].count} SAI executions found)`);
     } finally {
       n8nClient.release();
@@ -134,13 +135,13 @@ export class SimpleETLService extends EventEmitter {
    */
   private async startNotificationListener(): Promise<void> {
     console.log('📡 Setting up notification listener...');
-    
+
     this.notifyClient = new Client({
-      host: process.env.N8N_DB_HOST || 'localhost',
-      port: parseInt(process.env.N8N_DB_PORT || '5432'),
-      database: process.env.N8N_DB_NAME || 'n8n',
-      user: process.env.N8N_DB_USER || 'n8n_user',
-      password: process.env.N8N_DB_PASSWORD || 'REDACTED'
+      host: n8nDatabaseConfig.host,
+      port: n8nDatabaseConfig.port,
+      database: n8nDatabaseConfig.database,
+      user: n8nDatabaseConfig.username,
+      password: n8nDatabaseConfig.password
     });
     
     await this.notifyClient.connect();
@@ -423,6 +424,8 @@ export class SimpleETLService extends EventEmitter {
 
   /**
    * Insert analysis data
+   * NOTE: model_version extraction should be implemented in Stage 2 ETL
+   * Currently passing NULL - proper extraction from Ollama node metadata pending
    */
   private async insertAnalysis(executionId: number, analysisText: string): Promise<void> {
     // Simple risk level extraction
@@ -434,7 +437,7 @@ export class SimpleETLService extends EventEmitter {
     } else if (analysisText.toLowerCase().includes('low risk')) {
       riskLevel = 'low';
     }
-    
+
     // Extract confidence if present
     let confidence: number | null = null;
     const confMatch = analysisText.match(/confidence[:\s]+([0-9]*\.?[0-9]+)/i);
@@ -442,7 +445,7 @@ export class SimpleETLService extends EventEmitter {
       confidence = parseFloat(confMatch[1]);
       if (confidence > 1) confidence = confidence / 100; // Convert percentage to decimal
     }
-    
+
     await this.dashboardPool.query(`
       INSERT INTO execution_analysis (
         execution_id, risk_level, confidence_score, overall_assessment,
@@ -455,7 +458,7 @@ export class SimpleETLService extends EventEmitter {
       riskLevel,
       confidence,
       analysisText,
-      'qwen2.5vl:7b',
+      null, // TODO: Extract from Ollama node metadata in Stage 2 ETL
       null, // Will be updated later
       analysisText.toLowerCase().includes('smoke'),
       analysisText.toLowerCase().includes('flame') || analysisText.toLowerCase().includes('fire'),
@@ -503,10 +506,10 @@ export class SimpleETLService extends EventEmitter {
       const result = await client.query(`
         SELECT id, "workflowId", "startedAt", "stoppedAt", status
         FROM execution_entity
-        WHERE "workflowId"::text = 'yDbfhooKemfhMIkC' AND status = 'success'
+        WHERE "workflowId"::text = $1 AND status = 'success'
         ORDER BY "startedAt" DESC
         LIMIT 1
-      `);
+      `, [appConfig.sai.workflowId]);
       
       if (result.rows.length === 0) {
         console.log('⚠️ No successful SAI executions found for testing');

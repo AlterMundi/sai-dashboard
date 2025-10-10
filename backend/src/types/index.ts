@@ -330,6 +330,7 @@ export interface SessionData {
 
 export interface CacheConfig {
   path: string;
+  basePath: string;  // Base path for image storage (used by ETL services)
   enableThumbnails: boolean;
   thumbnailSize: number;
   thumbnailQuality: number;
