@@ -11,9 +11,7 @@
     "type-check": "tsc --noEmit",
     "test": "jest",
     "test:watch": "jest --watch",
-    "db:setup": "tsx scripts/setup-database.ts",
-    "etl:init": "tsx src/scripts/init-etl.ts",
-    "etl:test": "tsx src/scripts/test-etl.ts"
+    "db:setup": "tsx scripts/setup-database.ts"
   },
   "keywords": [
     "sai",
