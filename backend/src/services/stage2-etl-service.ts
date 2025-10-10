@@ -1,14 +1,21 @@
 /**
- * Stage 2 ETL Service: Deep Async Processing
+ * Stage 2 ETL Service: Deep Async Processing for YOLO Fire Detection
  *
  * PHILOSOPHY: Extract all available data from execution_data JSON blob.
  * Try multiple extraction paths, return NULL if unavailable.
  *
+ * CRITICAL: This service understands n8n's compact reference-based data format
+ * where data is stored as an array with string-indexed references that must be
+ * recursively resolved to access actual values.
+ *
  * Processes:
  * - Polls etl_processing_queue for pending Stage 2 work
  * - Fetches and parses execution_data JSON from n8n
- * - Extracts images, analysis, model info, node assignment
- * - Updates executions, execution_analysis, execution_images tables
+ * - Resolves n8n's compact reference format
+ * - Extracts YOLO inference results (detections, confidences, alert levels)
+ * - Extracts camera metadata (device_id, location, camera_id)
+ * - Extracts annotated images
+ * - Updates executions, execution_analysis, execution_detections tables
  * - Marks queue item as completed or failed (with retry)
  *
  * Data Integrity:
@@ -19,6 +26,7 @@
  *
  * See: docs/TWO_STAGE_ETL_ARCHITECTURE.md
  * See: docs/DATA_INTEGRITY_PRINCIPLES.md
+ * See: docs/N8N_DATA_FORMAT.md
  */
 
 import { Pool } from 'pg';
@@ -31,29 +39,56 @@ import { logger } from '@/utils/logger';
 import { randomUUID } from 'crypto';
 
 /**
- * Stage 2 extraction result
+ * YOLO detection object (from detections array)
+ */
+interface YoloDetection {
+  class: string;
+  confidence: number;
+  bounding_box: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+}
+
+/**
+ * Stage 2 extraction result for YOLO-based system
  * ALL fields nullable except execution_id (following data integrity principles)
  */
 interface Stage2ExtractionResult {
+  // YOLO Inference results
+  request_id: string | null;
+  yolo_model_version: string | null;
+  detection_count: number;
+  has_fire: boolean;
+  has_smoke: boolean;
+  alert_level: string | null;  // none/low/medium/high/critical
+  detection_mode: string | null;
+  active_classes: string[] | null;
+  detections: YoloDetection[] | null;
+
+  // Confidence scores
+  confidence_fire: number | null;
+  confidence_smoke: number | null;
+  confidence_score: number | null;  // Max confidence
+
   // Image data
   image_base64: string | null;
+  image_width: number | null;
+  image_height: number | null;
 
-  // Analysis data
-  analysis_text: string | null;
-  model_version: string | null;
-  risk_level: string | null;
-  confidence_score: number | null;
+  // Processing metrics
+  yolo_processing_time_ms: number | null;
 
-  // Detection flags
-  smoke_detected: boolean;
-  flame_detected: boolean;
-  heat_detected: boolean;
-
-  // Node assignment
-  node_id: string | null;
+  // Camera/device metadata (from Metadata node)
+  device_id: string | null;
   camera_id: string | null;
+  location: string | null;
+  camera_type: string | null;
+  capture_timestamp: string | null;
 
-  // Telegram notification
+  // Telegram notification (if present)
   telegram_sent: boolean;
   telegram_message_id: number | null;
 }
@@ -79,6 +114,7 @@ export class Stage2ETLService extends EventEmitter {
     processed: 0,
     failed: 0,
     imagesExtracted: 0,
+    detectionsFound: 0,
     avgProcessingTimeMs: 0,
     lastProcessedAt: null as Date | null,
     startedAt: new Date()
@@ -120,7 +156,7 @@ export class Stage2ETLService extends EventEmitter {
       return;
     }
 
-    logger.info('🚀 Starting Stage 2 ETL Service (Deep Async Processing)...');
+    logger.info('🚀 Starting Stage 2 ETL Service (YOLO Deep Processing)...');
 
     try {
       // Test database connections
@@ -135,7 +171,8 @@ export class Stage2ETLService extends EventEmitter {
         workerId: this.workerId,
         batchSize: this.BATCH_SIZE,
         pollInterval: this.POLL_INTERVAL_MS,
-        imageCachePath: this.IMAGE_CACHE_PATH
+        imageCachePath: this.IMAGE_CACHE_PATH,
+        mode: 'YOLO Fire Detection'
       });
 
       this.emit('started');
@@ -166,6 +203,7 @@ export class Stage2ETLService extends EventEmitter {
       totalProcessed: this.metrics.processed,
       totalFailed: this.metrics.failed,
       imagesExtracted: this.metrics.imagesExtracted,
+      detectionsFound: this.metrics.detectionsFound,
       avgTimeMs: this.metrics.avgProcessingTimeMs
     });
 
@@ -267,32 +305,38 @@ export class Stage2ETLService extends EventEmitter {
         return;
       }
 
-      logger.info(`🔍 Stage 2: Processing execution ${executionId} (deep extraction)`);
+      logger.info(`🔍 Stage 2: Processing execution ${executionId} (YOLO extraction)`);
 
       // 1. Fetch execution_data JSON from n8n
-      const executionData = await this.fetchExecutionData(executionId);
-      if (!executionData) {
+      const executionDataRaw = await this.fetchExecutionData(executionId);
+      if (!executionDataRaw) {
         throw new Error('execution_data not found in n8n database');
       }
 
-      // 2. Extract all available information
-      const extracted = this.extractFromExecutionData(executionData);
+      // 2. Extract all available information with n8n format resolution
+      const extracted = this.extractFromExecutionData(executionDataRaw);
 
-      // 3. Update executions table (node assignment)
-      if (extracted.node_id || extracted.camera_id) {
+      // 3. Update executions table (device/location/camera metadata)
+      if (extracted.device_id || extracted.camera_id || extracted.location) {
         await this.updateExecution(executionId, extracted);
       }
 
       // 4. Insert/update execution_analysis
       await this.upsertAnalysis(executionId, extracted);
 
-      // 5. Process and cache image (if present)
+      // 5. Insert individual detections (bounding boxes)
+      if (extracted.detections && extracted.detections.length > 0) {
+        await this.insertDetections(executionId, extracted.detections);
+        this.metrics.detectionsFound += extracted.detections.length;
+      }
+
+      // 6. Process and cache image (if present)
       if (extracted.image_base64) {
         await this.processImage(executionId, extracted.image_base64);
         this.metrics.imagesExtracted++;
       }
 
-      // 6. Insert notification status
+      // 7. Insert notification status
       await this.insertNotification(executionId, extracted);
 
       // Mark as completed
@@ -307,8 +351,10 @@ export class Stage2ETLService extends EventEmitter {
         executionId,
         processingTimeMs: processingTime,
         hasImage: !!extracted.image_base64,
-        hasAnalysis: !!extracted.analysis_text,
-        riskLevel: extracted.risk_level
+        hasFire: extracted.has_fire,
+        hasSmoke: extracted.has_smoke,
+        detectionCount: extracted.detection_count,
+        alertLevel: extracted.alert_level
       });
 
       this.emit('execution_processed', {
@@ -334,7 +380,7 @@ export class Stage2ETLService extends EventEmitter {
   /**
    * Fetch execution_data from n8n database
    */
-  private async fetchExecutionData(executionId: number): Promise<any> {
+  private async fetchExecutionData(executionId: number): Promise<any[] | null> {
     const result = await this.n8nPool.query(`
       SELECT data
       FROM execution_data
@@ -349,47 +395,175 @@ export class Stage2ETLService extends EventEmitter {
   }
 
   /**
-   * Extract all available data from execution_data JSON
+   * ========================================================================
+   * N8N DATA RESOLUTION: Handle compact reference-based format
+   * ========================================================================
+   *
+   * n8n stores data as an array where string values like "69" are references
+   * to indices in the same array. We must recursively resolve these.
+   */
+
+  /**
+   * Recursively resolve n8n references
+   * Converts string-indexed references to actual values
+   */
+  private deepResolve(obj: any, data: any[], depth = 0, maxDepth = 10): any {
+    if (depth > maxDepth) {
+      return obj; // Prevent infinite recursion
+    }
+
+    // Resolve string references to array indices
+    if (typeof obj === 'string' && obj.match(/^\d+$/) && parseInt(obj) < data.length) {
+      return this.deepResolve(data[parseInt(obj)], data, depth + 1, maxDepth);
+    }
+
+    // Recursively resolve objects
+    if (obj && typeof obj === 'object' && !Array.isArray(obj)) {
+      const resolved: any = {};
+      for (const [key, value] of Object.entries(obj)) {
+        resolved[key] = this.deepResolve(value, data, depth + 1, maxDepth);
+      }
+      return resolved;
+    }
+
+    // Recursively resolve arrays
+    if (Array.isArray(obj)) {
+      return obj.map(item => this.deepResolve(item, data, depth + 1, maxDepth));
+    }
+
+    return obj;
+  }
+
+  /**
+   * Find runData (node name to reference mapping)
+   */
+  private findRunData(data: any[]): any | null {
+    return data.find(item =>
+      item &&
+      typeof item === 'object' &&
+      ('YOLO Inference' in item || 'Webhook' in item || 'Metadata' in item)
+    );
+  }
+
+  /**
+   * Extract node output by node name
+   */
+  private extractNodeOutput(data: any[], nodeName: string): any | null {
+    const runData = this.findRunData(data);
+
+    if (!runData || !(nodeName in runData)) {
+      return null;
+    }
+
+    const nodeRef = runData[nodeName];
+    const nodeOutputArray = this.deepResolve(nodeRef, data);
+
+    if (!Array.isArray(nodeOutputArray) || nodeOutputArray.length === 0) {
+      return null;
+    }
+
+    // Get first execution (nodeOutputArray[0] is execution metadata)
+    const execution = nodeOutputArray[0];
+
+    // Navigate to output items: execution.data.main[0] is the output array
+    const outputItems = execution?.data?.main?.[0];
+    if (!Array.isArray(outputItems) || outputItems.length === 0) {
+      return null;
+    }
+
+    // Get first output item (contains {json: "75", pairedItem: "76"})
+    const firstOutputItem = outputItems[0];
+
+    if (!firstOutputItem || !firstOutputItem.json) {
+      return null;
+    }
+
+    // Resolve the json reference (e.g., "75" -> data[75])
+    return this.deepResolve(firstOutputItem.json, data);
+  }
+
+  /**
+   * ========================================================================
+   * EXTRACTION LOGIC: Extract YOLO and metadata from n8n data
+   * ========================================================================
+   */
+
+  /**
+   * Extract all available data from execution_data array
    * Implements multiple extraction strategies
    * Returns NULL for unavailable fields (honest approach)
    */
-  private extractFromExecutionData(data: any): Stage2ExtractionResult {
+  private extractFromExecutionData(data: any[]): Stage2ExtractionResult {
+    // Extract YOLO Inference node output
+    const yoloData = this.extractNodeOutput(data, 'YOLO Inference');
+
+    // Extract Metadata node output
+    const metadataData = this.extractNodeOutput(data, 'Metadata');
+
+    // Extract metadata object from Metadata node
+    const metadata = metadataData?.metadata || null;
+
+    // Parse detections array
+    const detections: YoloDetection[] | null = yoloData?.detections
+      ? this.parseDetections(yoloData.detections)
+      : null;
+
+    // Calculate max confidence from all detections
+    const maxConfidence = detections && detections.length > 0
+      ? Math.max(...detections.map(d => d.confidence))
+      : null;
+
     return {
-      image_base64: this.extractImage(data),
-      analysis_text: this.extractAnalysis(data),
-      model_version: this.extractModelVersion(data),
-      risk_level: this.extractRiskLevel(data),
-      confidence_score: this.extractConfidence(data),
-      smoke_detected: this.detectSmoke(data),
-      flame_detected: this.detectFlame(data),
-      heat_detected: this.detectHeat(data),
-      node_id: this.extractNodeId(data),
-      camera_id: this.extractCameraId(data),
-      telegram_sent: this.extractTelegramStatus(data),
-      telegram_message_id: this.extractTelegramMessageId(data)
+      // YOLO inference results
+      request_id: yoloData?.request_id || null,
+      yolo_model_version: yoloData?.version || null,
+      detection_count: yoloData?.detection_count ?? 0,
+      has_fire: yoloData?.has_fire ?? false,
+      has_smoke: yoloData?.has_smoke ?? false,
+      alert_level: yoloData?.alert_level || null,
+      detection_mode: yoloData?.detection_mode || null,
+      active_classes: yoloData?.active_classes || null,
+      detections: detections,
+
+      // Confidence scores
+      confidence_fire: yoloData?.confidence_scores?.fire ?? null,
+      confidence_smoke: yoloData?.confidence_scores?.smoke ?? null,
+      confidence_score: maxConfidence,
+
+      // Image data
+      image_base64: this.extractImage(yoloData),
+      image_width: yoloData?.image_size?.width ?? null,
+      image_height: yoloData?.image_size?.height ?? null,
+
+      // Processing metrics
+      yolo_processing_time_ms: yoloData?.processing_time_ms ?? null,
+
+      // Camera/device metadata
+      device_id: metadata?.device_id || yoloData?.camera_id?.split(':')[0] || null,
+      camera_id: metadata?.camera_id || yoloData?.camera_id || null,
+      location: metadata?.location || null,
+      camera_type: metadata?.camera_type || null,
+      capture_timestamp: metadata?.timestamp || null,
+
+      // Telegram (if exists in workflow)
+      telegram_sent: false,  // TODO: Extract from Telegram node if present
+      telegram_message_id: null
     };
   }
 
   /**
-   * Extract image from multiple possible locations
+   * Extract image from YOLO output (annotated_image field)
    */
-  private extractImage(data: any): string | null {
+  private extractImage(yoloData: any): string | null {
     try {
-      const paths = [
-        data?.nodeInputData?.Webhook?.[0]?.json?.body?.image,
-        data?.nodeInputData?.Webhook?.[0]?.json?.image,
-        data?.nodeOutputData?.Webhook?.[0]?.json?.image,
-        data?.nodeInputData?.Ollama?.[0]?.json?.image
-      ];
+      const annotatedImage = yoloData?.annotated_image;
 
-      for (const imagePath of paths) {
-        if (imagePath && typeof imagePath === 'string' && imagePath.length > 1000) {
-          // Remove data URL prefix if present
-          return imagePath.replace(/^data:image\/[a-z]+;base64,/, '');
-        }
+      if (annotatedImage && typeof annotatedImage === 'string' && annotatedImage.length > 1000) {
+        // Remove data URL prefix if present
+        return annotatedImage.replace(/^data:image\/[a-z]+;base64,/, '');
       }
 
-      return null; // No image found - that's OK
+      return null;
     } catch (error) {
       logger.debug('Image extraction failed:', error);
       return null;
@@ -397,182 +571,78 @@ export class Stage2ETLService extends EventEmitter {
   }
 
   /**
-   * Extract analysis text
+   * Parse detections array into structured format
    */
-  private extractAnalysis(data: any): string | null {
+  private parseDetections(detectionsRaw: any[]): YoloDetection[] | null {
     try {
-      return data?.nodeOutputData?.Ollama?.[0]?.json?.response || null;
-    } catch (error) {
-      return null;
-    }
-  }
-
-  /**
-   * Extract model version from Ollama node metadata
-   * CRITICAL: Never use defaults - return NULL if unavailable
-   */
-  private extractModelVersion(data: any): string | null {
-    try {
-      // Strategy 1: Direct from Ollama output
-      const model = data?.nodeOutputData?.Ollama?.[0]?.json?.model;
-      if (model) return model;
-
-      // Strategy 2: From Ollama metadata
-      const metadata = data?.nodeMetadata?.Ollama?.model;
-      if (metadata) return metadata;
-
-      // Strategy 3: Parse from analysis text
-      const analysis = this.extractAnalysis(data);
-      if (analysis) {
-        const modelMatch = analysis.match(/model[:\s]+([^\n\r,]+)/i);
-        if (modelMatch) return modelMatch[1].trim();
+      if (!Array.isArray(detectionsRaw) || detectionsRaw.length === 0) {
+        return null;
       }
 
-      return null; // Unknown - that's OK!
+      return detectionsRaw.map((det: any) => ({
+        class: det.class || 'unknown',
+        confidence: parseFloat(det.confidence) || 0,
+        bounding_box: {
+          x: det.bbox?.x ?? det.x ?? 0,
+          y: det.bbox?.y ?? det.y ?? 0,
+          width: det.bbox?.width ?? det.w ?? 0,
+          height: det.bbox?.height ?? det.h ?? 0
+        }
+      }));
     } catch (error) {
-      logger.debug('Model version extraction failed:', error);
+      logger.debug('Failed to parse detections:', error);
       return null;
     }
   }
 
   /**
-   * Extract risk level from analysis text
+   * ========================================================================
+   * DATABASE UPDATE OPERATIONS
+   * ========================================================================
    */
-  private extractRiskLevel(data: any): string | null {
-    const analysis = this.extractAnalysis(data);
-    if (!analysis) return null;
-
-    const lower = analysis.toLowerCase();
-
-    if (lower.includes('critical')) return 'critical';
-    if (lower.includes('high risk')) return 'high';
-    if (lower.includes('medium risk')) return 'medium';
-    if (lower.includes('low risk')) return 'low';
-    if (lower.includes('no risk') || lower.includes('none')) return 'none';
-
-    return null; // Unable to determine
-  }
 
   /**
-   * Extract confidence score
-   */
-  private extractConfidence(data: any): number | null {
-    const analysis = this.extractAnalysis(data);
-    if (!analysis) return null;
-
-    const match = analysis.match(/confidence[:\s]+([0-9]*\.?[0-9]+)/i);
-    if (match) {
-      let confidence = parseFloat(match[1]);
-      if (confidence > 1) confidence = confidence / 100; // Convert percentage
-      return confidence;
-    }
-
-    return null;
-  }
-
-  /**
-   * Detect smoke mention
-   */
-  private detectSmoke(data: any): boolean {
-    const analysis = this.extractAnalysis(data);
-    return analysis ? analysis.toLowerCase().includes('smoke') : false;
-  }
-
-  /**
-   * Detect flame mention
-   */
-  private detectFlame(data: any): boolean {
-    const analysis = this.extractAnalysis(data);
-    if (!analysis) return false;
-    const lower = analysis.toLowerCase();
-    return lower.includes('flame') || lower.includes('fire');
-  }
-
-  /**
-   * Detect heat signature mention
-   */
-  private detectHeat(data: any): boolean {
-    const analysis = this.extractAnalysis(data);
-    return analysis ? analysis.toLowerCase().includes('heat') : false;
-  }
-
-  /**
-   * Extract node ID (multiple strategies)
-   */
-  private extractNodeId(data: any): string | null {
-    try {
-      // Strategy 1: Direct from webhook payload
-      const webhookData = data?.nodeInputData?.Webhook?.[0]?.json?.body;
-      if (webhookData?.nodeId) return webhookData.nodeId;
-
-      // Strategy 2: From headers
-      const headers = data?.nodeInputData?.Webhook?.[0]?.json?.headers;
-      const userAgent = headers?.['user-agent'] || headers?.['User-Agent'];
-      if (userAgent) {
-        const nodeMatch = userAgent.match(/Node[_-]?(\w+)/i);
-        if (nodeMatch) return `NODE_${nodeMatch[1].toUpperCase()}`;
-      }
-
-      return null; // Unknown
-    } catch (error) {
-      return null;
-    }
-  }
-
-  /**
-   * Extract camera ID
-   */
-  private extractCameraId(data: any): string | null {
-    try {
-      const webhookData = data?.nodeInputData?.Webhook?.[0]?.json?.body;
-      return webhookData?.cameraId || null;
-    } catch (error) {
-      return null;
-    }
-  }
-
-  /**
-   * Extract Telegram notification status
-   */
-  private extractTelegramStatus(data: any): boolean {
-    try {
-      return data?.nodeOutputData?.Telegram?.[0]?.json?.success || false;
-    } catch (error) {
-      return false;
-    }
-  }
-
-  /**
-   * Extract Telegram message ID
-   */
-  private extractTelegramMessageId(data: any): number | null {
-    try {
-      const messageId = data?.nodeOutputData?.Telegram?.[0]?.json?.message_id;
-      return messageId ? parseInt(messageId) : null;
-    } catch (error) {
-      return null;
-    }
-  }
-
-  /**
-   * Update executions table with node assignment
+   * Update executions table with device/location metadata
    */
   private async updateExecution(
     executionId: number,
     extracted: Stage2ExtractionResult
   ): Promise<void> {
+    // Parse capture_timestamp if it's in non-standard format
+    let parsedTimestamp = extracted.capture_timestamp;
+    if (parsedTimestamp) {
+      try {
+        // Convert "2025-10-10_04-33-52" format to ISO8601
+        parsedTimestamp = parsedTimestamp.replace(/_/g, 'T').replace(/-(\d{2})-(\d{2})$/, ':$1:$2');
+      } catch (error) {
+        logger.debug('Failed to parse capture_timestamp, setting to null', { timestamp: extracted.capture_timestamp });
+        parsedTimestamp = null;
+      }
+    }
+
     await this.saiPool.query(`
       UPDATE executions
       SET
-        node_id = COALESCE($2, node_id),
+        device_id = COALESCE($2, device_id),
         camera_id = COALESCE($3, camera_id),
+        node_id = COALESCE($2, node_id),
+        location = COALESCE($4, location),
+        camera_type = COALESCE($5, camera_type),
+        capture_timestamp = COALESCE($6::timestamp, capture_timestamp),
         updated_at = NOW()
       WHERE id = $1
-    `, [executionId, extracted.node_id, extracted.camera_id]);
+    `, [
+      executionId,
+      extracted.device_id,
+      extracted.camera_id,
+      extracted.location,
+      extracted.camera_type,
+      parsedTimestamp
+    ]);
   }
 
   /**
-   * Insert/update execution_analysis
+   * Insert/update execution_analysis with YOLO data
    * ALL fields nullable (data integrity principle)
    */
   private async upsertAnalysis(
@@ -582,46 +652,93 @@ export class Stage2ETLService extends EventEmitter {
     await this.saiPool.query(`
       INSERT INTO execution_analysis (
         execution_id,
-        risk_level,
+        request_id,
+        yolo_model_version,
+        detection_count,
+        has_fire,
+        has_smoke,
+        alert_level,
+        detection_mode,
+        active_classes,
+        detections,
+        confidence_fire,
+        confidence_smoke,
         confidence_score,
-        overall_assessment,
-        model_version,
-        smoke_detected,
-        flame_detected,
-        heat_signature_detected,
-        alert_priority,
-        response_required,
-        node_id
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        image_width,
+        image_height,
+        yolo_processing_time_ms
+      ) VALUES (
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
+        $11, $12, $13, $14, $15, $16
+      )
       ON CONFLICT (execution_id) DO UPDATE SET
-        risk_level = EXCLUDED.risk_level,
+        request_id = EXCLUDED.request_id,
+        yolo_model_version = EXCLUDED.yolo_model_version,
+        detection_count = EXCLUDED.detection_count,
+        has_fire = EXCLUDED.has_fire,
+        has_smoke = EXCLUDED.has_smoke,
+        alert_level = EXCLUDED.alert_level,
+        detection_mode = EXCLUDED.detection_mode,
+        active_classes = EXCLUDED.active_classes,
+        detections = EXCLUDED.detections,
+        confidence_fire = EXCLUDED.confidence_fire,
+        confidence_smoke = EXCLUDED.confidence_smoke,
         confidence_score = EXCLUDED.confidence_score,
-        overall_assessment = EXCLUDED.overall_assessment,
-        model_version = EXCLUDED.model_version,
-        smoke_detected = EXCLUDED.smoke_detected,
-        flame_detected = EXCLUDED.flame_detected,
-        heat_signature_detected = EXCLUDED.heat_signature_detected,
-        alert_priority = EXCLUDED.alert_priority,
-        response_required = EXCLUDED.response_required,
-        node_id = EXCLUDED.node_id,
+        image_width = EXCLUDED.image_width,
+        image_height = EXCLUDED.image_height,
+        yolo_processing_time_ms = EXCLUDED.yolo_processing_time_ms,
         updated_at = NOW()
     `, [
       executionId,
-      extracted.risk_level,
+      extracted.request_id,
+      extracted.yolo_model_version,
+      extracted.detection_count,
+      extracted.has_fire,
+      extracted.has_smoke,
+      extracted.alert_level,
+      extracted.detection_mode,
+      extracted.active_classes,
+      extracted.detections ? JSON.stringify(extracted.detections) : null,
+      extracted.confidence_fire,
+      extracted.confidence_smoke,
       extracted.confidence_score,
-      extracted.analysis_text,
-      extracted.model_version, // NULL if not available - HONEST!
-      extracted.smoke_detected,
-      extracted.flame_detected,
-      extracted.heat_detected,
-      extracted.risk_level === 'high' || extracted.risk_level === 'critical' ? 'high' : 'normal',
-      extracted.risk_level === 'critical' && (extracted.confidence_score || 0) >= 0.8,
-      extracted.node_id
+      extracted.image_width,
+      extracted.image_height,
+      extracted.yolo_processing_time_ms
     ]);
   }
 
   /**
-   * Process and cache image
+   * Insert individual detections into execution_detections table
+   */
+  private async insertDetections(
+    executionId: number,
+    detections: YoloDetection[]
+  ): Promise<void> {
+    for (let i = 0; i < detections.length; i++) {
+      const det = detections[i];
+
+      await this.saiPool.query(`
+        INSERT INTO execution_detections (
+          execution_id,
+          detection_class,
+          confidence,
+          bounding_box,
+          detection_index
+        ) VALUES ($1, $2, $3, $4, $5)
+        ON CONFLICT DO NOTHING
+      `, [
+        executionId,
+        det.class,
+        det.confidence,
+        JSON.stringify(det.bounding_box),
+        i
+      ]);
+    }
+  }
+
+  /**
+   * Process and cache image (same as before)
    */
   private async processImage(executionId: number, imageBase64: string): Promise<void> {
     try {
@@ -692,8 +809,11 @@ export class Stage2ETLService extends EventEmitter {
   }
 
   /**
-   * Queue management functions
+   * ========================================================================
+   * QUEUE MANAGEMENT
+   * ========================================================================
    */
+
   private async markProcessing(executionId: number): Promise<boolean> {
     const result = await this.saiPool.query(
       'SELECT etl_start_processing($1, $2) as marked',
