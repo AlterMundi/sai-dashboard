@@ -4,8 +4,13 @@ This file provides guidance to Claude Code when working with this repository.
 
 ## 🎯 Project Overview
 
-SAI Dashboard is a data analysis tool for the SAI (Sistema de Alerta de Incendios), a **real-time fire monitoring system** that processes images from distributed camera nodes with instant fire detection analysis.
-It is aimed to consume large amount of excecution's information, filter and extract processed data from the system by power users.
+SAI Dashboard is a data analysis tool for the SAI (Sistema de Alerta de Incendios), a **real-time fire monitoring system** that processes images from distributed camera nodes with **YOLO-based fire detection**.
+
+The system uses a custom YOLO inference service (NOT Ollama) that provides:
+- Fire and smoke detection with bounding boxes
+- Alert levels (none/low/medium/high/critical)
+- Confidence scores per detection class
+- Annotated images with detection overlays
 
 **Stack**: React 18 + TypeScript, Node.js + Express, PostgreSQL, hybrid image storage (JPEG + WebP)
 
@@ -54,29 +59,35 @@ It is aimed to consume large amount of excecution's information, filter and extr
 - Path aliases (`@/`) resolved via `tsc-alias`
 - See `.env.example` for all configuration options
 
-## ⚠️ ETL Implementation Lessons (September 2025)
+## ⚠️ ETL Implementation History
 
-**Critical Issue Resolution**: ETL pipeline not processing new executions
+### October 2025: YOLO Schema Redesign
 
-**Root Cause**: Missing database columns and PostgreSQL connection setup
-- `execution_analysis.alert_priority` and `response_required` columns missing
-- `execution_notifications` table required for service queries
-- ETL notification listener needs separate PostgreSQL client connection
+**Issue**: ETL extraction was designed for Ollama AI analysis but SAI uses custom YOLO inference service. Stage 2 ETL had 0% extraction success due to incorrect data structure assumptions.
 
-**Fix Applied**:
-```sql
--- Add missing columns
-ALTER TABLE execution_analysis ADD COLUMN alert_priority VARCHAR(20) DEFAULT 'normal';
-ALTER TABLE execution_analysis ADD COLUMN response_required BOOLEAN DEFAULT FALSE;
+**Root Causes**:
+1. **Wrong AI system**: Code looked for Ollama nodes but workflow uses YOLO Inference
+2. **Wrong data format**: n8n uses compact reference-based format, not direct JSON
+3. **Schema mismatch**: Database had Ollama-specific columns instead of YOLO fields
 
--- Verify table exists
-CREATE TABLE IF NOT EXISTS execution_notifications (...);
-```
+**Fix Applied** (Migration 003):
+- Removed all Ollama references (`ollama_response`, `has_ollama_analysis`)
+- Added YOLO fields: `alert_level`, `detection_count`, `has_fire`, `has_smoke`, `confidence_fire`, `confidence_smoke`
+- Added device/location metadata: `device_id`, `location`, `camera_type`, `capture_timestamp`
+- Created `execution_detections` table for bounding boxes
+- Completely rewrote Stage 2 ETL with n8n compact format parser
 
-**Validation Steps**:
-1. Check service status: `systemctl status sai-dashboard-api.service`
-2. Test NOTIFY: `NOTIFY sai_execution_ready, '{"execution_id": 99999}'`
-3. Verify logs: `journalctl -u sai-dashboard-api.service | grep notification`
-4. Expected: `📬 Received notification for execution 99999`
+**N8N Data Format**:
+- Data is an array with string-indexed references (e.g., `"69"` points to `data[69]`)
+- Must recursively resolve references to access actual values
+- Node outputs accessed via runData mapping
 
-**Status**: ✅ ETL pipeline operational, processing live executions via PostgreSQL triggers
+**Status**: ✅ YOLO extraction implemented, ready for deployment
+
+### September 2025: Initial ETL Setup
+
+**Issue**: ETL pipeline not processing new executions
+
+**Fix**: Added missing database columns and PostgreSQL NOTIFY/LISTEN setup
+
+**Status**: ✅ ETL pipeline operational
