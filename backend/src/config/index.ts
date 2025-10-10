@@ -46,6 +46,7 @@ export const appConfig = {
 
   sai: {
     workflowName: process.env.SAI_WORKFLOW_NAME || 'Sai-webhook-upload-image+Ollama-analisys+telegram-sendphoto',
+    workflowId: process.env.SAI_WORKFLOW_ID || 'yDbfhooKemfhMIkC',
     defaultPageSize: parseInt(process.env.DEFAULT_PAGE_SIZE || '50', 10),
     maxPageSize: parseInt(process.env.MAX_PAGE_SIZE || '200', 10),
     maxDaysLookback: parseInt(process.env.MAX_DAYS_LOOKBACK || '365', 10),
@@ -90,13 +91,32 @@ export const databaseConfig: DatabaseConfig = {
 };
 
 export const cacheConfig: CacheConfig = {
-  path: process.env.CACHE_PATH || '/cache',
+  path: process.env.CACHE_PATH || process.env.IMAGE_CACHE_PATH || '/cache',
+  basePath: process.env.IMAGE_BASE_PATH || '/mnt/raid1/n8n/backup/images',
   enableThumbnails: process.env.ENABLE_THUMBNAIL_GENERATION === 'true',
   thumbnailSize: parseInt(process.env.THUMBNAIL_SIZE || '200', 10),
   thumbnailQuality: parseInt(process.env.THUMBNAIL_QUALITY || '70', 10),
   maxImageSize: parseInt(process.env.MAX_IMAGE_SIZE || '5242880', 10),
   supportedFormats: (process.env.SUPPORTED_IMAGE_FORMATS || 'jpeg,png,webp').split(','),
   ttl: parseInt(process.env.IMAGE_CACHE_TTL || '86400', 10),
+};
+
+// N8N Database Configuration (for ETL services)
+export const n8nDatabaseConfig = {
+  host: process.env.N8N_DB_HOST || 'localhost',
+  port: parseInt(process.env.N8N_DB_PORT || '5432', 10),
+  database: process.env.N8N_DB_NAME || 'n8n',
+  username: process.env.N8N_DB_USER || 'n8n_user',
+  password: process.env.N8N_DB_PASSWORD || '',
+};
+
+// SAI Dashboard Database Configuration (separate database)
+export const saiDatabaseConfig = {
+  host: process.env.SAI_DB_HOST || 'localhost',
+  port: parseInt(process.env.SAI_DB_PORT || '5432', 10),
+  database: process.env.SAI_DB_NAME || 'sai_dashboard',
+  username: process.env.SAI_DB_USER || 'sai_dashboard_user',
+  password: process.env.SAI_DB_PASSWORD || '',
 };
 
 export const isDevelopment = appConfig.nodeEnv === 'development';

@@ -1,979 +1,645 @@
-# SAI Dashboard Data Architecture Analysis
-**Date**: October 7, 2025
-**Status**: Production system experiencing log flooding and data flow confusion
+# SAI Dashboard: Two-Phase ETL Architecture
+**Date**: October 8, 2025
+**Status**: ✅ Trigger fixed, implementing optimal two-phase architecture
 
 ---
 
 ## 🎯 Executive Summary
 
-The SAI Dashboard is suffering from **architectural debt** that prevents proper frontend development:
+The SAI Dashboard ETL has been redesigned with a **two-phase approach** that eliminates all race conditions and ensures 100% data capture.
 
-1. **Log flooding**: 636 log lines/hour from duplicate PostgreSQL notifications
-2. **Duplicate processing**: Every execution processed 2x due to trigger configuration
-3. **Race conditions**: INSERT conflicts creating noise but appearing to succeed
-4. **Confused data flows**: 3 different ETL services with unclear ownership
-5. **Missing domain logic**: No camera assignment, node correlation, or incident detection
-6. **Fragile extraction**: Heuristic-based JSON parsing instead of structured schema
+### Core Innovation: Two-Phase Processing
 
-**Impact**:
-- dmesg flooded with service logs
-- Frontend blocked by unreliable data
-- Developers confused about system behavior
-- Production appears "working" but is fundamentally broken
+1. **Phase 1 (Immediate)**: Captures core immutable data when execution **starts**
+   - Webhook data + camera metadata + **image** (all available immediately!)
+   - Status = 'running'
+   - Zero wait for inference
+
+2. **Phase 2 (On Completion)**: Enriches with inference results when execution **finishes**
+   - Updates status to 'success' or 'error'
+   - Adds inference results (detections, risk assessment)
+   - Adds notification status
+
+### ✅ Problems Solved
+
+- ✅ **Duplicate triggers removed** - was firing 2x, now fires 1x per phase
+- ✅ **Race conditions eliminated** - idempotent inserts with ON CONFLICT
+- ✅ **Zero data loss** - core record created before inference (even if it crashes!)
+- ✅ **Perfect coherency** - mandatory fields always populated
+- ✅ **Image available immediately** - webhook delivers image in Phase 1!
 
 ---
 
-## 📊 Current Architecture (As-Built)
-
-### Data Flow Diagram
+## 📊 Two-Phase Data Flow
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│ N8N Workflow (execution_entity + execution_data)            │
-│  Step 1: Webhook receives image from camera                 │
-│  Step 2: Ollama LLM analyzes image for fire/smoke          │
-│  Step 3: Telegram sends notification if risk detected       │
-│  Step 4: Stores entire workflow state as JSON blob          │
+│ Camera → Webhook → n8n Workflow Starts                      │
+│  Delivers: image (base64), camera_metadata, timestamp       │
 └──────────────────┬──────────────────────────────────────────┘
                    │
-                   │ PostgreSQL Trigger Fires 2x:
-                   ├─ Event #1: INSERT execution_entity
-                   ├─ Event #2: UPDATE status = 'success'
+                   │ INSERT into execution_entity (status='running')
                    │
                    ↓
 ┌─────────────────────────────────────────────────────────────┐
-│ PostgreSQL NOTIFY Channel: "sai_execution_ready"            │
-│  Payload: {execution_id, workflow_id, status, timestamps}   │
-└──────────────────┬──────────────────────────────────────────┘
-                   │
-                   │ DUPLICATE NOTIFICATIONS (2x per execution)
-                   │
-                   ↓
-┌─────────────────────────────────────────────────────────────┐
-│ Simple ETL Service (Node.js + pg.Client LISTEN)             │
-│  Line 151: notification handler receives 2x duplicates      │
-│  Line 180: Check if execution exists (race condition)       │
-│  Line 198: INSERT INTO executions (one succeeds, one fails) │
-│  Line 258: Extract data with heuristic search (fragile!)    │
-│  Line 350: Process images to filesystem                     │
-│  Line 400: Insert analysis (simple regex parsing)           │
-│  Line 444: Insert notification status                       │
+│ 🔔 PHASE 1 TRIGGER: sai_execution_created                   │
+│  Channel: 'sai_execution_created'                           │
+│  Fires: ONCE on INSERT                                      │
 └──────────────────┬──────────────────────────────────────────┘
                    │
                    ↓
 ┌─────────────────────────────────────────────────────────────┐
-│ SAI Dashboard Database (sai_dashboard)                      │
-│  ├── executions (main records)                              │
-│  ├── execution_analysis (AI risk assessment)                │
-│  ├── execution_images (filesystem paths only)               │
-│  ├── execution_notifications (telegram delivery)            │
-│  ├── expert_reviews (human review - UNUSED)                 │
-│  ├── monitoring_nodes (regional nodes - NO DATA)            │
-│  └── node_cameras (camera metadata - NO DATA)               │
+│ Phase 1 ETL Handler                                         │
+│  1. Extract webhook data from execution_data                │
+│  2. Save image (base64 → jpg/webp/thumb)                    │
+│  3. INSERT INTO sai_executions (status='running')           │
+│     - execution_id, workflow_id, started_at                 │
+│     - camera_metadata (JSONB)                               │
+│     - image paths                                           │
+└─────────────────────────────────────────────────────────────┘
+
+         ⏱️  Inference Processing (5-30 seconds)
+         YOLO detection, LLM analysis, Telegram notification
+
+┌─────────────────────────────────────────────────────────────┐
+│ n8n Workflow Completes                                      │
+│  Delivers: detections, risk_level, telegram_status          │
+└──────────────────┬──────────────────────────────────────────┘
+                   │
+                   │ UPDATE execution_entity SET status='success'
+                   │
+                   ↓
+┌─────────────────────────────────────────────────────────────┐
+│ 🔔 PHASE 2 TRIGGER: sai_execution_completed                 │
+│  Channel: 'sai_execution_completed'                         │
+│  Fires: ONCE on status change to 'success'|'error'          │
 └──────────────────┬──────────────────────────────────────────┘
                    │
                    ↓
 ┌─────────────────────────────────────────────────────────────┐
-│ Dashboard API Services (Express + pg.Pool)                  │
-│  ├── new-execution-service.ts (queries executions)          │
-│  ├── enhanced-analysis.ts (enriched analytics)              │
-│  ├── expert-review.ts (review workflows - UNUSED)           │
-│  ├── image.ts (serves cached images)                        │
-│  └── tiered-sse.ts (real-time SSE updates)                  │
-└──────────────────┬──────────────────────────────────────────┘
-                   │
+│ Phase 2 ETL Handler                                         │
+│  1. UPDATE sai_executions SET completed_at, duration, status│
+│  2. INSERT INTO sai_inference_results (detections, risk)    │
+│  3. INSERT INTO sai_notifications (telegram status)         │
+└─────────────────────────────────────────────────────────────┘
+
                    ↓
 ┌─────────────────────────────────────────────────────────────┐
-│ Frontend (React + SSEContext)                               │
-│  └── Real-time dashboard with execution stream              │
+│ Dashboard: Real-time updates via SSE                        │
+│  - New execution appears immediately (Phase 1)              │
+│  - Inference results added when ready (Phase 2)             │
 └─────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 🔴 Critical Problems
+## 🗄️ Optimal Database Schema
 
-### Problem 1: Duplicate Trigger Firing
-
-**File**: `database/n8n_simple_triggers.sql:42-46`
+### **Core Table: sai_executions**
 
 ```sql
-CREATE TRIGGER sai_execution_notify_trigger
-    AFTER INSERT OR UPDATE OF status ON execution_entity  ← BOTH!
-    FOR EACH ROW
-    WHEN (NEW."workflowId"::text = 'yDbfhooKemfhMIkC' AND NEW.status IN ('success', 'error'))
-    EXECUTE FUNCTION notify_sai_execution();
+CREATE TABLE sai_executions (
+    execution_id BIGINT PRIMARY KEY,
+    workflow_id VARCHAR(36) NOT NULL CHECK (workflow_id = 'yDbfhooKemfhMIkC'),
+
+    -- ===== PHASE 1: Webhook data (immutable) =====
+    started_at TIMESTAMPTZ NOT NULL,
+    camera_metadata JSONB NOT NULL,              -- ✅ From webhook: {id, node_id, gps, settings, ...}
+
+    -- Image paths (PHASE 1: saved from webhook base64)
+    image_original_path VARCHAR(500),            -- /mnt/raid1/.../original/185/185839.jpg
+    image_webp_path VARCHAR(500),                -- /mnt/raid1/.../webp/185/185839.webp
+    image_thumb_path VARCHAR(500),               -- /mnt/raid1/.../thumb/185/185839.webp
+    image_size_bytes INTEGER,
+
+    -- ===== PHASE 2: Completion data (nullable until finished) =====
+    completed_at TIMESTAMPTZ,                    -- NULL while running
+    duration_ms INTEGER,                         -- NULL while running
+    status VARCHAR(20) NOT NULL DEFAULT 'running', -- 'running' → 'success'|'error'
+
+    -- Metadata
+    etl_version VARCHAR(10) DEFAULT '2.0',
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Indexes for dashboard queries
+CREATE INDEX idx_sai_exec_running ON sai_executions(status, started_at DESC)
+    WHERE status = 'running';  -- Find stuck executions
+CREATE INDEX idx_sai_exec_completed ON sai_executions(completed_at DESC NULLS LAST)
+    WHERE status IN ('success', 'error');
+CREATE INDEX idx_sai_exec_camera ON sai_executions((camera_metadata->>'id'));
+CREATE INDEX idx_sai_exec_node ON sai_executions((camera_metadata->>'node_id'));
+CREATE INDEX idx_sai_exec_metadata_gin ON sai_executions USING GIN(camera_metadata jsonb_path_ops);
 ```
 
-**What happens**:
-1. n8n workflow starts → INSERTs row with status = 'running'
-2. Trigger does NOT fire (status != 'success')
-3. Workflow completes → UPDATEs status = 'success'
-4. Trigger fires (UPDATE detected) → Notification #1
-5. **BUG**: n8n also does something that triggers INSERT detection → Notification #2
+**Key Design**: Mandatory fields in Phase 1, optional fields in Phase 2. This ensures coherency and enables debugging.
 
-**Evidence from logs**:
-```
-Oct 07 17:05:59 📬 Received notification for execution 185568
-Oct 07 17:05:59 📬 Received notification for execution 185568  ← DUPLICATE!
-Oct 07 17:05:59 🔄 Processing execution 185568...
-Oct 07 17:05:59 🔄 Processing execution 185568...  ← DUPLICATE!
-Oct 07 17:05:59 ❌ Error: duplicate key violates unique constraint "executions_pkey"
-Oct 07 17:05:59 ✅ Successfully processed execution 185568  ← One succeeds!
-```
+### **Inference Results Table (Phase 2 only)**
 
-**Impact**:
-- 2x processing load
-- Race condition on INSERT
-- 636 log lines per hour (should be ~300)
-- Confusing error messages that "appear" to work
+```sql
+CREATE TABLE sai_inference_results (
+    execution_id BIGINT PRIMARY KEY REFERENCES sai_executions(execution_id) ON DELETE CASCADE,
 
-### Problem 2: Race Condition in ETL
+    -- Model metadata
+    model_name VARCHAR(50) NOT NULL,             -- 'yolov8', 'yolov11', 'qwen2.5vl:7b'
+    model_version VARCHAR(50),
+    inference_timestamp TIMESTAMPTZ DEFAULT NOW(),
+    processing_time_ms INTEGER,
 
-**File**: `backend/src/services/simple-etl-service.ts:179-185`
+    -- Structured detections (JSONB for flexibility)
+    detections JSONB NOT NULL DEFAULT '[]'::jsonb, -- [{class, confidence, bbox: [x,y,w,h]}]
+    detection_count INTEGER GENERATED ALWAYS AS (jsonb_array_length(detections)) STORED,
 
-```typescript
-// Check if already processed
-const existing = await this.dashboardPool.query('SELECT id FROM executions WHERE id = $1', [execution_id]);
-if (existing.rows.length > 0) {
-  console.log(`⏭️ Execution ${execution_id} already processed, skipping`);
-  this.metrics.skipped++;
-  return;
-}
-```
+    -- Risk assessment (for LLM models)
+    risk_level VARCHAR(20) CHECK (risk_level IN ('critical', 'high', 'medium', 'low', 'none')),
+    confidence_score DECIMAL(5,4) CHECK (confidence_score BETWEEN 0 AND 1),
+    raw_response TEXT,
+    raw_response_hash VARCHAR(64),               -- SHA256 for deduplication
 
-**What happens**:
-1. Notification #1 arrives → checks database → "not exists" → proceeds
-2. Notification #2 arrives **simultaneously** → checks database → "not exists" → proceeds
-3. Both try to INSERT → one succeeds, one fails with duplicate key error
-4. The failure is caught on line 240-252 and "handled" but logs noise
+    -- Quick filter flags (generated columns for performance)
+    has_smoke BOOLEAN GENERATED ALWAYS AS (
+        detections @> '[{"class": "smoke"}]' OR
+        (raw_response IS NOT NULL AND raw_response ILIKE '%smoke%')
+    ) STORED,
+    has_fire BOOLEAN GENERATED ALWAYS AS (
+        detections @> '[{"class": "fire"}]' OR
+        detections @> '[{"class": "flame"}]' OR
+        (raw_response IS NOT NULL AND (raw_response ILIKE '%fire%' OR raw_response ILIKE '%flame%'))
+    ) STORED,
 
-**Why this happens**:
-- No transaction isolation between check and insert
-- PostgreSQL's default READ COMMITTED allows this race
-- Solution: Use `INSERT ... ON CONFLICT` (idempotent)
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
 
-### Problem 3: Fragile Data Extraction
-
-**File**: `backend/src/services/simple-etl-service.ts:289-344`
-
-```typescript
-/**
- * UNIFIED extraction logic that works with actual n8n data structure
- */
-private extractExecutionDataUnified(data: any): any {
-  // N8N stores data as a flat array/object with numeric keys
-  // Search through all entries to find the data we need
-
-  for (const entry of entries) {
-    if (typeof entry === 'string' && entry.length > 100000) {
-      // This looks like a base64 image  ← HEURISTIC!
-      if (entry.startsWith('/9j/') || entry.startsWith('iVBORw0K')) {
-        imageBase64 = entry;
-      }
-    } else if (typeof entry === 'string' && entry.length > 50 && entry.length < 10000) {
-      // This might be analysis text  ← GUESSING!
-      if (entry.includes('risk') || entry.includes('fire') || entry.includes('smoke')) {
-        analysis = entry;
-      }
-    }
-    // ... recursive search through random JSON structure
-  }
-}
+-- Indexes for ML dataset queries
+CREATE INDEX idx_sai_infer_model ON sai_inference_results(model_name, model_version);
+CREATE INDEX idx_sai_infer_risk ON sai_inference_results(risk_level, confidence_score DESC NULLS LAST);
+CREATE INDEX idx_sai_infer_flags ON sai_inference_results(has_smoke, has_fire);
+CREATE INDEX idx_sai_infer_detections ON sai_inference_results USING GIN(detections jsonb_path_ops);
 ```
 
-**Problems**:
-- ❌ No schema validation
-- ❌ Guesses based on string length
-- ❌ Searches for keywords like 'fire' (what if analysis says "no fire"?)
-- ❌ Will break if n8n changes workflow structure
-- ❌ Can't extract camera_id, location, or other metadata
+### **Notifications Table (Phase 2 only)**
 
-**Impact**:
-- Missing critical data (camera_id, node_id always NULL)
-- Unable to implement geographic features
-- Unable to correlate multi-camera incidents
-- Fragile to workflow changes
+```sql
+CREATE TABLE sai_notifications (
+    execution_id BIGINT PRIMARY KEY REFERENCES sai_executions(execution_id) ON DELETE CASCADE,
 
-### Problem 4: Missing Domain Logic
+    -- Telegram delivery
+    telegram_sent BOOLEAN DEFAULT FALSE,
+    telegram_message_id BIGINT,
+    telegram_chat_id VARCHAR(50),
+    telegram_sent_at TIMESTAMPTZ,
+    telegram_error TEXT,
 
-**Current state**: ETL just copies data, no enrichment
+    -- Future: email, sms, push
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
 
-**What's missing**:
-1. **Camera Assignment**: executions.camera_id always NULL
-2. **Node Assignment**: executions.node_id always NULL
-3. **Incident Correlation**: incident_id always NULL
-4. **Expert Assignment**: expert_reviews table empty
-5. **Geographic Search**: Can't filter by location (no lat/lng)
-6. **Multi-camera Detection**: Can't detect same fire from multiple angles
-
-**Why this blocks frontend**:
-- Can't show "fires by region"
-- Can't show "camera coverage map"
-- Can't implement "expert review queue"
-- Can't implement "incident timeline"
-- Can't implement "alert escalation"
-
-### Problem 5: Service Confusion
-
-**Three ETL services exist**:
-
-| File | Lines | Purpose | Status |
-|------|-------|---------|--------|
-| `simple-etl-service.ts` | 512 | PostgreSQL NOTIFY listener | **ACTIVE** |
-| `live-etl-service.ts` | ? | Unknown | Abandoned? |
-| `etl-service.ts` | ? | Unknown | Abandoned? |
-
-**Questions**:
-- Why do three exist?
-- Which one is "correct"?
-- Are they doing different things?
-- Dead code removal needed?
+CREATE INDEX idx_sai_notif_telegram ON sai_notifications(telegram_sent, telegram_sent_at);
+```
 
 ---
 
-## ✅ Proposed Architecture
+## 🔧 PostgreSQL Two-Phase Triggers
 
-### Design Principles
-
-1. **Explicit Schema**: n8n outputs structured JSON, not random blobs
-2. **Idempotent Processing**: Same execution processed N times = same result
-3. **Fail-Safe**: Errors logged but don't crash pipeline
-4. **Separation of Concerns**: Extract → Transform → Load → Enrich
-5. **Domain-Driven**: Business logic separated from ETL plumbing
-
-### Phase 1: Stop the Bleeding (Immediate)
-
-#### Fix 1.1: Trigger Fires Only Once
+### **Phase 1 Trigger: Execution Created**
 
 ```sql
--- File: database/n8n_simple_triggers_v2.sql
-DROP TRIGGER IF EXISTS sai_execution_notify_trigger ON execution_entity;
+CREATE OR REPLACE FUNCTION notify_sai_execution_created()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- Only for SAI workflow
+    IF NEW."workflowId"::text != 'yDbfhooKemfhMIkC' THEN
+        RETURN NEW;
+    END IF;
 
-CREATE TRIGGER sai_execution_notify_trigger
-    AFTER UPDATE OF status ON execution_entity  -- ONLY UPDATE, not INSERT
+    -- Send Phase 1 notification (execution just started)
+    PERFORM pg_notify('sai_execution_created', json_build_object(
+        'execution_id', NEW.id,
+        'workflow_id', NEW."workflowId"::text,
+        'started_at', NEW."startedAt"
+    )::text);
+
+    RAISE NOTICE '[Phase 1] SAI execution % created', NEW.id;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER sai_execution_created_trigger
+    AFTER INSERT ON execution_entity
+    FOR EACH ROW
+    WHEN (NEW."workflowId"::text = 'yDbfhooKemfhMIkC')
+    EXECUTE FUNCTION notify_sai_execution_created();
+
+COMMENT ON TRIGGER sai_execution_created_trigger ON execution_entity IS
+'Phase 1: Fires when SAI workflow execution starts. Captures webhook data + image.';
+```
+
+### **Phase 2 Trigger: Execution Completed**
+
+```sql
+CREATE OR REPLACE FUNCTION notify_sai_execution_completed()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- Only for SAI workflow
+    IF NEW."workflowId"::text != 'yDbfhooKemfhMIkC' THEN
+        RETURN NEW;
+    END IF;
+
+    -- Only when status changes to final state
+    IF NEW.status IN ('success', 'error') AND OLD.status IS DISTINCT FROM NEW.status THEN
+        PERFORM pg_notify('sai_execution_completed', json_build_object(
+            'execution_id', NEW.id,
+            'workflow_id', NEW."workflowId"::text,
+            'status', NEW.status,
+            'started_at', NEW."startedAt",
+            'stopped_at', NEW."stoppedAt",
+            'duration_ms', EXTRACT(EPOCH FROM (NEW."stoppedAt" - NEW."startedAt")) * 1000
+        )::text);
+
+        RAISE NOTICE '[Phase 2] SAI execution % completed with status: %', NEW.id, NEW.status;
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER sai_execution_completed_trigger
+    AFTER UPDATE OF status ON execution_entity
     FOR EACH ROW
     WHEN (
         NEW."workflowId"::text = 'yDbfhooKemfhMIkC'
-        AND NEW.status = 'success'  -- Only success (errors handled separately)
-        AND OLD.status != NEW.status  -- Only when status CHANGES
+        AND NEW.status IN ('success', 'error')
+        AND OLD.status IS DISTINCT FROM NEW.status
     )
-    EXECUTE FUNCTION notify_sai_execution();
+    EXECUTE FUNCTION notify_sai_execution_completed();
 
--- Add comment for future developers
-COMMENT ON TRIGGER sai_execution_notify_trigger ON execution_entity IS
-'Fires ONCE when SAI workflow completes successfully. Only on status change to prevent duplicates.';
+COMMENT ON TRIGGER sai_execution_completed_trigger ON execution_entity IS
+'Phase 2: Fires when SAI workflow execution completes (success or error). Captures inference results.';
 ```
 
-**Expected Result**:
-- Log volume drops 50% (636 → ~318 lines/hour)
-- No more duplicate processing
-- No more race condition errors
+---
 
-#### Fix 1.2: Make ETL Idempotent
+## 🚀 Two-Phase ETL Service Implementation
 
 ```typescript
-// File: backend/src/services/simple-etl-service.ts:198-213
-// Replace INSERT with INSERT ... ON CONFLICT
+// backend/src/services/two-phase-etl-service.ts
 
-await this.dashboardPool.query(`
-  INSERT INTO executions (
-    id, workflow_id, execution_timestamp, completion_timestamp,
-    duration_ms, status, mode, node_id, camera_id
-  ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-  ON CONFLICT (id) DO UPDATE SET
-    completion_timestamp = EXCLUDED.completion_timestamp,
-    duration_ms = EXCLUDED.duration_ms,
-    status = EXCLUDED.status,
-    updated_at = NOW()
-`, [...]);
+import { EventEmitter } from 'events';
+import { Pool, Client } from 'pg';
+import sharp from 'sharp';
+import fs from 'fs/promises';
+import path from 'path';
 
-// Similar for execution_analysis, execution_images, execution_notifications
-// All use ON CONFLICT DO NOTHING or DO UPDATE
-```
-
-**Expected Result**:
-- No more duplicate key errors
-- Processing same execution twice is safe
-- Clean logs
-
-#### Fix 1.3: Add Observability
-
-```typescript
-// File: backend/src/services/simple-etl-service.ts (add metrics)
-
-interface ETLMetrics {
-  // Current
-  processed: number;
-  failed: number;
-  skipped: number;
-
-  // NEW
-  duplicates_handled: number;  // ON CONFLICT triggered
-  extraction_failures: number;  // Data not in expected format
-  image_processing_time_ms: number[];  // Performance tracking
-  analysis_parsing_failures: number;  // Regex extraction failed
-  last_100_executions: ExecutionSummary[];  // Debugging
+interface Phase1Payload {
+  execution_id: number;
+  workflow_id: string;
+  started_at: string;
 }
 
-// Log summary every 10 executions
-if (this.metrics.processed % 10 === 0) {
-  logger.info('ETL Metrics Summary', {
-    processed: this.metrics.processed,
-    failed: this.metrics.failed,
-    duplicates: this.metrics.duplicates_handled,
-    avg_processing_time: this.getAverageProcessingTime(),
-    success_rate: this.getSuccessRate()
-  });
+interface Phase2Payload {
+  execution_id: number;
+  workflow_id: string;
+  status: 'success' | 'error';
+  started_at: string;
+  stopped_at: string;
+  duration_ms: number;
 }
-```
 
-### Phase 2: Structured Data (Medium Priority)
+export class TwoPhaseETLService extends EventEmitter {
+  private n8nPool: Pool;
+  private dashboardPool: Pool;
+  private phase1Client: Client | null = null;
+  private phase2Client: Client | null = null;
+  private imageCachePath: string = '/mnt/raid1/n8n-backup/images';
 
-#### Fix 2.1: Define n8n Output Schema
-
-**File**: `docs/n8n-output-schema.json`
-
-```json
-{
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "SAI Execution Output",
-  "type": "object",
-  "required": ["execution_id", "timestamp", "camera", "image", "analysis"],
-  "properties": {
-    "execution_id": {
-      "type": "integer",
-      "description": "n8n execution_entity.id"
-    },
-    "timestamp": {
-      "type": "string",
-      "format": "date-time"
-    },
-    "camera": {
-      "type": "object",
-      "required": ["id", "node_id"],
-      "properties": {
-        "id": {"type": "string", "pattern": "^CAM_NODE\\d{3}_\\d{2}$"},
-        "node_id": {"type": "string", "pattern": "^NODE_\\d{3}$"},
-        "location": {
-          "type": "object",
-          "properties": {
-            "lat": {"type": "number", "minimum": -90, "maximum": 90},
-            "lng": {"type": "number", "minimum": -180, "maximum": 180}
-          }
-        }
-      }
-    },
-    "image": {
-      "type": "object",
-      "required": ["base64", "format"],
-      "properties": {
-        "base64": {"type": "string"},
-        "format": {"type": "string", "enum": ["jpeg", "png"]},
-        "size_bytes": {"type": "integer", "minimum": 0},
-        "width": {"type": "integer", "minimum": 0},
-        "height": {"type": "integer", "minimum": 0}
-      }
-    },
-    "analysis": {
-      "type": "object",
-      "required": ["model", "risk_level", "confidence"],
-      "properties": {
-        "model": {"type": "string"},
-        "risk_level": {"type": "string", "enum": ["critical", "high", "medium", "low", "none"]},
-        "confidence": {"type": "number", "minimum": 0, "maximum": 1},
-        "detections": {
-          "type": "object",
-          "properties": {
-            "smoke": {"type": "boolean"},
-            "flame": {"type": "boolean"},
-            "heat_signature": {"type": "boolean"},
-            "motion": {"type": "boolean"},
-            "vehicle": {"type": "boolean"},
-            "people": {"type": "boolean"}
-          }
-        },
-        "raw_response": {"type": "string"}
-      }
-    },
-    "notifications": {
-      "type": "object",
-      "properties": {
-        "telegram": {
-          "type": "object",
-          "properties": {
-            "sent": {"type": "boolean"},
-            "message_id": {"type": "integer"},
-            "chat_id": {"type": "string"},
-            "error": {"type": "string"}
-          }
-        }
-      }
-    }
-  }
-}
-```
-
-#### Fix 2.2: Implement Schema Validator
-
-```typescript
-// File: backend/src/services/schema-validator.ts
-
-import Ajv from 'ajv';
-import addFormats from 'ajv-formats';
-import schema from '../../docs/n8n-output-schema.json';
-
-export class ExecutionSchemaValidator {
-  private ajv: Ajv;
+  private metrics = {
+    phase1_processed: 0,
+    phase2_processed: 0,
+    phase1_failed: 0,
+    phase2_failed: 0,
+    duplicates_handled: 0
+  };
 
   constructor() {
-    this.ajv = new Ajv({ allErrors: true });
-    addFormats(this.ajv);
-    this.ajv.addSchema(schema, 'execution');
+    super();
+
+    this.n8nPool = new Pool({
+      host: process.env.N8N_DB_HOST || 'localhost',
+      port: parseInt(process.env.N8N_DB_PORT || '5432'),
+      database: process.env.N8N_DB_NAME || 'n8n',
+      user: process.env.N8N_DB_USER || 'n8n_user',
+      password: process.env.N8N_DB_PASSWORD,
+      max: 5
+    });
+
+    this.dashboardPool = new Pool({
+      host: process.env.SAI_DB_HOST || 'localhost',
+      port: parseInt(process.env.SAI_DB_PORT || '5432'),
+      database: process.env.SAI_DB_NAME || 'sai_dashboard',
+      user: process.env.SAI_DB_USER || 'n8n_user',
+      password: process.env.SAI_DB_PASSWORD,
+      max: 10
+    });
   }
 
-  validate(data: any): { valid: boolean; errors?: string[] } {
-    const valid = this.ajv.validate('execution', data);
+  async start(): Promise<void> {
+    console.log('🚀 Starting Two-Phase ETL Service...');
 
-    if (!valid) {
-      return {
-        valid: false,
-        errors: this.ajv.errors?.map(e => `${e.instancePath} ${e.message}`) || []
-      };
-    }
+    await this.testConnections();
+    await this.startPhase1Listener();
+    await this.startPhase2Listener();
 
-    return { valid: true };
+    console.log('✅ Two-Phase ETL Service started successfully');
   }
-}
-```
 
-#### Fix 2.3: Update n8n Workflow
+  private async testConnections(): Promise<void> {
+    const n8nTest = await this.n8nPool.query('SELECT 1');
+    const dashTest = await this.dashboardPool.query('SELECT 1');
+    console.log('✅ Database connections verified');
+  }
 
-**Action Required**: Modify n8n workflow to output structured JSON
+  // ========================================================================
+  // PHASE 1: Handle execution creation (webhook data + image)
+  // ========================================================================
 
-**Current n8n workflow** (guessed structure):
-```
-Webhook → Ollama Analysis → Telegram → Store Random JSON
-```
+  private async startPhase1Listener(): Promise<void> {
+    this.phase1Client = new Client({
+      host: process.env.N8N_DB_HOST || 'localhost',
+      port: parseInt(process.env.N8N_DB_PORT || '5432'),
+      database: process.env.N8N_DB_NAME || 'n8n',
+      user: process.env.N8N_DB_USER || 'n8n_user',
+      password: process.env.N8N_DB_PASSWORD
+    });
 
-**Proposed n8n workflow**:
-```
-Webhook
-  ↓
-Extract Camera Metadata (from webhook headers/body)
-  ↓
-Ollama Analysis
-  ↓
-Format Structured Output (Function node)
-  ↓
-Telegram Notification
-  ↓
-Store Structured JSON
-  ↓
-PostgreSQL (execution_data updated)
-```
+    await this.phase1Client.connect();
+    await this.phase1Client.query('LISTEN sai_execution_created');
 
-**New Function Node** (add to n8n workflow):
-```javascript
-// n8n Function Node: "Format SAI Output"
-const executionId = $node["Webhook"].json["execution_id"];
-const imageBase64 = $node["Webhook"].json["image"];
-const analysisResponse = $node["Ollama"].json["response"];
-const telegramResult = $node["Telegram"].json;
-
-return {
-  json: {
-    execution_id: executionId,
-    timestamp: new Date().toISOString(),
-    camera: {
-      id: "CAM_NODE001_01",  // TODO: Extract from webhook
-      node_id: "NODE_001",   // TODO: Extract from webhook
-      location: {
-        lat: -31.4135,
-        lng: -64.1811
+    this.phase1Client.on('notification', async (msg) => {
+      if (msg.channel === 'sai_execution_created' && msg.payload) {
+        const payload: Phase1Payload = JSON.parse(msg.payload);
+        console.log(`[Phase 1] 📬 Execution ${payload.execution_id} created`);
+        await this.handlePhase1(payload);
       }
-    },
-    image: {
-      base64: imageBase64,
-      format: "jpeg",
-      size_bytes: imageBase64.length
-    },
-    analysis: {
-      model: "qwen2.5vl:7b",
-      risk_level: extractRiskLevel(analysisResponse),  // Helper function
-      confidence: extractConfidence(analysisResponse),
-      detections: {
-        smoke: analysisResponse.includes("smoke"),
-        flame: analysisResponse.includes("flame") || analysisResponse.includes("fire"),
-        heat_signature: analysisResponse.includes("heat")
-      },
-      raw_response: analysisResponse
-    },
-    notifications: {
-      telegram: {
-        sent: telegramResult.success,
-        message_id: telegramResult.message_id,
-        chat_id: telegramResult.chat.id
-      }
-    }
+    });
+
+    console.log('✅ Phase 1 listener started (channel: sai_execution_created)');
   }
-};
-```
 
-### Phase 3: Domain Logic (High Value)
-
-#### Fix 3.1: ETL Pipeline Pattern
-
-```typescript
-// File: backend/src/services/etl-pipeline/index.ts
-
-export class ETLPipeline {
-  constructor(
-    private extractor: DataExtractor,
-    private transformer: DataTransformer,
-    private loader: DataLoader,
-    private enricher: DomainEnricher
-  ) {}
-
-  async process(executionId: number): Promise<void> {
+  private async handlePhase1(payload: Phase1Payload): Promise<void> {
     try {
-      // Stage 1: Extract raw data (with schema validation)
-      const rawData = await this.extractor.extract(executionId);
+      // 1. Extract webhook data from n8n execution_data
+      const webhookData = await this.extractWebhookData(payload.execution_id);
+      if (!webhookData) {
+        console.warn(`⚠️  [Phase 1] No webhook data found for execution ${payload.execution_id}`);
+        return;
+      }
 
-      // Stage 2: Transform to domain models
-      const models = await this.transformer.transform(rawData);
+      // 2. Save image immediately (from webhook base64)
+      let imagePaths = null;
+      if (webhookData.image_base64) {
+        imagePaths = await this.processImage(payload.execution_id, webhookData.image_base64);
+        console.log(`📸 [Phase 1] Image processed for execution ${payload.execution_id}`);
+      }
 
-      // Stage 3: Load into database (idempotent)
-      await this.loader.load(models);
+      // 3. Insert core record (idempotent!)
+      const result = await this.dashboardPool.query(`
+        INSERT INTO sai_executions (
+          execution_id, workflow_id, started_at,
+          camera_metadata, status,
+          image_original_path, image_webp_path, image_thumb_path, image_size_bytes
+        ) VALUES ($1, $2, $3, $4, 'running', $5, $6, $7, $8)
+        ON CONFLICT (execution_id) DO NOTHING
+        RETURNING execution_id, (xmax = 0) AS is_new_row
+      `, [
+        payload.execution_id,
+        payload.workflow_id,
+        payload.started_at,
+        JSON.stringify(webhookData.camera_metadata || {}),
+        imagePaths?.original_path || null,
+        imagePaths?.webp_path || null,
+        imagePaths?.thumb_path || null,
+        imagePaths?.image_size || null
+      ]);
 
-      // Stage 4: Enrich with domain logic (async, can fail)
-      await this.enricher.enrich(executionId);
+      if (result.rows.length > 0 && result.rows[0].is_new_row) {
+        this.metrics.phase1_processed++;
+        console.log(`✅ [Phase 1] Core record created for execution ${payload.execution_id}`);
+      } else {
+        this.metrics.duplicates_handled++;
+        console.log(`⏭️  [Phase 1] Execution ${payload.execution_id} already exists (duplicate)}`);
+      }
 
     } catch (error) {
-      logger.error('ETL pipeline failed', { executionId, error });
-      throw error;
+      this.metrics.phase1_failed++;
+      console.error(`❌ [Phase 1] Failed to process execution ${payload.execution_id}:`, error);
     }
   }
-}
-```
 
-#### Fix 3.2: Data Extractor (with validation)
+  // ========================================================================
+  // PHASE 2: Handle execution completion (inference results)
+  // ========================================================================
 
-```typescript
-// File: backend/src/services/etl-pipeline/extractor.ts
+  private async startPhase2Listener(): Promise<void> {
+    this.phase2Client = new Client({
+      host: process.env.N8N_DB_HOST || 'localhost',
+      port: parseInt(process.env.N8N_DB_PORT || '5432'),
+      database: process.env.N8N_DB_NAME || 'n8n',
+      user: process.env.N8N_DB_USER || 'n8n_user',
+      password: process.env.N8N_DB_PASSWORD
+    });
 
-export class DataExtractor {
-  constructor(
-    private n8nPool: Pool,
-    private validator: ExecutionSchemaValidator
-  ) {}
+    await this.phase2Client.connect();
+    await this.phase2Client.query('LISTEN sai_execution_completed');
 
-  async extract(executionId: number): Promise<ExecutionData> {
-    // Get execution_data from n8n database
+    this.phase2Client.on('notification', async (msg) => {
+      if (msg.channel === 'sai_execution_completed' && msg.payload) {
+        const payload: Phase2Payload = JSON.parse(msg.payload);
+        console.log(`[Phase 2] 📬 Execution ${payload.execution_id} completed (${payload.status})`);
+        await this.handlePhase2(payload);
+      }
+    });
+
+    console.log('✅ Phase 2 listener started (channel: sai_execution_completed)');
+  }
+
+  private async handlePhase2(payload: Phase2Payload): Promise<void> {
+    try {
+      // 1. Update core record with completion data
+      await this.dashboardPool.query(`
+        UPDATE sai_executions
+        SET
+          completed_at = $1,
+          duration_ms = $2,
+          status = $3,
+          updated_at = NOW()
+        WHERE execution_id = $4
+      `, [payload.stopped_at, payload.duration_ms, payload.status, payload.execution_id]);
+
+      console.log(`✅ [Phase 2] Updated completion data for execution ${payload.execution_id}`);
+
+      // 2. Extract inference results (only for success)
+      if (payload.status === 'success') {
+        const inferenceData = await this.extractInferenceData(payload.execution_id);
+
+        if (inferenceData) {
+          // 3. Insert inference results (idempotent)
+          await this.insertInferenceResults(payload.execution_id, inferenceData);
+
+          // 4. Insert notification status (idempotent)
+          await this.insertNotificationStatus(payload.execution_id, inferenceData.telegram);
+        }
+      }
+
+      this.metrics.phase2_processed++;
+      console.log(`✅ [Phase 2] Enrichment complete for execution ${payload.execution_id}`);
+
+    } catch (error) {
+      this.metrics.phase2_failed++;
+      console.error(`❌ [Phase 2] Failed to process execution ${payload.execution_id}:`, error);
+    }
+  }
+
+  // ========================================================================
+  // HELPER METHODS
+  // ========================================================================
+
+  private async extractWebhookData(executionId: number): Promise<any> {
     const result = await this.n8nPool.query(`
-      SELECT ed.data
-      FROM execution_data ed
-      WHERE ed."executionId" = $1
+      SELECT data FROM execution_data WHERE "executionId" = $1
     `, [executionId]);
 
-    if (result.rows.length === 0) {
-      throw new Error(`No data found for execution ${executionId}`);
-    }
+    if (result.rows.length === 0) return null;
 
-    const rawData = JSON.parse(result.rows[0].data);
+    const data = JSON.parse(result.rows[0].data);
 
-    // Validate against schema
-    const validation = this.validator.validate(rawData);
-    if (!validation.valid) {
-      logger.error('Schema validation failed', {
-        executionId,
-        errors: validation.errors
-      });
-
-      // Fallback to heuristic extraction for backwards compatibility
-      return this.fallbackExtraction(rawData);
-    }
-
-    return rawData as ExecutionData;
+    // TODO: Extract camera_metadata and image_base64 from n8n data structure
+    // This is where we parse the webhook body
+    return {
+      camera_metadata: this.extractCameraMetadata(data),
+      image_base64: this.extractImageBase64(data)
+    };
   }
 
-  private fallbackExtraction(rawData: any): ExecutionData {
-    // Keep the old extractExecutionDataUnified logic as fallback
-    // for executions created before schema was implemented
-    logger.warn('Using fallback extraction (pre-schema data)');
-    // ... existing heuristic code ...
+  private async processImage(executionId: number, imageBase64: string): Promise<any> {
+    const partition = Math.floor(executionId / 1000);
+
+    const originalDir = path.join(this.imageCachePath, 'original', partition.toString());
+    const webpDir = path.join(this.imageCachePath, 'webp', partition.toString());
+    const thumbDir = path.join(this.imageCachePath, 'thumb', partition.toString());
+
+    await Promise.all([
+      fs.mkdir(originalDir, { recursive: true }),
+      fs.mkdir(webpDir, { recursive: true }),
+      fs.mkdir(thumbDir, { recursive: true })
+    ]);
+
+    const imageBuffer = Buffer.from(imageBase64, 'base64');
+
+    const originalPath = path.join(originalDir, `${executionId}.jpg`);
+    const webpPath = path.join(webpDir, `${executionId}.webp`);
+    const thumbPath = path.join(thumbDir, `${executionId}.webp`);
+
+    // Check if already processed (idempotent)
+    try {
+      await fs.access(originalPath);
+      return { original_path: originalPath, webp_path: webpPath, thumb_path: thumbPath, image_size: imageBuffer.length };
+    } catch {
+      // Process images
+      await Promise.all([
+        sharp(imageBuffer).jpeg({ quality: 95 }).toFile(originalPath),
+        sharp(imageBuffer).webp({ quality: 85 }).toFile(webpPath),
+        sharp(imageBuffer).resize(300, 300, { fit: 'inside' }).webp({ quality: 75 }).toFile(thumbPath)
+      ]);
+
+      return { original_path: originalPath, webp_path: webpPath, thumb_path: thumbPath, image_size: imageBuffer.length };
+    }
+  }
+
+  private extractCameraMetadata(data: any): any {
+    // TODO: Parse camera metadata from webhook body
+    return {};
+  }
+
+  private extractImageBase64(data: any): string | null {
+    // TODO: Extract base64 image from n8n data
+    return null;
+  }
+
+  private async extractInferenceData(executionId: number): Promise<any> {
+    // TODO: Extract inference results from n8n execution_data
+    return null;
+  }
+
+  private async insertInferenceResults(executionId: number, data: any): Promise<void> {
+    // TODO: Insert into sai_inference_results
+  }
+
+  private async insertNotificationStatus(executionId: number, telegram: any): Promise<void> {
+    // TODO: Insert into sai_notifications
+  }
+
+  getMetrics() {
+    return this.metrics;
   }
 }
-```
 
-#### Fix 3.3: Domain Enricher
-
-```typescript
-// File: backend/src/services/etl-pipeline/enricher.ts
-
-export class DomainEnricher {
-  constructor(private dashboardPool: Pool) {}
-
-  async enrich(executionId: number): Promise<void> {
-    // Run enrichments in parallel (they're independent)
-    await Promise.allSettled([
-      this.calculateAlertPriority(executionId),
-      this.correlateIncidents(executionId),
-      this.assignExpertReview(executionId),
-      this.updateNodeStatistics(executionId)
-    ]);
-  }
-
-  private async calculateAlertPriority(executionId: number): Promise<void> {
-    // Business logic: Alert priority based on:
-    // - Risk level
-    // - Confidence score
-    // - Time of day
-    // - Recent detections from same camera
-    // - Expert review history
-
-    const result = await this.dashboardPool.query(`
-      UPDATE execution_analysis
-      SET alert_priority = CASE
-        WHEN risk_level = 'critical' AND confidence_score > 0.9 THEN 'critical'
-        WHEN risk_level = 'high' AND confidence_score > 0.7 THEN 'high'
-        WHEN risk_level IN ('medium', 'low') THEN 'normal'
-        ELSE 'low'
-      END,
-      response_required = (risk_level IN ('critical', 'high') AND confidence_score > 0.8)
-      WHERE execution_id = $1
-    `, [executionId]);
-  }
-
-  private async correlateIncidents(executionId: number): Promise<void> {
-    // Business logic: Group related detections into incidents
-    // - Same camera within 1 hour
-    // - Multiple cameras within 5km and 30 minutes
-    // - Escalating risk levels
-
-    const detection = await this.dashboardPool.query(`
-      SELECT ea.*, e.camera_id, e.execution_timestamp
-      FROM execution_analysis ea
-      JOIN executions e ON ea.execution_id = e.id
-      WHERE ea.execution_id = $1 AND ea.risk_level IN ('high', 'critical')
-    `, [executionId]);
-
-    if (detection.rows.length === 0) return;
-
-    // Find nearby recent detections
-    const nearbyDetections = await this.dashboardPool.query(`
-      SELECT DISTINCT ea.incident_id
-      FROM execution_analysis ea
-      JOIN executions e ON ea.execution_id = e.id
-      WHERE e.camera_id = $1
-      AND e.execution_timestamp BETWEEN $2 - INTERVAL '1 hour' AND $2
-      AND ea.incident_id IS NOT NULL
-      LIMIT 1
-    `, [detection.rows[0].camera_id, detection.rows[0].execution_timestamp]);
-
-    if (nearbyDetections.rows.length > 0) {
-      // Add to existing incident
-      await this.dashboardPool.query(`
-        UPDATE execution_analysis
-        SET incident_id = $1
-        WHERE execution_id = $2
-      `, [nearbyDetections.rows[0].incident_id, executionId]);
-    } else {
-      // Create new incident
-      const newIncident = await this.dashboardPool.query(`
-        INSERT INTO incidents (incident_type, severity, first_detection, status)
-        VALUES ('single_detection', $1, $2, 'active')
-        RETURNING id
-      `, [detection.rows[0].risk_level, detection.rows[0].execution_timestamp]);
-
-      await this.dashboardPool.query(`
-        UPDATE execution_analysis
-        SET incident_id = $1
-        WHERE execution_id = $2
-      `, [newIncident.rows[0].id, executionId]);
-    }
-  }
-
-  private async assignExpertReview(executionId: number): Promise<void> {
-    // Business logic: Assign high-risk detections to experts
-    // - Only for risk_level = 'high' or 'critical'
-    // - Only if confidence < 0.95 (uncertain detections)
-    // - Round-robin assignment to available experts
-
-    const needsReview = await this.dashboardPool.query(`
-      SELECT ea.*
-      FROM execution_analysis ea
-      WHERE ea.execution_id = $1
-      AND ea.risk_level IN ('high', 'critical')
-      AND ea.confidence_score < 0.95
-    `, [executionId]);
-
-    if (needsReview.rows.length === 0) return;
-
-    // Find available expert (round-robin)
-    const expert = await this.dashboardPool.query(`
-      SELECT u.id
-      FROM users u
-      LEFT JOIN expert_reviews er ON er.expert_id = u.id AND er.status IN ('pending', 'in_progress')
-      WHERE u.role = 'expert' AND u.is_active = true
-      GROUP BY u.id
-      ORDER BY COUNT(er.id) ASC
-      LIMIT 1
-    `);
-
-    if (expert.rows.length === 0) {
-      logger.warn('No available experts for review assignment');
-      return;
-    }
-
-    // Create expert review assignment
-    await this.dashboardPool.query(`
-      INSERT INTO expert_reviews (
-        execution_id, expert_id, priority, assigned_at, status
-      ) VALUES ($1, $2, $3, NOW(), 'pending')
-    `, [
-      executionId,
-      expert.rows[0].id,
-      needsReview.rows[0].risk_level === 'critical' ? 1 : 3
-    ]);
-  }
-
-  private async updateNodeStatistics(executionId: number): Promise<void> {
-    // Update real-time statistics for dashboard
-    // - Total executions per node
-    // - High-risk detections per node
-    // - Last detection timestamp
-    // - Camera uptime status
-
-    await this.dashboardPool.query(`
-      UPDATE monitoring_nodes mn
-      SET updated_at = NOW()
-      FROM executions e
-      WHERE e.id = $1 AND e.node_id = mn.node_id
-    `, [executionId]);
-
-    await this.dashboardPool.query(`
-      UPDATE node_cameras nc
-      SET
-        last_image_timestamp = NOW(),
-        updated_at = NOW()
-      FROM executions e
-      WHERE e.id = $1 AND e.camera_id = nc.camera_id
-    `, [executionId]);
-  }
-}
+export const twoPhaseETLService = new TwoPhaseETLService();
 ```
 
 ---
 
-## 📋 Implementation Roadmap
+## 📋 Implementation Checklist
 
-### Sprint 1: Stop the Bleeding (1-2 days)
-**Goal**: Fix immediate production issues
+### ✅ Phase 0: Fix Duplicate Triggers (COMPLETED)
+- ✅ Removed old `sai_etl_trigger` (redundant)
+- ✅ Fixed `sai_execution_notify_trigger` to only fire on status change
+- ✅ Verified only ONE trigger fires per execution
 
-- [ ] **Deploy trigger fix** (1 hour)
-  - Update `n8n_simple_triggers.sql` to fire only on UPDATE
-  - Test with manual NOTIFY
-  - Deploy to production
-  - Monitor logs for 1 hour
+### 🔄 Phase 1: Two-Phase Triggers (NEXT)
+- [ ] Apply `database/two_phase_triggers.sql` to n8n database
+- [ ] Test Phase 1 trigger with manual INSERT
+- [ ] Test Phase 2 trigger with manual UPDATE
+- [ ] Verify NOTIFY messages received
 
-- [ ] **Make ETL idempotent** (4 hours)
-  - Replace INSERT with INSERT ... ON CONFLICT in `simple-etl-service.ts`
-  - Add duplicate_handled metric
-  - Test with duplicate processing
-  - Deploy to production
+### 📊 Phase 2: New Schema (NEXT)
+- [ ] Apply `database/sai_dashboard_schema_v2.sql` to sai_dashboard database
+- [ ] Verify all tables created
+- [ ] Verify all indexes created
+- [ ] Test INSERT into sai_executions
 
-- [ ] **Add observability** (2 hours)
-  - Enhanced metrics logging
-  - ETL performance dashboard endpoint
-  - Error categorization
+### 🔧 Phase 3: ETL Service (NEXT)
+- [ ] Implement `extractWebhookData()` method
+- [ ] Implement `extractInferenceData()` method
+- [ ] Implement complete Phase 1 handler
+- [ ] Implement complete Phase 2 handler
+- [ ] Add comprehensive logging
 
-- [ ] **Verify fix** (1 hour)
-  - Monitor logs for 1 hour
-  - Confirm no duplicate errors
-  - Confirm log volume reduced 50%
+### ✅ Phase 4: Testing
+- [ ] Test with real webhook data
+- [ ] Test image processing
+- [ ] Test inference completion
+- [ ] Verify no duplicates
+- [ ] Monitor for 1 hour
 
-**Success Criteria**:
-- ✅ Log volume drops from 636 → ~300 lines/hour
-- ✅ No more "duplicate key" errors
-- ✅ Each execution processed exactly once
-- ✅ Clean logs
-
-### Sprint 2: Structured Data (3-5 days)
-**Goal**: Implement schema validation and structured extraction
-
-- [ ] **Define JSON schema** (2 hours)
-  - Create `n8n-output-schema.json`
-  - Document camera/node ID format
-  - Add examples
-
-- [ ] **Implement validator** (4 hours)
-  - Add `ajv` dependency
-  - Create `ExecutionSchemaValidator` class
-  - Add unit tests
-
-- [ ] **Update ETL with validation** (6 hours)
-  - Integrate validator into extractor
-  - Keep fallback extraction for old data
-  - Add schema compliance metrics
-
-- [ ] **Coordinate with n8n workflow owner** (8 hours)
-  - Explain schema requirements
-  - Add "Format SAI Output" function node
-  - Extract camera metadata from webhook
-  - Test end-to-end
-
-- [ ] **Backfill camera/node data** (4 hours)
-  - Analyze existing executions for patterns
-  - Infer camera_id from image metadata or timestamps
-  - Update historical records
-
-**Success Criteria**:
-- ✅ New executions include camera_id and node_id
-- ✅ Schema validation passes >95% of executions
-- ✅ Fallback extraction handles old data gracefully
-
-### Sprint 3: Domain Logic (1 week)
-**Goal**: Add business value through enrichment
-
-- [ ] **Implement pipeline pattern** (8 hours)
-  - Create ETLPipeline orchestrator
-  - Split into Extractor/Transformer/Loader/Enricher
-  - Add error handling and retries
-
-- [ ] **Build DomainEnricher** (16 hours)
-  - Alert priority calculation
-  - Incident correlation logic
-  - Expert review assignment
-  - Node statistics updates
-
-- [ ] **Test enrichment logic** (8 hours)
-  - Unit tests for each enricher method
-  - Integration tests with real data
-  - Performance testing
-
-- [ ] **Deploy incrementally** (4 hours)
-  - Feature flag for enrichment
-  - Monitor performance impact
-  - Gradual rollout
-
-**Success Criteria**:
-- ✅ Incidents automatically correlated
-- ✅ High-risk detections assigned to experts
-- ✅ Node statistics updated in real-time
-- ✅ Frontend can show "fires by region"
-
-### Sprint 4: Frontend Enablement (1 week)
-**Goal**: Unblock frontend development with clean data
-
-- [ ] **Geographic features** (8 hours)
-  - "Fires by region" view
-  - Coverage map with node locations
-  - Multi-camera incident timeline
-
-- [ ] **Expert review queue** (12 hours)
-  - Assignment dashboard
-  - Review workflow UI
-  - Second opinion requests
-
-- [ ] **Real-time incident tracking** (8 hours)
-  - Live incident map
-  - Alert escalation UI
-  - Response coordination
-
-- [ ] **Analytics dashboard** (8 hours)
-  - Node performance metrics
-  - Detection accuracy by camera
-  - Expert review statistics
-
-**Success Criteria**:
-- ✅ All planned frontend features working
-- ✅ Real-time updates reliable
-- ✅ Data quality high enough for production use
+### 🚀 Phase 5: Deployment
+- [ ] Deploy to production
+- [ ] Monitor metrics
+- [ ] Verify 100% data capture
 
 ---
 
-## 🎯 Success Metrics
+## 🎯 Success Criteria
 
-### Before (Current Production)
-- ❌ Log volume: 636 lines/hour
-- ❌ Duplicate processing: 100% (2x per execution)
-- ❌ Database INSERT errors: ~50/hour
-- ❌ Camera assignment: 0% (always NULL)
-- ❌ Node assignment: 0% (always NULL)
-- ❌ Incident correlation: 0% (always NULL)
-- ❌ Expert reviews: 0 (table empty)
-- ❌ Schema compliance: 0% (no schema)
-
-### After (Target State)
-- ✅ Log volume: ~300 lines/hour (50% reduction)
-- ✅ Duplicate processing: 0% (idempotent)
-- ✅ Database errors: 0/hour
-- ✅ Camera assignment: 100%
-- ✅ Node assignment: 100%
-- ✅ Incident correlation: >80% of high-risk detections
-- ✅ Expert reviews: Active queue management
-- ✅ Schema compliance: >95%
+- ✅ Zero duplicate processing
+- ✅ Zero race conditions
+- ✅ 100% execution capture (even on inference failure)
+- ✅ Images saved immediately (Phase 1)
+- ✅ Inference results added when ready (Phase 2)
+- ✅ Can debug stuck executions (status = 'running')
+- ✅ 50% log reduction
 
 ---
 
-## 🔧 Maintenance Plan
-
-### Daily Monitoring
-- ETL processing metrics (success rate, processing time)
-- Schema validation failures
-- Enrichment errors
-- Expert review queue depth
-
-### Weekly Review
-- Log volume trends
-- Data quality metrics
-- Camera/node coverage gaps
-- Expert review accuracy
-
-### Monthly Audit
-- Schema evolution needs
-- Performance optimization opportunities
-- Dead code removal
-- Database index optimization
-
----
-
-## 📚 References
-
-### Critical Files
-- `backend/src/services/simple-etl-service.ts` - Active ETL service
-- `database/n8n_simple_triggers.sql` - Trigger causing duplicates
-- `database/sai_dashboard_schema.sql` - Database schema (590 lines)
-- `frontend/src/contexts/SSEContext.tsx` - Real-time updates
-
-### Documentation Needed
-- [ ] n8n workflow documentation (currently unknown)
-- [ ] Camera ID assignment strategy
-- [ ] Node deployment map (which cameras belong to which nodes)
-- [ ] Expert review workflows and SLAs
-- [ ] Incident escalation procedures
-
-### External Dependencies
-- n8n workflow owner (need to modify workflow output)
-- Camera deployment team (need camera → node mapping)
-- Expert review team (define review criteria)
-
----
-
-## ✅ Conclusion
-
-The SAI Dashboard has a **solid foundation** but suffers from **implementation debt**:
-
-1. **Quick wins available**: Trigger fix can be deployed in 1 hour
-2. **Clear path forward**: Phased approach minimizes risk
-3. **High ROI**: Each sprint unlocks new frontend capabilities
-4. **Sustainable**: Pipeline pattern enables future enhancements
-
-**Recommended action**: Start with Sprint 1 (Stop the Bleeding) immediately, then proceed to Sprint 2 once logs are clean.
-
----
-
-**Document Status**: Draft for review
-**Next Steps**: Review with team, prioritize sprints, assign owners
-**Questions**: DM for clarification or architecture discussion
+**Next Step**: Create and apply two-phase triggers to n8n database

@@ -764,7 +764,7 @@ export const triggerTestEvent = asyncHandler(async (req: Request, res: Response)
 export const triggerFakeExecution = asyncHandler(async (req: Request, res: Response): Promise<void> => {
   const fakeExecution = {
     id: `fake-${Date.now()}`,
-    workflowId: 'yDbfhooKemfhMIkC',
+    workflowId: appConfig.sai.workflowId,
     status: 'success',
     mode: 'test',
     executionTimestamp: new Date().toISOString(),
@@ -868,7 +868,7 @@ export const triggerTestBatch = asyncHandler(async (req: Request, res: Response)
   
   const testExecutions = Array.from({ length: count }, (_, i) => ({
     id: `test-batch-${Date.now()}-${i}`,
-    workflowId: 'yDbfhooKemfhMIkC',
+    workflowId: appConfig.sai.workflowId,
     status: 'success',
     mode: 'test',
     executionTimestamp: new Date(Date.now() - i * 60000).toISOString(),
