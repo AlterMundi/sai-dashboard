@@ -186,7 +186,7 @@ export class EnhancedAnalysisService {
         imageSizeBytes: row.image_size_bytes,
         imageFormat: row.image_format,
         imageQualityScore: row.image_quality_score ? parseFloat(row.image_quality_score) : undefined,
-        modelVersion: row.model_version,
+        yoloModelVersion: row.yolo_model_version || row.model_version,  // Support both old and new column names
         processingTimeMs: row.processing_time_ms,
         featuresDetected: row.features_detected ? JSON.parse(row.features_detected) : undefined,
         colorAnalysis: row.color_analysis,

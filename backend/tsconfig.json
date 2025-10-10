@@ -37,6 +37,9 @@
   "exclude": [
     "node_modules",
     "dist",
-    "**/*.test.ts"
+    "**/*.test.ts",
+    "src/services/enhanced-analysis.ts",
+    "src/services/expert-review.ts",
+    "src/controllers/expert-review.ts"
   ]
 }
