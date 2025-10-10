@@ -24,80 +24,92 @@ export interface ImageAnalysis {
   recommendations?: string[];
 }
 
-// Enhanced Analysis Types for SAI System
+// YOLO Detection object (matches Stage2 ETL)
+export interface YoloDetection {
+  class: string;
+  confidence: number;
+  bounding_box: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+}
+
+// Enhanced Analysis Types for SAI System (YOLO-based)
 export interface SaiEnhancedAnalysis {
   // Primary Key
   executionId: string;
-  
+
+  // YOLO Inference Results
+  requestId?: string;
+  yoloModelVersion?: string;
+  detectionCount?: number;
+  hasFire?: boolean;
+  hasSmoke?: boolean;
+  alertLevel?: 'none' | 'low' | 'medium' | 'high' | 'critical';
+  detectionMode?: string;
+  activeClasses?: string[];
+  detections?: YoloDetection[];
+
+  // Confidence Scores
+  confidenceFire?: number;
+  confidenceSmoke?: number;
+  confidenceScore?: number;  // Max confidence
+
   // Node & Device Context
   nodeId?: string;
-  nodeName?: string;
-  nodeType?: string;
+  deviceId?: string;
   cameraId?: string;
   cameraLocation?: string;
-  
-  // Core Risk Analysis (AI Generated)
-  riskLevel: 'high' | 'medium' | 'low' | 'none';
-  confidenceScore?: number;
+  cameraType?: string;
+
+  // Image Data
   hasImage: boolean;
-  
-  // Detailed Detection Flags
-  smokeDetected?: boolean;
-  flameDetected?: boolean;
-  heatSignatureDetected?: boolean;
-  motionDetected?: boolean;
-  
+
   // Image Quality Metrics
   imageWidth?: number;
   imageHeight?: number;
   imageSizeBytes?: number;
   imageFormat?: string;
-  imageQualityScore?: number;
-  
-  // AI/ML Context
-  modelVersion?: string;
+
+  // Processing Metrics
+  yoloProcessingTimeMs?: number;
   processingTimeMs?: number;
-  featuresDetected?: string[];
-  colorAnalysis?: Record<string, unknown>;
-  
+
   // Alert & Response
-  alertPriority: 'critical' | 'high' | 'normal' | 'low';
-  responseRequired?: boolean;
   falsePositiveFlag?: boolean;
   verifiedByHuman?: boolean;
   humanVerifier?: string;
-  
+
   // Communication Status
   telegramDelivered: boolean;
   telegramMessageId?: string;
   telegramChatId?: string;
   emailSent?: boolean;
   smsSent?: boolean;
-  
+
   // Geographic Context
   latitude?: number;
   longitude?: number;
   elevation?: number;
   fireZoneRisk?: string;
-  
+  location?: string;
+
   // Temporal Context
   detectionTimestamp?: Date;
+  captureTimestamp?: Date;
   isDaylight?: boolean;
   weatherConditions?: string;
   temperatureCelsius?: number;
   humidityPercent?: number;
   windSpeedKmh?: number;
-  
+
   // Correlation & Incidents
   incidentId?: string;
   relatedExecutionIds?: string[];
   duplicateOf?: string;
-  
-  // Analysis Content
-  ollamaAnalysisText?: string;
-  rawAnalysisJson?: Record<string, unknown>;
-  confidenceBreakdown?: Record<string, number>;
-  
+
   // Processing Metadata
   processedAt: Date;
   processingVersion: string;
@@ -204,34 +216,46 @@ export interface ExecutionWithImage {
   durationMs: number | null;
   status: 'success' | 'error' | 'canceled' | 'running';
   mode: string;
-  
-  // Node and Camera data (NEW)
+
+  // Device and Camera data
+  deviceId: string | null;
   nodeId: string | null;
   cameraId: string | null;
+  location: string | null;
+  cameraType: string | null;
+  captureTimestamp: Date | null;
 
-  // Analysis data
-  riskLevel: 'critical' | 'high' | 'medium' | 'low' | 'none';
+  // YOLO Analysis data
+  requestId: string | null;
+  yoloModelVersion: string | null;
+  detectionCount: number;
+  hasFire: boolean;
+  hasSmoke: boolean;
+  alertLevel: 'none' | 'low' | 'medium' | 'high' | 'critical' | null;
+  detectionMode: string | null;
+  activeClasses: string[] | null;
+  detections: YoloDetection[] | null;
+
+  // Confidence scores
+  confidenceFire: number | null;
+  confidenceSmoke: number | null;
   confidenceScore: number | null;
-  overallAssessment: string | null;
-  smokeDetected: boolean;
-  flameDetected: boolean;
-  heatSignatureDetected: boolean;
-  alertPriority: 'critical' | 'high' | 'normal' | 'low';
-  responseRequired: boolean;
 
   // Image data
   hasImage: boolean;
   imagePath: string | null;
   imageSizeBytes: number | null;
   imageFormat: string | null;
+  imageWidth: number | null;
+  imageHeight: number | null;
 
   // Notification data
   telegramSent: boolean;
   telegramMessageId: number | null;
   telegramSentAt: Date | null;
 
-  // Metadata
-  modelVersion: string | null;
+  // Processing metadata
+  yoloProcessingTimeMs: number | null;
   processingTimeMs: number | null;
   extractedAt: Date | null;
 }
@@ -263,27 +287,24 @@ export interface ExecutionFilters extends PaginationQuery {
   endDate?: string;
   search?: string;
   hasImage?: boolean;
-  riskLevel?: 'high' | 'medium' | 'low' | 'none';
+  alertLevel?: 'none' | 'low' | 'medium' | 'high' | 'critical';
   telegramSent?: boolean;
   datePreset?: 'today' | 'yesterday' | 'last7days' | 'last30days' | 'thisMonth' | 'lastMonth';
-  sortBy?: 'date' | 'risk' | 'status' | 'confidence' | 'camera' | 'priority';
+  sortBy?: 'date' | 'status' | 'confidence' | 'camera' | 'alert';
   sortOrder?: 'asc' | 'desc';
-  
-  // Enhanced filters for new analysis fields
+
+  // Enhanced filters for YOLO analysis fields
   cameraId?: string;
   nodeId?: string;
   searchQuery?: string;
   pageSize?: number;
-  nodeType?: string;
-  alertPriority?: 'critical' | 'high' | 'normal' | 'low';
-  responseRequired?: boolean;
   verifiedByHuman?: boolean;
   incidentId?: string;
   fireType?: string;
   minConfidence?: number;
   maxConfidence?: number;
-  smokeDetected?: boolean;
-  flameDetected?: boolean;
+  hasFire?: boolean;
+  hasSmoke?: boolean;
   isDaylight?: boolean;
   weatherConditions?: string;
 }
@@ -392,7 +413,8 @@ export interface ExecutionStatistics {
     averageExecutionTime: number;
     activeToday: number;
   };
-  riskDistribution: {
+  alertDistribution: {
+    critical: number;
     high: number;
     medium: number;
     low: number;
@@ -420,19 +442,12 @@ export interface ExecutionStatistics {
     p95ResponseTime: number;
     p99ResponseTime: number;
   };
-  
-  // Enhanced statistics for new analysis capabilities
+
+  // YOLO detection statistics
   detectionBreakdown?: {
-    smokeDetected: number;
-    flameDetected: number;
-    heatSignatureDetected: number;
-    motionDetected: number;
-  };
-  alertDistribution?: {
-    critical: number;
-    high: number;
-    normal: number;
-    low: number;
+    hasFire: number;
+    hasSmoke: number;
+    bothDetected: number;
   };
   expertReviewStats?: {
     pending: number;
@@ -446,9 +461,9 @@ export interface ExecutionStatistics {
     cameraId: string;
     location?: string;
     totalDetections: number;
-    riskDetections: number;
+    fireDetections: number;
+    smokeDetections: number;
     falsePositives: number;
-    averageImageQuality: number;
   }>;
   incidentStatistics?: {
     activeIncidents: number;
