@@ -26,6 +26,7 @@ import {
   getEnhancedStatistics,
   triggerAnalysisProcessing
 } from '@/controllers/executions';
+/* Disabled: Expert Review System (requires legacy Ollama fields)
 import {
   getExpertAssignments,
   submitExpertReview,
@@ -40,6 +41,7 @@ import {
   processExecutionAnalysis,
   getIncidentAnalysis
 } from '@/controllers/expert-review';
+*/
 import {
   connectSSE,
   getSSEStatus
@@ -184,9 +186,9 @@ executionRouter.get('/:executionId/data', getExecutionData);
 
 // Image routes moved to public section above for HTML <img> tag compatibility
 
-// Enhanced analysis endpoints
-executionRouter.get('/:executionId/analysis', getComprehensiveAnalysis);
-executionRouter.post('/:executionId/process', processExecutionAnalysis);
+// Enhanced analysis endpoints (DISABLED - Requires Expert Review System)
+// executionRouter.get('/:executionId/analysis', getComprehensiveAnalysis);
+// executionRouter.post('/:executionId/process', processExecutionAnalysis);
 
 // Manual analysis trigger
 executionRouter.post('/trigger-analysis', triggerAnalysisProcessing);
@@ -194,8 +196,9 @@ executionRouter.post('/trigger-analysis', triggerAnalysisProcessing);
 router.use('/executions', executionRouter);
 
 // =================================================================
-// Expert Review Routes (Protected)
+// Expert Review Routes (DISABLED - Requires Legacy Ollama Fields)
 // =================================================================
+/*
 const expertRouter = Router();
 
 // Expert assignments and workflow
@@ -214,23 +217,24 @@ expertRouter.get('/tags', getAvailableExpertTags);
 expertRouter.post('/system/backfill', triggerAnalysisBackfill);
 
 router.use('/expert', expertRouter);
+*/
 
 // =================================================================
 // Incident Analysis Routes (Protected)
 // =================================================================
 const incidentRouter = Router();
 
-// Incident correlation and analysis
-incidentRouter.get('/:incidentId', getIncidentAnalysis);
+// Incident correlation and analysis (DISABLED - Requires Expert Review System)
+// incidentRouter.get('/:incidentId', getIncidentAnalysis);
 
 // Multi-camera incident detection
 incidentRouter.get('/', async (req, res) => {
   try {
-    const { 
+    const {
       status = 'active',
       timeRange = '24h',
       minCameras = 1,
-      riskLevel
+      alertLevel
     } = req.query;
 
     // Get active incidents across multiple cameras
@@ -247,28 +251,26 @@ incidentRouter.get('/', async (req, res) => {
       whereConditions.push(`detection_timestamp > NOW() - INTERVAL '7 days'`);
     }
 
-    // Risk level filter
-    if (riskLevel) {
+    // Alert level filter
+    if (alertLevel) {
       paramCount++;
-      whereConditions.push(`risk_level = $${paramCount}`);
-      queryParams.push(riskLevel);
+      whereConditions.push(`alert_level = $${paramCount}`);
+      queryParams.push(alertLevel);
     }
 
     const whereClause = whereConditions.join(' AND ');
 
     // Get incident summaries
     const incidentsQuery = `
-      SELECT 
+      SELECT
         incident_id,
         COUNT(*) as total_detections,
         COUNT(DISTINCT camera_id) as cameras_involved,
-        MAX(risk_level) as max_risk_level,
+        MAX(alert_level) as max_alert_level,
         MIN(detection_timestamp) as incident_start,
         MAX(detection_timestamp) as incident_end,
-        BOOL_OR(response_required) as response_required,
-        COUNT(CASE WHEN expert_review_status = 'completed' THEN 1 END) as expert_reviewed,
         ARRAY_AGG(DISTINCT camera_id) as camera_list
-      FROM sai_execution_analysis
+      FROM execution_analysis
       WHERE ${whereClause}
       GROUP BY incident_id
       HAVING COUNT(DISTINCT camera_id) >= $${paramCount + 1}
@@ -277,19 +279,17 @@ incidentRouter.get('/', async (req, res) => {
     `;
 
     queryParams.push(parseInt(minCameras as string) || 1);
-    const { db } = await import('@/database/pool');
-    const incidents = await db.query(incidentsQuery, queryParams);
+    const { dualDb } = await import('@/database/dual-pool');
+    const incidents = await dualDb.query(incidentsQuery, queryParams);
 
     res.json({
       data: incidents.map((incident: any) => ({
         incidentId: incident.incident_id,
         totalDetections: parseInt(incident.total_detections),
         camerasInvolved: parseInt(incident.cameras_involved),
-        maxRiskLevel: incident.max_risk_level,
+        maxAlertLevel: incident.max_alert_level,
         incidentStart: incident.incident_start,
         incidentEnd: incident.incident_end,
-        responseRequired: incident.response_required,
-        expertReviewed: parseInt(incident.expert_reviewed),
         cameraList: incident.camera_list
       })),
       meta: {
@@ -414,17 +414,6 @@ if (process.env.NODE_ENV === 'development' || process.env.ENABLE_API_DOCS === 't
             'GET /events': 'Server-Sent Events stream for real-time updates',
             'GET /events/status': 'SSE connection status and statistics'
           },
-          expert: {
-            'GET /expert/assignments': 'Get expert review assignments',
-            'POST /expert/assignments/:id/review': 'Submit expert review',
-            'POST /expert/assignments/:id/second-opinion': 'Request second opinion',
-            'POST /expert/assignments/:id/escalate': 'Escalate to supervisor',
-            'PATCH /expert/assignments/:id/status': 'Update review status',
-            'GET /expert/performance': 'Get expert performance metrics',
-            'GET /expert/system/stats': 'Get system review statistics',
-            'GET /expert/tags': 'Get available expert tags',
-            'POST /expert/system/backfill': 'Trigger analysis backfill'
-          },
           incidents: {
             'GET /incidents': 'List multi-camera incidents',
             'GET /incidents/:id': 'Get incident analysis'
@@ -442,10 +431,6 @@ if (process.env.NODE_ENV === 'development' || process.env.ENABLE_API_DOCS === 't
             url: '/api/auth/login',
             method: 'POST',
             body: { password: 'dashboard_password' }
-          },
-          expertAuth: {
-            note: 'Expert endpoints require authentication with expert role',
-            adminEndpoints: ['/expert/system/stats', '/expert/system/backfill']
           }
         },
         rateLimit: {
