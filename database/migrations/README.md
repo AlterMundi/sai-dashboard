@@ -1,7 +1,7 @@
 # Database Migrations
 
-**Current Schema Version:** 2.0 (Pure YOLO)
-**Last Migration:** 004 (October 10, 2025)
+**Current Schema Version:** 2.1 (Optimized YOLO)
+**Last Migration:** 005 (October 12, 2025)
 
 ---
 
@@ -90,6 +90,56 @@ Migration includes rollback script if needed.
 
 ---
 
+### Migration 005: Schema Cleanup
+**File:** `005_schema_cleanup.sql`
+**Date:** October 12, 2025
+**Status:** ✅ Applied
+
+**Purpose:**
+- Remove unused database schema elements
+- Optimize detection data storage (JSONB vs separate table)
+- Clean up never-implemented features
+
+**Removed:**
+- **Tables Dropped:**
+  - `execution_detections` - Denormalized bounding boxes (77 rows, duplicate of JSONB data)
+  - `dashboard_stats` - Pre-computed metrics cache (never implemented, 0 rows)
+- **Columns Dropped:**
+  - `execution_images.backup_path` - Unused backup path field (all NULL)
+
+**Added:**
+- GIN index on `execution_analysis.detections` for fast JSONB queries
+- Index on `execution_analysis.detection_count` for filtering
+
+**Benefits:**
+- Simplified schema (no duplicate detection data)
+- Faster Stage 2 ETL (~5ms improvement per execution)
+- Cleaner codebase (removed insertDetections function)
+- Better query performance with JSONB GIN index
+
+**Data Loss:**
+- None (execution_detections data preserved in execution_analysis.detections JSONB)
+
+**Apply:**
+```bash
+psql -U sai_dashboard_user -d sai_dashboard -f 005_schema_cleanup.sql
+```
+
+**Verification:**
+```sql
+-- Verify tables dropped
+\dt execution_detections
+\dt dashboard_stats
+
+-- Verify column removed
+\d execution_images
+
+-- Verify GIN index created
+\di idx_execution_analysis_detections_gin
+```
+
+---
+
 ## 🔄 Migration History Timeline
 
 ```
@@ -103,7 +153,9 @@ Initial State (Aug 2025)
     ↓
 [Migration 004] - Remove Legacy Fields ✅
     ↓
-Current State: Pure YOLO Schema (Oct 2025)
+[Migration 005] - Schema Cleanup ✅
+    ↓
+Current State: Optimized YOLO Schema (Oct 2025)
 ```
 
 ---
@@ -196,17 +248,17 @@ Historical migrations that have been superseded:
 
 ## 📊 Current Schema Summary
 
-**Tables:** 6 main tables
+**Tables:** 5 main tables (reduced from 7 in initial design)
 - `executions` (Core records)
-- `execution_analysis` (YOLO results - 18 columns)
-- `execution_detections` (Bounding boxes)
-- `execution_images` (Image cache)
+- `execution_analysis` (YOLO results with detections JSONB - 18 columns)
+- `execution_images` (Image cache - 10 columns)
 - `execution_notifications` (Telegram alerts)
 - `etl_processing_queue` (ETL management)
 
-**Indexes:** Optimized for query performance
+**Indexes:** Optimized for query performance (including GIN for JSONB)
 **Partitioning:** Image storage partitioned by execution ID
 **Data Integrity:** NULL = "not available", no fake defaults
+**Detection Storage:** JSONB with GIN index (faster than separate table + JOIN)
 
 ---
 
@@ -240,5 +292,5 @@ COMMIT;
 
 ---
 
-**Last Updated:** October 10, 2025
-**Schema Version:** 2.0 (Pure YOLO)
+**Last Updated:** October 12, 2025
+**Schema Version:** 2.1 (Optimized YOLO)

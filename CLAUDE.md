@@ -189,7 +189,7 @@ import { config } from '@/config';        // → backend/src/config/index.ts
 
 ---
 
-## 📊 Database Schema (Pure YOLO - Post Migration 004)
+## 📊 Database Schema (Pure YOLO - Post Migration 005)
 
 ### Core Tables
 
@@ -202,17 +202,13 @@ import { config } from '@/config';        // → backend/src/config/index.ts
 - YOLO fire/smoke detection results
 - Fields: `execution_id`, `request_id`, `alert_level`, `detection_count`, `has_fire`, `has_smoke`
 - Confidence: `confidence_fire`, `confidence_smoke`, `confidence_score`
-- Detections: `detections` (JSONB array), `active_classes` (string array)
+- Detections: `detections` (JSONB array with bounding boxes), `active_classes` (string array)
 - **18 columns total** (reduced from 31 in Sept 2025)
-
-**`execution_detections`** (Stage 2 ETL)
-- Individual bounding boxes for fire/smoke detections
-- Fields: `execution_id`, `detection_class` (fire/smoke/unknown), `confidence`, `bounding_box` (JSONB)
-- One row per detection (e.g., 3 smoke detections = 3 rows)
+- **GIN Index:** Fast JSONB queries like `WHERE detections @> '[{"class": "fire"}]'`
 
 **`execution_images`** (Stage 2 ETL)
 - Image cache metadata
-- Fields: `execution_id`, `original_path`, `thumbnail_path`, `cached_path`, `backup_path`
+- Fields: `execution_id`, `original_path`, `thumbnail_path`, `cached_path`
 - Metadata: `size_bytes`, `width`, `height`, `format`, `quality_score`
 
 **`etl_processing_queue`** (ETL Management)
@@ -227,7 +223,13 @@ import { config } from '@/config';        // → backend/src/config/index.ts
 ### Foreign Keys (CASCADE)
 
 All child tables have `ON DELETE CASCADE` to `executions.id`:
-- Delete execution → automatically deletes analysis, images, detections, queue entries
+- Delete execution → automatically deletes analysis, images, queue entries
+
+### Removed Tables (Migration 005)
+
+**Previously existed but removed as unused:**
+- `execution_detections` - Denormalized bounding boxes (now in `execution_analysis.detections` JSONB)
+- `dashboard_stats` - Pre-computed metrics cache (never implemented)
 
 ---
 
@@ -341,6 +343,7 @@ Real-time updates use Server-Sent Events:
 ### Database
 - `database/migrations/003_yolo_schema_redesign.sql` - YOLO schema (Oct 2025)
 - `database/migrations/004_remove_legacy_fields.sql` - Legacy cleanup (Oct 2025)
+- `database/migrations/005_schema_cleanup.sql` - Remove unused tables/columns (Oct 2025)
 - `database/migrations/README.md` - Migration history
 
 ### Documentation
@@ -363,7 +366,7 @@ Before October 2025, this system was incorrectly built for Ollama AI analysis. T
 
 **DO:**
 - Use YOLO-specific fields: `alert_level`, `has_fire`, `has_smoke`, `detection_count`
-- Query `execution_analysis` and `execution_detections` tables
+- Query `execution_analysis.detections` JSONB field for bounding boxes
 - Parse YOLO Inference node output (not Ollama node)
 
 ### 2. N8N Data Format
@@ -451,8 +454,9 @@ Private Server (localhost)
 ### Recent History (October 2025)
 - **Migration 003:** Redesigned schema for YOLO (was incorrectly built for Ollama)
 - **Migration 004:** Removed 13 legacy Ollama fields (31 → 18 columns)
+- **Migration 005:** Removed unused tables (`execution_detections`, `dashboard_stats`) and columns (`backup_path`)
 - **Ollama Cleanup:** Deleted 133,696 historical Ollama executions (recovered 167 GB)
-- **Current State:** Pure YOLO system, 100% analysis coverage for executions since Oct 5, 2025
+- **Current State:** Pure YOLO system with clean schema, JSONB-based detection storage
 
 ### Data Retention
 - **n8n database:** ~5 days of execution_data (automatically purged by n8n)

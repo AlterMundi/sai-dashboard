@@ -15,7 +15,7 @@
  * - Extracts YOLO inference results (detections, confidences, alert levels)
  * - Extracts camera metadata (device_id, location, camera_id)
  * - Extracts annotated images
- * - Updates executions, execution_analysis, execution_detections tables
+ * - Updates executions, execution_analysis tables
  * - Marks queue item as completed or failed (with retry)
  *
  * Data Integrity:
@@ -321,12 +321,11 @@ export class Stage2ETLService extends EventEmitter {
         await this.updateExecution(executionId, extracted);
       }
 
-      // 4. Insert/update execution_analysis
+      // 4. Insert/update execution_analysis (includes detections JSONB)
       await this.upsertAnalysis(executionId, extracted);
 
-      // 5. Insert individual detections (bounding boxes)
+      // 5. Track detection metrics (detections stored in JSONB, not separate table)
       if (extracted.detections && extracted.detections.length > 0) {
-        await this.insertDetections(executionId, extracted.detections);
         this.metrics.detectionsFound += extracted.detections.length;
       }
 
@@ -709,36 +708,7 @@ export class Stage2ETLService extends EventEmitter {
   }
 
   /**
-   * Insert individual detections into execution_detections table
-   */
-  private async insertDetections(
-    executionId: number,
-    detections: YoloDetection[]
-  ): Promise<void> {
-    for (let i = 0; i < detections.length; i++) {
-      const det = detections[i];
-
-      await this.saiPool.query(`
-        INSERT INTO execution_detections (
-          execution_id,
-          detection_class,
-          confidence,
-          bounding_box,
-          detection_index
-        ) VALUES ($1, $2, $3, $4, $5)
-        ON CONFLICT DO NOTHING
-      `, [
-        executionId,
-        det.class,
-        det.confidence,
-        JSON.stringify(det.bounding_box),
-        i
-      ]);
-    }
-  }
-
-  /**
-   * Process and cache image (same as before)
+   * Process and cache image
    */
   private async processImage(executionId: number, imageBase64: string): Promise<void> {
     try {
