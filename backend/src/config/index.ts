@@ -5,16 +5,87 @@ import { resolve } from 'path';
 // Load .env from project root (single source of truth)
 config({ path: resolve(__dirname, '../../../.env') });
 
+/**
+ * Validation: Required environment variables
+ * These MUST be set for the application to start
+ */
 const requiredEnvVars = [
-  'DATABASE_URL',
   'DASHBOARD_PASSWORD',
   'SESSION_SECRET',
+  'N8N_DB_PASSWORD',
+  'SAI_DB_PASSWORD',
 ] as const;
 
+const missingVars: string[] = [];
+const warningVars: Array<{ key: string; message: string }> = [];
+
+// Check for missing required variables
 for (const envVar of requiredEnvVars) {
   if (!process.env[envVar]) {
-    throw new Error(`Missing required environment variable: ${envVar}`);
+    missingVars.push(envVar);
   }
+}
+
+// Warn if legacy DATABASE_URL is set (superseded by dual-database config)
+if (process.env.DATABASE_URL) {
+  warningVars.push({
+    key: 'DATABASE_URL',
+    message: 'Legacy variable - use N8N_DB_* and SAI_DB_* variables instead',
+  });
+}
+
+// Check for insecure default values (production safety)
+if (process.env.NODE_ENV === 'production') {
+  if (process.env.DASHBOARD_PASSWORD === '12345') {
+    warningVars.push({
+      key: 'DASHBOARD_PASSWORD',
+      message: 'Using weak password "12345" in production! Change immediately.',
+    });
+  }
+
+  if (process.env.SESSION_SECRET === 'your-super-secret-session-key-change-this-in-production') {
+    warningVars.push({
+      key: 'SESSION_SECRET',
+      message: 'Using default SESSION_SECRET in production! Change immediately.',
+    });
+  }
+}
+
+// Check for critical database configuration
+const criticalDbVars = ['N8N_DB_HOST', 'N8N_DB_USER', 'N8N_DB_PASSWORD', 'SAI_DB_HOST', 'SAI_DB_USER', 'SAI_DB_PASSWORD'];
+for (const dbVar of criticalDbVars) {
+  if (!process.env[dbVar]) {
+    warningVars.push({
+      key: dbVar,
+      message: 'Database configuration missing - ETL services may fail',
+    });
+  }
+}
+
+// Check for required frontend variables
+if (!process.env.VITE_API_URL && !process.env.API_BASE_PATH) {
+  warningVars.push({
+    key: 'VITE_API_URL',
+    message: 'Frontend API URL not configured - API calls may fail',
+  });
+}
+
+// Report errors and exit if critical variables are missing
+if (missingVars.length > 0) {
+  console.error('\n❌ FATAL: Missing required environment variables:\n');
+  missingVars.forEach((v) => console.error(`  - ${v}`));
+  console.error('\nPlease check your .env file and ensure all required variables are set.');
+  console.error('See .env.example for reference.\n');
+  process.exit(1);
+}
+
+// Report warnings (non-fatal)
+if (warningVars.length > 0) {
+  console.warn('\n⚠️  WARNING: Configuration issues detected:\n');
+  warningVars.forEach(({ key, message }) => {
+    console.warn(`  - ${key}: ${message}`);
+  });
+  console.warn('\n');
 }
 
 export const appConfig = {
@@ -45,7 +116,7 @@ export const appConfig = {
   },
 
   sai: {
-    workflowName: process.env.SAI_WORKFLOW_NAME || 'Sai-webhook-upload-image+Ollama-analisys+telegram-sendphoto',
+    workflowName: process.env.SAI_WORKFLOW_NAME || 'SAI Webhook + YOLO',
     workflowId: process.env.SAI_WORKFLOW_ID || 'yDbfhooKemfhMIkC',
     defaultPageSize: parseInt(process.env.DEFAULT_PAGE_SIZE || '50', 10),
     maxPageSize: parseInt(process.env.MAX_PAGE_SIZE || '200', 10),
@@ -79,19 +150,11 @@ export const appConfig = {
   }
 };
 
-export const databaseConfig: DatabaseConfig = {
-  host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || '5432', 10),
-  database: process.env.DB_NAME || 'n8n',
-  username: process.env.DB_USER || 'sai_dashboard_readonly',
-  password: process.env.DB_PASSWORD || 'password',
-  maxConnections: parseInt(process.env.DB_MAX_CONNECTIONS || '5', 10),
-  idleTimeout: parseInt(process.env.DB_IDLE_TIMEOUT || '30000', 10),
-  connectionTimeout: parseInt(process.env.DB_CONNECTION_TIMEOUT || '2000', 10),
-};
+// LEGACY: databaseConfig removed - use n8nDatabaseConfig or saiDatabaseConfig instead
+// export const databaseConfig: DatabaseConfig = { ... }
 
 export const cacheConfig: CacheConfig = {
-  path: process.env.CACHE_PATH || process.env.IMAGE_CACHE_PATH || '/cache',
+  path: process.env.CACHE_PATH || '/cache',
   basePath: process.env.IMAGE_BASE_PATH || '/mnt/raid1/n8n/backup/images',
   enableThumbnails: process.env.ENABLE_THUMBNAIL_GENERATION === 'true',
   thumbnailSize: parseInt(process.env.THUMBNAIL_SIZE || '200', 10),
