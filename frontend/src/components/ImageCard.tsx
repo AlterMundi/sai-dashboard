@@ -3,7 +3,7 @@ import { StatusBadge } from './ui/StatusBadge';
 import { LoadingSpinner } from './ui/LoadingSpinner';
 import { DynamicTimeAgo } from './ui/DynamicTimeAgo';
 import { executionsApi } from '@/services/api';
-import { formatDuration, truncateText, cn } from '@/utils';
+import { formatDuration, cn } from '@/utils';
 import { ImageCardProps } from '@/types';
 import { Calendar, Clock, AlertTriangle, CheckCircle, MessageCircle, Flame, Wind, Camera, MapPin } from 'lucide-react';
 

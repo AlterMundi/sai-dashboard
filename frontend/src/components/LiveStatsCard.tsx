@@ -29,8 +29,8 @@ export function LiveStatsCard({
 
   // Update value when live stats change
   useEffect(() => {
-    if (liveStats && liveStats[statKey] !== undefined) {
-      const newValue = liveStats[statKey];
+    if (liveStats && liveStats[statKey as keyof typeof liveStats] !== undefined) {
+      const newValue = liveStats[statKey as keyof typeof liveStats] as number;
       
       if (newValue !== currentValue) {
         setPreviousValue(currentValue);

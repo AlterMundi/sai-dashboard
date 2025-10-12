@@ -1,19 +1,17 @@
 import { useState, useEffect, useCallback } from 'react';
 import { executionsApi } from '@/services/api';
-import { ExecutionWithImage, ExecutionFilters, UseExecutionsReturn, ExecutionStats, DailySummary, AnalysisStatus, AnalysisAlert } from '@/types';
+import { ExecutionWithImageUrls, ExecutionFilters, UseExecutionsReturn, ExecutionStats, DailySummary } from '@/types';
 
 export function useExecutions(
   initialFilters: ExecutionFilters = {},
   refreshTrigger?: number
 ): UseExecutionsReturn {
-  const [executions, setExecutions] = useState<ExecutionWithImage[]>([]);
+  const [executions, setExecutions] = useState<ExecutionWithImageUrls[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [hasNext, setHasNext] = useState(false);
   const [currentPage, setCurrentPage] = useState(0);
   const [filters, setFilters] = useState<ExecutionFilters>(initialFilters);
-  const [analysisStatus, setAnalysisStatus] = useState<AnalysisStatus | null>(null);
-  const [alerts, setAlerts] = useState<AnalysisAlert[]>([]);
 
   const fetchExecutions = useCallback(async (
     newFilters: ExecutionFilters = filters,
@@ -40,8 +38,6 @@ export function useExecutions(
       }
 
       setHasNext(response.meta?.hasNext || false);
-      setAnalysisStatus(response.meta?.analysisStatus || null);
-      setAlerts(response.alerts || []);
       setError(null);
 
     } catch (error) {
@@ -81,27 +77,20 @@ export function useExecutions(
   }, [fetchExecutions]);
 
   // Prepend new executions (for real-time updates)
-  const prependExecutions = useCallback((newExecutions: ExecutionWithImage[]) => {
+  const prependExecutions = useCallback((newExecutions: ExecutionWithImageUrls[]) => {
     if (!newExecutions || newExecutions.length === 0) return;
-    
+
     setExecutions(prev => {
       // Filter out duplicates based on ID
       const existingIds = new Set(prev.map(exec => exec.id));
       const uniqueNewExecutions = newExecutions.filter(exec => !existingIds.has(exec.id));
-      
+
       if (uniqueNewExecutions.length === 0) return prev;
-      
+
       console.log(`🆕 Prepending ${uniqueNewExecutions.length} new executions to gallery`);
       return [...uniqueNewExecutions, ...prev];
     });
   }, []);
-
-  // Trigger analysis function
-  const triggerAnalysis = useCallback(async () => {
-    await executionsApi.triggerAnalysis();
-    // Refresh executions after triggering to get updated status
-    await fetchExecutions(filters, true);
-  }, [filters, fetchExecutions]);
 
   // Initial fetch
   useEffect(() => {
@@ -125,16 +114,13 @@ export function useExecutions(
     refresh,
     updateFilters,
     filters,
-    analysisStatus,
-    alerts,
-    triggerAnalysis,
     prependExecutions,
   };
 }
 
 // Hook for searching executions
 export function useExecutionSearch() {
-  const [results, setResults] = useState<ExecutionWithImage[]>([]);
+  const [results, setResults] = useState<ExecutionWithImageUrls[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

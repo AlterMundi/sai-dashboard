@@ -67,7 +67,7 @@ export function ImageGallery({ initialFilters = {}, className, refreshTrigger, o
   }, [onPrependRegister, prependExecutions]);
 
 
-  const handleCardClick = useCallback((execution: ExecutionWithImage) => {
+  const handleCardClick = useCallback((execution: ExecutionWithImageUrls) => {
     setSelectedExecution(execution);
     setIsModalOpen(true);
   }, []);

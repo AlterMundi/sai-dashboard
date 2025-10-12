@@ -3,7 +3,7 @@ import { Layout } from '@/components/Layout';
 import { ImageGallery } from '@/components/ImageGallery';
 import { LoadingState } from '@/components/ui/LoadingSpinner';
 import { LiveStatsCard, SystemHealthIndicator } from '@/components/LiveStatsCard';
-import { useExecutionStats, useDailySummary, useExecutions } from '@/hooks/useExecutions';
+import { useExecutionStats, useDailySummary } from '@/hooks/useExecutions';
 import { executionsApi } from '@/services/api';
 import { useSSEHandler, useSSE } from '@/contexts/SSEContext';
 import { ExecutionFilters } from '@/types';
@@ -27,10 +27,6 @@ export function Dashboard() {
   
   const { stats, isLoading: statsLoading, error: statsError } = useExecutionStats();
   useDailySummary(7);
-  
-  // Get analysis status for compact header display  
-  const { analysisStatus } = useExecutions({});
-
   // Get live SSE data
   const { isConnected, systemHealth } = useSSE();
 
@@ -188,21 +184,8 @@ export function Dashboard() {
               </div>
             </form>
 
-            {/* Compact Analysis Status */}
+            {/* Filter Toggle Section */}
             <div className="flex items-center space-x-3">
-              {analysisStatus && typeof analysisStatus.coverage === 'number' && (
-                <div className="hidden sm:flex items-center px-3 py-1 bg-gray-50 rounded-full text-xs text-gray-600">
-                  <div className={`w-2 h-2 rounded-full mr-2 ${
-                    analysisStatus.coverage >= 90 ? 'bg-green-500' :
-                    analysisStatus.coverage >= 50 ? 'bg-yellow-500' : 'bg-red-500'
-                  }`}></div>
-                  Analysis: {Math.round(analysisStatus.coverage)}% Complete
-                  {typeof analysisStatus.pending === 'number' && analysisStatus.pending > 0 && (
-                    <span className="ml-1 text-gray-500">({analysisStatus.pending} pending)</span>
-                  )}
-                </div>
-              )}
-              
               {/* Filter Toggle */}
               <button
                 onClick={() => setShowFilters(!showFilters)}
@@ -267,17 +250,18 @@ export function Dashboard() {
 
                 {/* Risk Level Filter */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Risk Level</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Alert Level</label>
                   <select
-                    value={filters.riskLevel || ''}
-                    onChange={(e) => applyQuickFilter({ riskLevel: (e.target.value as any) || undefined })}
+                    value={filters.alertLevel || ''}
+                    onChange={(e) => applyQuickFilter({ alertLevel: (e.target.value as any) || undefined })}
                     className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                   >
-                    <option value="">All risk levels</option>
-                    <option value="high">High Risk</option>
-                    <option value="medium">Medium Risk</option>
-                    <option value="low">Low Risk</option>
-                    <option value="none">No Risk</option>
+                    <option value="">All alert levels</option>
+                    <option value="critical">Critical</option>
+                    <option value="high">High</option>
+                    <option value="medium">Medium</option>
+                    <option value="low">Low</option>
+                    <option value="none">None</option>
                   </select>
                 </div>
 
@@ -387,10 +371,10 @@ export function Dashboard() {
                   Today
                 </button>
                 <button
-                  onClick={() => applyQuickFilter({ riskLevel: 'high' })}
+                  onClick={() => applyQuickFilter({ alertLevel: 'high' })}
                   className="px-3 py-1 bg-red-100 text-red-700 rounded-full text-sm hover:bg-red-200 transition-colors"
                 >
-                  High Risk Only
+                  High Alert Only
                 </button>
                 <button
                   onClick={() => applyQuickFilter({ telegramSent: true })}
@@ -399,10 +383,10 @@ export function Dashboard() {
                   Telegram Delivered
                 </button>
                 <button
-                  onClick={() => applyQuickFilter({ sortBy: 'risk', sortOrder: 'desc' })}
+                  onClick={() => applyQuickFilter({ sortBy: 'alert', sortOrder: 'desc' })}
                   className="px-3 py-1 bg-orange-100 text-orange-700 rounded-full text-sm hover:bg-orange-200 transition-colors"
                 >
-                  Sort by Risk (High first)
+                  Sort by Alert (Critical first)
                 </button>
               </div>
             </div>

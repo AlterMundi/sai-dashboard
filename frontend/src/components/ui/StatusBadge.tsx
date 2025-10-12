@@ -25,7 +25,7 @@ export function StatusBadge({ status, size = 'md' }: StatusBadgeProps) {
           'mr-1.5 h-1.5 w-1.5 rounded-full',
           status === 'success' && 'bg-success-600',
           status === 'error' && 'bg-danger-600',
-          (status === 'waiting' || status === 'running') && 'bg-warning-600 animate-pulse',
+          status === 'running' && 'bg-warning-600 animate-pulse',
           status === 'canceled' && 'bg-gray-600'
         )}
       />
