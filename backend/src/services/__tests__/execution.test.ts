@@ -1,8 +1,8 @@
 import { ExecutionService } from '../execution';
-import { db } from '../../database/pool';
+import { db } from '../../database/dual-pool';
 import { mockExecutionData, mockDailySummary } from '../../__tests__/setup';
 
-jest.mock('../../database/pool');
+jest.mock('../../database/dual-pool');
 
 describe('ExecutionService', () => {
   let service: ExecutionService;

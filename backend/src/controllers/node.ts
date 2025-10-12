@@ -5,7 +5,7 @@
  */
 
 import { Request, Response } from 'express';
-import { db as pool } from '@/database/pool';
+import { db as pool } from '@/database/dual-pool';
 import { logger } from '@/utils/logger';
 import { DatabaseConfig } from '@/types';
 

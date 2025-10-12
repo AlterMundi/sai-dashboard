@@ -2,7 +2,7 @@ import { promises as fs } from 'fs';
 import { createReadStream, existsSync } from 'fs';
 import { join, dirname } from 'path';
 import sharp from 'sharp';
-import { db } from '@/database/pool';
+import { db } from '@/database/dual-pool';
 import { cacheConfig } from '@/config';
 import { logger } from '@/utils/logger';
 import { validateImageFormat, sanitizeFilename, formatBytes } from '@/utils';
