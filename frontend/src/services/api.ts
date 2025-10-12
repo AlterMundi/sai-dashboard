@@ -1,8 +1,8 @@
 import axios, { AxiosResponse, AxiosError } from 'axios';
-import { 
-  ApiResponse, 
-  ExecutionWithImage, 
-  ExecutionFilters, 
+import {
+  ApiResponse,
+  Execution,
+  ExecutionFilters,
   DailySummary,
   ExecutionStats,
   AuthResponse,
@@ -140,12 +140,12 @@ export const authApi = {
 // Executions API
 export const executionsApi = {
   async getExecutions(filters: ExecutionFilters = {}): Promise<{
-    executions: ExecutionWithImage[];
+    executions: Execution[];
     meta: any;
     alerts?: any[];
   }> {
     try {
-      const response: AxiosResponse<ApiResponse<ExecutionWithImage[]>> = await api.get('/executions', {
+      const response: AxiosResponse<ApiResponse<Execution[]>> = await api.get('/executions', {
         params: filters
       });
       return {
@@ -158,18 +158,18 @@ export const executionsApi = {
     }
   },
 
-  async getExecutionById(id: string): Promise<ExecutionWithImage> {
+  async getExecutionById(id: number): Promise<Execution> {
     try {
-      const response: AxiosResponse<ApiResponse<ExecutionWithImage>> = await api.get(`/executions/${id}`);
+      const response: AxiosResponse<ApiResponse<Execution>> = await api.get(`/executions/${id}`);
       return response.data.data;
     } catch (error) {
       throw handleApiError(error);
     }
   },
 
-  async searchExecutions(query: string, limit?: number): Promise<ExecutionWithImage[]> {
+  async searchExecutions(query: string, limit?: number): Promise<Execution[]> {
     try {
-      const response: AxiosResponse<ApiResponse<ExecutionWithImage[]>> = await api.get('/executions/search', {
+      const response: AxiosResponse<ApiResponse<Execution[]>> = await api.get('/executions/search', {
         params: { q: query, limit }
       });
       return response.data.data;
@@ -198,15 +198,15 @@ export const executionsApi = {
     }
   },
 
-  getImageUrl(executionId: string, thumbnail = false): string {
+  getImageUrl(executionId: number, thumbnail = false): string {
     const baseUrl = import.meta.env.VITE_API_URL || '/api';
     const token = tokenManager.get();
-    
+
     if (!token) {
       console.warn('No authentication token available for image request');
       return '';
     }
-    
+
     // Use proper endpoint based on image type
     let endpoint = '';
     if (thumbnail) {
@@ -214,7 +214,7 @@ export const executionsApi = {
     } else {
       endpoint = `/executions/${executionId}/image/webp`; // Prefer WebP for better performance
     }
-    
+
     return `${baseUrl}${endpoint}?token=${encodeURIComponent(token)}`;
   },
 

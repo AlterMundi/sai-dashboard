@@ -5,7 +5,7 @@ import { ImageModal } from './ImageModal';
 import { FilterBar } from './FilterBar';
 import { LoadingSpinner, LoadingState } from './ui/LoadingSpinner';
 import { useExecutions } from '@/hooks/useExecutions';
-import { ExecutionWithImage, ExecutionFilters } from '@/types';
+import { ExecutionWithImageUrls, ExecutionFilters } from '@/types';
 import { cn } from '@/utils';
 import { Grid, List, RefreshCw, ArrowUp, Filter } from 'lucide-react';
 
@@ -13,11 +13,11 @@ interface ImageGalleryProps {
   initialFilters?: ExecutionFilters;
   className?: string;
   refreshTrigger?: number;
-  onPrependRegister?: (prependFn: (executions: ExecutionWithImage[]) => void) => void;
+  onPrependRegister?: (prependFn: (executions: ExecutionWithImageUrls[]) => void) => void;
 }
 
 export function ImageGallery({ initialFilters = {}, className, refreshTrigger, onPrependRegister }: ImageGalleryProps) {
-  const [selectedExecution, setSelectedExecution] = useState<ExecutionWithImage | null>(null);
+  const [selectedExecution, setSelectedExecution] = useState<ExecutionWithImageUrls | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [showScrollTop, setShowScrollTop] = useState(false);
