@@ -3,11 +3,11 @@ import { createPortal } from 'react-dom';
 import { StatusBadge } from './ui/StatusBadge';
 import { LoadingSpinner } from './ui/LoadingSpinner';
 import { executionsApi } from '@/services/api';
-import { 
-  formatDate, 
-  formatDuration, 
-  copyToClipboard, 
-  cn 
+import {
+  formatDate,
+  formatDuration,
+  copyToClipboard,
+  cn
 } from '@/utils';
 import { DynamicTimeAgo } from './ui/DynamicTimeAgo';
 import { ImageModalProps } from '@/types';
@@ -20,17 +20,12 @@ import {
   MessageCircle,
   AlertTriangle,
   CheckCircle,
-  Zap,
-  Eye,
-  Share2,
   Flame,
   Wind,
-  Thermometer,
   MapPin,
   Camera,
-  Sun,
-  Moon,
-  Droplets,
+  Zap,
+  Box,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -69,11 +64,11 @@ export function ImageModal({ execution, isOpen, onClose }: ImageModalProps) {
 
   if (!isOpen || !execution) return null;
 
-  const imageUrl = execution.imageUrl 
+  const imageUrl = execution.hasImage
     ? executionsApi.getImageUrl(execution.id, false)
     : undefined;
 
-  const duration = execution.durationMs 
+  const duration = execution.durationMs
     ? Math.round(execution.durationMs / 1000)
     : null;
 
@@ -88,7 +83,7 @@ export function ImageModal({ execution, isOpen, onClose }: ImageModalProps) {
   };
 
   const handleCopyId = async () => {
-    const success = await copyToClipboard(execution.id);
+    const success = await copyToClipboard(String(execution.id));
     if (success) {
       toast.success('Execution ID copied to clipboard');
     } else {
@@ -98,7 +93,7 @@ export function ImageModal({ execution, isOpen, onClose }: ImageModalProps) {
 
   const handleDownload = () => {
     if (!imageUrl) return;
-    
+
     const link = document.createElement('a');
     link.href = imageUrl;
     link.download = `sai-execution-${execution.id}.jpg`;
@@ -112,7 +107,7 @@ export function ImageModal({ execution, isOpen, onClose }: ImageModalProps) {
       try {
         await navigator.share({
           title: `SAI Execution ${execution.id}`,
-          text: execution.overallAssessment || 'SAI image analysis result',
+          text: `YOLO Detection - Alert Level: ${execution.alertLevel || 'none'}`,
           url: window.location.href,
         });
       } catch (error) {
@@ -148,136 +143,110 @@ export function ImageModal({ execution, isOpen, onClose }: ImageModalProps) {
               </p>
             </div>
           </div>
-          
+
           <div className="flex items-center space-x-2">
-            {/* Action buttons */}
             <button
               onClick={handleCopyId}
-              className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-200 rounded-lg transition-colors"
-              title="Copy execution ID"
+              className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+              title="Copy ID"
             >
-              <Copy className="h-4 w-4" />
+              <Copy className="h-5 w-5" />
             </button>
-            
-            <button
-              onClick={handleShare}
-              className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-200 rounded-lg transition-colors"
-              title="Share"
-            >
-              <Share2 className="h-4 w-4" />
-            </button>
-            
             {imageUrl && (
               <button
                 onClick={handleDownload}
-                className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-200 rounded-lg transition-colors"
-                title="Download image"
+                className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                title="Download Image"
               >
-                <Download className="h-4 w-4" />
+                <Download className="h-5 w-5" />
               </button>
             )}
-            
+            <button
+              onClick={handleShare}
+              className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+              title="Share"
+            >
+              <MessageCircle className="h-5 w-5" />
+            </button>
             <button
               onClick={onClose}
-              className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-200 rounded-lg transition-colors"
-              title="Close"
+              className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+              title="Close (Esc)"
             >
-              <X className="h-4 w-4" />
+              <X className="h-5 w-5" />
             </button>
           </div>
         </div>
 
         {/* Content */}
-        <div className="flex flex-col lg:flex-row max-h-[80vh]">
+        <div className="flex flex-col lg:flex-row max-h-[calc(100vh-8rem)] overflow-hidden">
           {/* Image Section */}
-          <div className="flex-1 relative bg-gray-100 min-h-[300px] lg:min-h-[500px]">
+          <div className="flex-1 bg-gray-900 flex items-center justify-center p-4 relative">
             {imageUrl ? (
               <>
                 {imageLoading && (
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <LoadingSpinner size="xl" color="gray" />
+                    <LoadingSpinner size="lg" color="white" />
                   </div>
                 )}
                 {imageError ? (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-400">
+                  <div className="flex flex-col items-center text-gray-400">
                     <AlertTriangle className="h-16 w-16 mb-4" />
                     <p className="text-lg">Failed to load image</p>
-                    <p className="text-sm mt-2">The image may be corrupted or unavailable</p>
                   </div>
                 ) : (
                   <img
                     src={imageUrl}
                     alt={`Execution ${execution.id}`}
                     className={cn(
-                      'w-full h-full object-contain cursor-zoom-in transition-opacity duration-200',
+                      'max-w-full max-h-full object-contain transition-opacity duration-200 cursor-zoom-in',
                       imageLoading ? 'opacity-0' : 'opacity-100',
-                      fullSize && 'cursor-zoom-out object-cover'
+                      fullSize && 'cursor-zoom-out'
                     )}
                     onLoad={handleImageLoad}
                     onError={handleImageError}
                     onClick={() => setFullSize(!fullSize)}
                   />
                 )}
-                
-                {/* Full size toggle button */}
-                {!imageLoading && !imageError && (
-                  <button
-                    onClick={() => setFullSize(!fullSize)}
-                    className="absolute top-4 right-4 p-2 bg-black bg-opacity-50 text-white rounded-lg hover:bg-opacity-70 transition-all"
-                    title={fullSize ? 'Fit to container' : 'View full size'}
-                  >
-                    <Eye className="h-4 w-4" />
-                  </button>
-                )}
               </>
             ) : (
-              <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-400">
+              <div className="flex flex-col items-center text-gray-400">
                 <AlertTriangle className="h-16 w-16 mb-4" />
                 <p className="text-lg">No image available</p>
-                <p className="text-sm mt-2">This execution does not have an associated image</p>
               </div>
             )}
           </div>
 
-          {/* Details Panel */}
-          <div className="w-full lg:w-96 border-t lg:border-t-0 lg:border-l border-gray-200 bg-white overflow-y-auto">
+          {/* Details Sidebar */}
+          <div className="w-full lg:w-96 bg-white overflow-y-auto">
             <div className="p-6 space-y-6">
-              {/* Basic Info */}
+              {/* Execution Metadata */}
               <div className="space-y-3">
                 <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
                   Execution Info
                 </h3>
-                
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div className="flex items-center">
-                    <Calendar className="h-4 w-4 text-gray-400 mr-2" />
-                    <div>
-                      <p className="text-gray-500">Started</p>
-                      <p className="font-medium">{formatDate(execution.executionTimestamp, 'MMM d, HH:mm')}</p>
-                      <p className="text-xs text-gray-400"><DynamicTimeAgo date={execution.executionTimestamp} /></p>
-                    </div>
+
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <p className="text-gray-500">Started</p>
+                    <p className="font-medium mt-1">
+                      <DynamicTimeAgo date={execution.executionTimestamp} />
+                    </p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {formatDate(execution.executionTimestamp)}
+                    </p>
                   </div>
-                  
+
                   {duration && (
-                    <div className="flex items-center">
-                      <Clock className="h-4 w-4 text-gray-400 mr-2" />
-                      <div>
-                        <p className="text-gray-500">Duration</p>
-                        <p className="font-medium">{formatDuration(duration)}</p>
+                    <div>
+                      <p className="text-gray-500">Duration</p>
+                      <div className="flex items-center mt-1">
+                        <Clock className="h-4 w-4 text-gray-400 mr-1" />
+                        <span className="font-medium">{formatDuration(duration)}</span>
                       </div>
                     </div>
                   )}
-                </div>
 
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <p className="text-gray-500">Mode</p>
-                    <p className="font-medium capitalize flex items-center">
-                      <Zap className="h-3 w-3 mr-1" />
-                      {execution.mode}
-                    </p>
-                  </div>
-                  
                   <div>
                     <p className="text-gray-500">Status</p>
                     <div className="flex items-center mt-1">
@@ -286,387 +255,211 @@ export function ImageModal({ execution, isOpen, onClose }: ImageModalProps) {
                       <span className="font-medium capitalize">{execution.status}</span>
                     </div>
                   </div>
+
+                  <div>
+                    <p className="text-gray-500">Mode</p>
+                    <p className="font-medium mt-1 capitalize">{execution.mode}</p>
+                  </div>
                 </div>
               </div>
 
-              {/* Risk Assessment */}
+              {/* YOLO Analysis Results */}
               <div className="space-y-3">
                 <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
-                  Risk Assessment
+                  YOLO Analysis
                 </h3>
-                
-                <div className="grid grid-cols-2 gap-3">
+
+                {/* Alert Level */}
+                {execution.alertLevel && (
                   <div className="p-3 bg-gray-50 rounded-lg">
-                    <p className="text-xs text-gray-500 mb-1">Risk Level</p>
-                    <div className={cn(
-                      "px-2 py-1 rounded text-sm font-medium text-center",
-                      execution.riskLevel === 'high' && 'bg-red-100 text-red-700',
-                      execution.riskLevel === 'medium' && 'bg-orange-100 text-orange-700', 
-                      execution.riskLevel === 'low' && 'bg-yellow-100 text-yellow-700',
-                      execution.riskLevel === 'none' && 'bg-gray-100 text-gray-700'
-                    )}>
-                      {execution.riskLevel?.toUpperCase() || 'UNKNOWN'}
+                    <p className="text-xs text-gray-500 mb-2">Alert Level</p>
+                    <div
+                      className={cn(
+                        "px-3 py-2 rounded text-sm font-bold text-center uppercase",
+                        execution.alertLevel === 'critical' && 'bg-red-600 text-white animate-pulse',
+                        execution.alertLevel === 'high' && 'bg-orange-600 text-white',
+                        execution.alertLevel === 'medium' && 'bg-yellow-500 text-white',
+                        execution.alertLevel === 'low' && 'bg-blue-500 text-white',
+                        execution.alertLevel === 'none' && 'bg-gray-200 text-gray-700'
+                      )}
+                    >
+                      {execution.alertLevel}
                     </div>
                   </div>
-                  
-                  <div className="p-3 bg-gray-50 rounded-lg">
-                    <p className="text-xs text-gray-500 mb-1">Alert Priority</p>
-                    <div className={cn(
-                      "px-2 py-1 rounded text-sm font-medium text-center",
-                      execution.alertPriority === 'critical' && 'bg-red-100 text-red-700',
-                      execution.alertPriority === 'high' && 'bg-orange-100 text-orange-700',
-                      execution.alertPriority === 'normal' && 'bg-blue-100 text-blue-700',
-                      execution.alertPriority === 'low' && 'bg-gray-100 text-gray-700'
-                    )}>
-                      {execution.alertPriority?.toUpperCase() || 'NORMAL'}
+                )}
+
+                {/* Detection Summary */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div
+                    className={cn(
+                      "p-3 rounded-lg border",
+                      execution.hasFire ? 'bg-red-50 border-red-300' : 'bg-gray-50 border-gray-200'
+                    )}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <Flame className={cn("h-4 w-4", execution.hasFire ? 'text-red-600' : 'text-gray-400')} />
+                      <span className={cn(
+                        "text-xs font-bold uppercase",
+                        execution.hasFire ? 'text-red-700' : 'text-gray-500'
+                      )}>
+                        {execution.hasFire ? 'Detected' : 'Clear'}
+                      </span>
                     </div>
+                    <p className="text-sm font-medium text-gray-700">Fire</p>
+                    {execution.confidenceFire !== null && execution.confidenceFire > 0 && (
+                      <p className="text-xs text-gray-600 mt-1">
+                        {Math.round(execution.confidenceFire * 100)}% confidence
+                      </p>
+                    )}
+                  </div>
+
+                  <div
+                    className={cn(
+                      "p-3 rounded-lg border",
+                      execution.hasSmoke ? 'bg-gray-100 border-gray-400' : 'bg-gray-50 border-gray-200'
+                    )}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <Wind className={cn("h-4 w-4", execution.hasSmoke ? 'text-gray-700' : 'text-gray-400')} />
+                      <span className={cn(
+                        "text-xs font-bold uppercase",
+                        execution.hasSmoke ? 'text-gray-800' : 'text-gray-500'
+                      )}>
+                        {execution.hasSmoke ? 'Detected' : 'Clear'}
+                      </span>
+                    </div>
+                    <p className="text-sm font-medium text-gray-700">Smoke</p>
+                    {execution.confidenceSmoke !== null && execution.confidenceSmoke > 0 && (
+                      <p className="text-xs text-gray-600 mt-1">
+                        {Math.round(execution.confidenceSmoke * 100)}% confidence
+                      </p>
+                    )}
                   </div>
                 </div>
 
-                {execution.responseRequired && (
-                  <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                {/* Detection Count */}
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="flex items-center justify-between">
                     <div className="flex items-center">
-                      <AlertTriangle className="h-5 w-5 text-red-600 mr-2" />
-                      <span className="text-sm font-medium text-red-800">Immediate Response Required</span>
+                      <Box className="h-4 w-4 text-blue-600 mr-2" />
+                      <span className="text-sm font-medium text-blue-900">
+                        Total Detections
+                      </span>
                     </div>
+                    <span className="text-lg font-bold text-blue-700">
+                      {execution.detectionCount}
+                    </span>
+                  </div>
+                </div>
+
+                {/* YOLO Model Info */}
+                {(execution.yoloModelVersion || execution.yoloProcessingTimeMs) && (
+                  <div className="space-y-1.5 text-xs text-gray-600">
+                    {execution.yoloModelVersion && (
+                      <div className="flex items-center justify-between">
+                        <span>Model:</span>
+                        <span className="font-mono">{execution.yoloModelVersion}</span>
+                      </div>
+                    )}
+                    {execution.yoloProcessingTimeMs && (
+                      <div className="flex items-center justify-between">
+                        <span>Processing:</span>
+                        <span className="font-mono">{execution.yoloProcessingTimeMs}ms</span>
+                      </div>
+                    )}
+                    {execution.requestId && (
+                      <div className="flex items-center justify-between">
+                        <span>Request ID:</span>
+                        <span className="font-mono text-xs">{execution.requestId.slice(0, 8)}...</span>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
 
-              {/* Detection Results */}
-              <div className="space-y-3">
-                <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
-                  Detection Results
-                </h3>
-                
-                <div className="space-y-2">
-                  <div className={cn(
-                    "flex items-center justify-between p-3 rounded-lg border",
-                    execution.smokeDetected ? 'bg-gray-50 border-gray-300' : 'bg-gray-25 border-gray-200'
-                  )}>
-                    <div className="flex items-center">
-                      <Wind className={cn("h-4 w-4 mr-2", execution.smokeDetected ? 'text-gray-600' : 'text-gray-400')} />
-                      <span className="text-sm">Smoke Detection</span>
-                    </div>
-                    <span className={cn(
-                      "text-sm font-medium",
-                      execution.smokeDetected ? 'text-gray-700' : 'text-gray-500'
-                    )}>
-                      {execution.smokeDetected ? 'DETECTED' : 'Clear'}
-                    </span>
-                  </div>
-                  
-                  <div className={cn(
-                    "flex items-center justify-between p-3 rounded-lg border",
-                    execution.flameDetected ? 'bg-red-50 border-red-300' : 'bg-gray-25 border-gray-200'
-                  )}>
-                    <div className="flex items-center">
-                      <Flame className={cn("h-4 w-4 mr-2", execution.flameDetected ? 'text-red-600' : 'text-gray-400')} />
-                      <span className="text-sm">Flame Detection</span>
-                    </div>
-                    <span className={cn(
-                      "text-sm font-medium",
-                      execution.flameDetected ? 'text-red-700' : 'text-gray-500'
-                    )}>
-                      {execution.flameDetected ? 'DETECTED' : 'Clear'}
-                    </span>
-                  </div>
-                  
-                  <div className={cn(
-                    "flex items-center justify-between p-3 rounded-lg border",
-                    execution.heatSignatureDetected ? 'bg-orange-50 border-orange-300' : 'bg-gray-25 border-gray-200'
-                  )}>
-                    <div className="flex items-center">
-                      <Thermometer className={cn("h-4 w-4 mr-2", execution.heatSignatureDetected ? 'text-orange-600' : 'text-gray-400')} />
-                      <span className="text-sm">Heat Signature</span>
-                    </div>
-                    <span className={cn(
-                      "text-sm font-medium",
-                      execution.heatSignatureDetected ? 'text-orange-700' : 'text-gray-500'
-                    )}>
-                      {execution.heatSignatureDetected ? 'DETECTED' : 'Clear'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* AI Analysis Results */}
-              {execution.overallAssessment && (
+              {/* Device & Camera Info */}
+              {(execution.cameraId || execution.deviceId || execution.location) && (
                 <div className="space-y-3">
                   <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
-                    AI Analysis
+                    Device Info
                   </h3>
-                  
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <div className="space-y-3">
-                      <div>
-                        <p className="text-sm font-medium text-gray-700 mb-2">Assessment</p>
-                        <p className="text-gray-900 leading-relaxed">
-                          {execution.overallAssessment}
-                        </p>
-                      </div>
-                      
-                      {execution.confidenceScore && (
-                        <div>
-                          <div className="flex justify-between text-sm mb-1">
-                            <span className="text-gray-600">Confidence</span>
-                            <span className="font-medium">
-                              {Math.round(execution.confidenceScore * 100)}%
-                            </span>
-                          </div>
-                          <div className="w-full bg-gray-200 rounded-full h-2">
-                            <div
-                              className={cn(
-                                'h-2 rounded-full transition-all duration-500',
-                                execution.confidenceScore > 0.8 ? 'bg-success-500' :
-                                execution.confidenceScore > 0.6 ? 'bg-warning-500' : 'bg-danger-500'
-                              )}
-                              style={{ width: `${execution.confidenceScore * 100}%` }}
-                            />
-                          </div>
-                        </div>
-                      )}
 
-                      {(execution as any).modelVersion && (
-                        <div>
-                          <p className="text-xs text-gray-500">Model Version: {(execution as any).modelVersion}</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Telegram Status */}
-              {execution.telegramSent && (
-                <div className="space-y-3">
-                  <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
-                    Notifications
-                  </h3>
-                  
-                  <div className="flex items-center p-3 bg-success-50 border border-success-200 rounded-lg">
-                    <MessageCircle className="h-5 w-5 text-success-600 mr-3" />
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-success-800">
-                        Telegram notification sent
-                      </p>
-                      {execution.telegramMessageId && (
-                        <p className="text-xs text-success-600 font-mono mt-1">
-                          Message ID: {execution.telegramMessageId}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Environmental Conditions */}
-              {((execution as any).temperatureCelsius !== undefined || (execution as any).humidityPercent !== undefined || (execution as any).windSpeedKmh !== undefined || (execution as any).isDaylight !== undefined || (execution as any).weatherConditions) && (
-                <div className="space-y-3">
-                  <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
-                    Environmental Conditions
-                  </h3>
-                  
-                  <div className="grid grid-cols-2 gap-3">
-                    {(execution as any).temperatureCelsius !== undefined && (
-                      <div className="p-3 bg-blue-50 rounded-lg">
-                        <div className="flex items-center">
-                          <Thermometer className="h-4 w-4 text-blue-600 mr-2" />
-                          <div>
-                            <p className="text-xs text-gray-500">Temperature</p>
-                            <p className="text-sm font-medium text-gray-900">{(execution as any).temperatureCelsius}°C</p>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                    
-                    {(execution as any).humidityPercent !== undefined && (
-                      <div className="p-3 bg-teal-50 rounded-lg">
-                        <div className="flex items-center">
-                          <Droplets className="h-4 w-4 text-teal-600 mr-2" />
-                          <div>
-                            <p className="text-xs text-gray-500">Humidity</p>
-                            <p className="text-sm font-medium text-gray-900">{(execution as any).humidityPercent}%</p>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                    
-                    {(execution as any).windSpeedKmh !== undefined && (
-                      <div className="p-3 bg-green-50 rounded-lg">
-                        <div className="flex items-center">
-                          <Wind className="h-4 w-4 text-green-600 mr-2" />
-                          <div>
-                            <p className="text-xs text-gray-500">Wind Speed</p>
-                            <p className="text-sm font-medium text-gray-900">{(execution as any).windSpeedKmh} km/h</p>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                    
-                    {(execution as any).isDaylight !== undefined && (
-                      <div className="p-3 bg-yellow-50 rounded-lg">
-                        <div className="flex items-center">
-                          {(execution as any).isDaylight ? (
-                            <Sun className="h-4 w-4 text-yellow-600 mr-2" />
-                          ) : (
-                            <Moon className="h-4 w-4 text-indigo-600 mr-2" />
-                          )}
-                          <div>
-                            <p className="text-xs text-gray-500">Time of Day</p>
-                            <p className="text-sm font-medium text-gray-900">
-                              {(execution as any).isDaylight ? 'Daylight' : 'Nighttime'}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {(execution as any).weatherConditions && (
-                    <div className="p-3 bg-gray-50 rounded-lg">
-                      <p className="text-xs text-gray-500 mb-1">Weather Conditions</p>
-                      <p className="text-sm text-gray-900">{(execution as any).weatherConditions}</p>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Location Information */}
-              {(execution.cameraId || execution.nodeId || (execution as any).latitude !== undefined || (execution as any).fireZoneRisk) && (
-                <div className="space-y-3">
-                  <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
-                    Location Information
-                  </h3>
-                  
-                  <div className="space-y-2">
+                  <div className="space-y-2 text-sm">
                     {execution.cameraId && (
-                      <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
-                        <div className="flex items-center">
-                          <Camera className="h-4 w-4 text-blue-600 mr-2" />
-                          <span className="text-sm text-gray-700">Camera ID</span>
-                        </div>
-                        <code className="font-mono text-sm bg-white px-2 py-1 rounded border">
-                          {execution.cameraId}
-                        </code>
+                      <div className="flex items-center">
+                        <Camera className="h-4 w-4 text-gray-400 mr-2" />
+                        <span className="text-gray-500 mr-2">Camera:</span>
+                        <span className="font-mono font-medium">{execution.cameraId}</span>
                       </div>
                     )}
-                    
-                    {execution.nodeId && (
-                      <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
-                        <div className="flex items-center">
-                          <MapPin className="h-4 w-4 text-green-600 mr-2" />
-                          <span className="text-sm text-gray-700">Node ID</span>
-                        </div>
-                        <code className="font-mono text-sm bg-white px-2 py-1 rounded border">
-                          {execution.nodeId}
-                        </code>
+                    {execution.location && (
+                      <div className="flex items-center">
+                        <MapPin className="h-4 w-4 text-gray-400 mr-2" />
+                        <span className="text-gray-500 mr-2">Location:</span>
+                        <span className="font-medium">{execution.location}</span>
                       </div>
                     )}
-                    
-                    {((execution as any).latitude !== undefined && (execution as any).longitude !== undefined) && (
-                      <div className="p-3 bg-gray-50 rounded-lg">
-                        <p className="text-xs text-gray-500 mb-1">GPS Coordinates</p>
-                        <p className="text-sm font-mono text-gray-900">
-                          {(execution as any).latitude.toFixed(6)}, {(execution as any).longitude.toFixed(6)}
-                        </p>
-                      </div>
-                    )}
-                    
-                    {(execution as any).fireZoneRisk && (
-                      <div className="p-3 bg-orange-50 rounded-lg">
-                        <p className="text-xs text-gray-500 mb-1">Fire Zone Risk</p>
-                        <p className="text-sm text-gray-900">{(execution as any).fireZoneRisk}</p>
+                    {execution.deviceId && (
+                      <div className="flex items-center">
+                        <Zap className="h-4 w-4 text-gray-400 mr-2" />
+                        <span className="text-gray-500 mr-2">Device:</span>
+                        <span className="font-mono font-medium text-xs">{execution.deviceId}</span>
                       </div>
                     )}
                   </div>
                 </div>
               )}
 
-              {/* Image Information */}
-              {(execution.imageSizeBytes || execution.imageFormat || (execution as any).imageWidth) && (
+              {/* Image Metadata */}
+              {execution.hasImage && (
                 <div className="space-y-3">
                   <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
-                    Image Details
+                    Image Info
                   </h3>
-                  
-                  <div className="grid grid-cols-2 gap-3 text-sm">
-                    {execution.imageFormat && (
+
+                  <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
+                    {execution.imageWidth && execution.imageHeight && (
                       <div>
-                        <p className="text-gray-500">Format</p>
-                        <p className="font-medium uppercase">{execution.imageFormat}</p>
+                        <span className="text-gray-500">Dimensions:</span>
+                        <p className="font-medium mt-0.5">
+                          {execution.imageWidth} × {execution.imageHeight}
+                        </p>
                       </div>
                     )}
-                    
                     {execution.imageSizeBytes && (
                       <div>
-                        <p className="text-gray-500">File Size</p>
-                        <p className="font-medium">{(execution.imageSizeBytes / 1024).toFixed(1)} KB</p>
+                        <span className="text-gray-500">Size:</span>
+                        <p className="font-medium mt-0.5">
+                          {(execution.imageSizeBytes / 1024).toFixed(1)} KB
+                        </p>
                       </div>
                     )}
-                    
-                    {((execution as any).imageWidth && (execution as any).imageHeight) && (
+                    {execution.imageFormat && (
                       <div>
-                        <p className="text-gray-500">Dimensions</p>
-                        <p className="font-medium">{(execution as any).imageWidth} × {(execution as any).imageHeight}</p>
-                      </div>
-                    )}
-                    
-                    {(execution as any).imageQualityScore && (
-                      <div>
-                        <p className="text-gray-500">Quality Score</p>
-                        <p className="font-medium">{Math.round((execution as any).imageQualityScore * 100)}%</p>
+                        <span className="text-gray-500">Format:</span>
+                        <p className="font-medium mt-0.5 uppercase">{execution.imageFormat}</p>
                       </div>
                     )}
                   </div>
                 </div>
               )}
 
-              {/* Technical Details */}
-              <div className="space-y-3">
-                <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
-                  Technical Details
-                </h3>
-                
-                <div className="text-sm space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Execution ID</span>
-                    <code className="font-mono text-xs bg-gray-100 px-2 py-1 rounded">
-                      {execution.id}
-                    </code>
+              {/* Notifications */}
+              {execution.telegramSent && (
+                <div className="p-3 bg-success-50 border border-success-200 rounded-lg">
+                  <div className="flex items-center">
+                    <MessageCircle className="h-5 w-5 text-success-600 mr-2" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-success-900">Telegram Notification Sent</p>
+                      {execution.telegramSentAt && (
+                        <p className="text-xs text-success-700 mt-0.5">
+                          {formatDate(execution.telegramSentAt)}
+                        </p>
+                      )}
+                    </div>
                   </div>
-                  
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Workflow ID</span>
-                    <code className="font-mono text-xs bg-gray-100 px-2 py-1 rounded">
-                      {execution.workflowId}
-                    </code>
-                  </div>
-
-                  {(execution as any).processingTimeMs && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Processing Time</span>
-                      <span className="font-medium">{(execution as any).processingTimeMs}ms</span>
-                    </div>
-                  )}
-
-                  {(execution as any).extractedAt && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Data Extracted</span>
-                      <span className="font-medium">{formatDate((execution as any).extractedAt, 'MMM d, HH:mm')}</span>
-                    </div>
-                  )}
-
-                  {(execution as any).incidentId && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Incident ID</span>
-                      <code className="font-mono text-xs bg-gray-100 px-2 py-1 rounded">
-                        {(execution as any).incidentId}
-                      </code>
-                    </div>
-                  )}
                 </div>
-              </div>
+              )}
             </div>
           </div>
         </div>
