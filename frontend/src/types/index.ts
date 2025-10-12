@@ -122,6 +122,9 @@ export interface ThemeStore {
 // Store Types (Zustand)
 // ============================================================================
 
+import type { ExecutionWithImageUrls } from './execution';
+import type { ExecutionFilters } from './api';
+
 export interface AuthStore {
   isAuthenticated: boolean;
   token: string | null;

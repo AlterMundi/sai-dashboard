@@ -44,4 +44,17 @@ export interface UseSSEReturn {
   clientCount: number;
   connect: () => void;
   disconnect: () => void;
+  liveStats: {
+    totalExecutions: number;
+    successRate: number;
+    avgProcessingTime: number;
+    activeAlerts: number;
+  } | null;
+  systemHealth: {
+    status: 'healthy' | 'degraded' | 'down' | 'warning' | 'critical';
+    etlQueueSize: number;
+    lastUpdate: string;
+    cpu?: number;
+    memory?: number;
+  } | null;
 }

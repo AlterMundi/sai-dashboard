@@ -369,6 +369,7 @@ export function SSEProvider({ children }: SSEProviderProps) {
     liveStats,
     systemHealth,
     connect,
+    disconnect: cleanup,
   };
 
   return (
