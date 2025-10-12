@@ -1,392 +1,127 @@
-// API Response Types
-export interface ApiResponse<T> {
-  data: T;
-  meta?: {
-    total?: number;
-    page?: number;
-    limit?: number;
-    hasNext?: boolean;
-    filters?: Record<string, any>;
-  };
-  error?: {
-    message: string;
-    code: string;
-    details?: Record<string, any>;
-  };
-}
+/**
+ * SAI Dashboard Types - Main Export File
+ *
+ * This file re-exports all type definitions used throughout the application.
+ * Types are organized into logical modules for better maintainability.
+ *
+ * IMPORTANT: These types match the backend YOLO schema exactly.
+ * Schema Version: 2.1 (Optimized YOLO)
+ * Last Updated: October 12, 2025
+ */
 
-// Execution Types
-export interface SaiExecution {
-  id: string;
-  workflowId: string;
-  status: 'success' | 'error' | 'waiting' | 'running' | 'canceled';
-  executionTimestamp: string;
-  completionTimestamp: string | null;
-  durationMs: number | null;
-  mode: 'webhook' | 'manual' | 'retry';
-  nodeId?: string;
-  cameraId?: string;
-  
-  // Analysis fields from new ETL structure
-  riskLevel?: 'high' | 'medium' | 'low' | 'none';
-  confidenceScore?: number | null;
-  overallAssessment?: string | null;
-  smokeDetected?: boolean;
-  flameDetected?: boolean;
-  heatSignatureDetected?: boolean;
-  alertPriority?: 'critical' | 'high' | 'normal' | 'low';
-  responseRequired?: boolean;
-  
-  // Image fields
-  hasImage?: boolean;
-  imagePath?: string | null;
-  imageSizeBytes?: number | null;
-  imageFormat?: string | null;
-  
-  // Notification fields
-  telegramSent?: boolean;
-  telegramMessageId?: string | null;
-  telegramSentAt?: string | null;
-  
-  // Metadata
-  modelVersion?: string | null;
-  processingTimeMs?: number | null;
-  extractedAt?: string | null;
-}
+// ============================================================================
+// Execution Types (Core)
+// ============================================================================
+export type {
+  Execution,
+  ExecutionWithImageUrls,
+  ExecutionStatus,
+  AlertLevel,
+  DetectionMode,
+  YoloDetection,
+} from './execution';
 
-export interface ImageAnalysis {
-  riskAssessment: string;
-  confidence: number;
-  description: string;
-  recommendations?: string[];
-}
+// ============================================================================
+// API Types
+// ============================================================================
+export type {
+  ApiResponse,
+  PaginatedResponse,
+  ExecutionFilters,
+  DailySummary,
+  ExecutionStats,
+  AuthResponse,
+  LoginRequest,
+  TokenValidation,
+  HealthStatus,
+  SSEStatus,
+  SSEExecutionEvent,
+  SSEHeartbeatEvent,
+  SSEConnectionEvent,
+} from './api';
 
-export interface SaiEnhancedAnalysis {
-  executionId: string;
-  cameraId?: string;
-  cameraLocation?: string;
-  nodeId?: string;
-  nodeType?: string;
-  riskLevel: 'high' | 'medium' | 'low' | 'none';
-  confidenceScore?: number;
-  hasImage: boolean;
-  smokeDetected?: boolean;
-  flameDetected?: boolean;
-  heatSignatureDetected?: boolean;
-  motionDetected?: boolean;
-  imageWidth?: number;
-  imageHeight?: number;
-  imageSizeBytes?: number;
-  imageFormat?: string;
-  imageQualityScore?: number;
-  alertPriority: 'critical' | 'high' | 'normal' | 'low';
-  responseRequired: boolean;
-  telegramSent: boolean;
-  telegramMessageId?: string;
-  telegramChatId?: string;
-  latitude?: number;
-  longitude?: number;
-  fireZoneRisk?: string;
-  detectionTimestamp?: string;
-  isDaylight?: boolean;
-  weatherConditions?: string;
-  temperatureCelsius?: number;
-  humidityPercent?: number;
-  windSpeedKmh?: number;
-  incidentId?: string;
-  ollamaAnalysisText?: string;
-  processedAt: string;
-  processingVersion: string;
-  extractionMethod: string;
-}
+// ============================================================================
+// Component Prop Types
+// ============================================================================
+export type {
+  ImageCardProps,
+  ImageModalProps,
+  ImageGalleryProps,
+  FilterBarProps,
+  StatusBadgeProps,
+  AlertLevelBadgeProps,
+  DetectionBadgeProps,
+  LiveStatsCardProps,
+  StatsDashboardProps,
+  PaginationProps,
+  LayoutProps,
+  LoginFormProps,
+} from './components';
 
-export interface ExpertReview {
-  expertReviewStatus: 'pending' | 'in_review' | 'completed' | 'disputed';
-  expertReviewPriority?: number;
-  assignedExpertId?: string;
-  expertReviewDeadline?: string;
-  expertRiskAssessment?: 'high' | 'medium' | 'low' | 'none';
-  expertConfidence?: number;
-  expertAgreesWithAi?: boolean;
-  expertNotes?: string;
-  expertReasoning?: string;
-  expertTags?: string[];
-  fireType?: string;
-  fireStage?: string;
-  fireCause?: string;
-  reviewedAt?: string;
-  reviewDurationMinutes?: number;
-  expertName?: string;
-  needsSecondOpinion?: boolean;
-  consensusReached?: boolean;
-  useForTraining: boolean;
-}
-
-export interface ExecutionWithImage extends SaiExecution {
-  imageUrl?: string;
-  thumbnailUrl?: string;
-  expertReview?: ExpertReview;
-  
-  // Enhanced analysis properties from SaiEnhancedAnalysis
-  cameraLocation?: string;
-  nodeType?: string;
-  motionDetected?: boolean;
-  imageWidth?: number;
-  imageHeight?: number;
-  imageQualityScore?: number;
-  telegramChatId?: string;
-  latitude?: number;
-  longitude?: number;
-  fireZoneRisk?: string;
-  detectionTimestamp?: string;
-  isDaylight?: boolean;
-  weatherConditions?: string;
-  temperatureCelsius?: number;
-  humidityPercent?: number;
-  windSpeedKmh?: number;
-  incidentId?: string;
-  ollamaAnalysisText?: string;
-}
-
-// Filter and Pagination Types
-export interface ExecutionFilters {
-  // Pagination
-  page?: number;
-  limit?: number;
-  
-  // Basic execution filters
-  status?: 'success' | 'error' | 'waiting' | 'running' | 'canceled';
-  startDate?: string;
-  endDate?: string;
-  search?: string;
-  hasImage?: boolean;
-  telegramSent?: boolean;
-  
-  // Enhanced analysis filters
-  riskLevel?: 'high' | 'medium' | 'low' | 'none';
-  cameraId?: string;
-  cameraLocation?: string;
-  nodeId?: string;
-  alertPriority?: 'critical' | 'high' | 'normal' | 'low';
-  responseRequired?: boolean;
-  smokeDetected?: boolean;
-  flameDetected?: boolean;
-  heatSignatureDetected?: boolean;
-  motionDetected?: boolean;
-  confidenceMin?: number;
-  confidenceMax?: number;
-  imageQualityMin?: number;
-  
-  // Geographic filters
-  latitude?: number;
-  longitude?: number;
-  fireZoneRisk?: string;
-  withinRadius?: number; // km
-  
-  // Environmental filters
-  isDaylight?: boolean;
-  weatherConditions?: string;
-  temperatureMin?: number;
-  temperatureMax?: number;
-  
-  // Expert review filters
-  expertReviewStatus?: 'pending' | 'in_review' | 'completed' | 'disputed';
-  assignedExpertId?: string;
-  expertRiskAssessment?: 'high' | 'medium' | 'low' | 'none';
-  needsSecondOpinion?: boolean;
-  useForTraining?: boolean;
-  reviewOverdue?: boolean;
-  
-  // Incident correlation
-  incidentId?: string;
-  hasIncident?: boolean;
-  multiCamera?: boolean;
-  
-  // Date presets and sorting
-  datePreset?: 'today' | 'yesterday' | 'last7days' | 'last30days' | 'thisMonth' | 'lastMonth';
-  sortBy?: 'date' | 'risk' | 'status' | 'confidence' | 'priority' | 'camera' | 'expert';
-  sortOrder?: 'asc' | 'desc';
-  
-  // Advanced filters
-  analysisTextSearch?: string;
-  expertNotesSearch?: string;
-  tagFilter?: string[];
-  processingVersion?: string;
-}
-
-export interface PaginatedResponse<T> {
-  data: T[];
-  meta: {
-    total: number;
-    page: number;
-    limit: number;
-    hasNext: boolean;
-    analysisStatus?: AnalysisStatus;
-  };
-  alerts?: AnalysisAlert[];
-}
-
-// Daily Summary Type
-export interface DailySummary {
-  date: string;
-  totalExecutions: number;
-  successfulExecutions: number;
-  failedExecutions: number;
-  successRate: number;
-  avgExecutionTime: number | null;
-}
-
-// Statistics Types
-export interface ExecutionStats {
-  totalExecutions: number;
-  successRate: number;
-  avgDailyExecutions: number;
-  lastExecution: string | null;
-}
-
-// Analysis Status Types
-export interface AnalysisStatus {
-  totalInRange: number;
-  analyzed: number | 'unknown';
-  pending: number | 'unknown';
-  coverage: number | 'unknown';
-}
-
-export interface AnalysisAlert {
-  type: 'warning' | 'info' | 'success';
-  level: 'high' | 'medium' | 'low';
-  message: string;
-  details: string;
-  action?: string;
-  actionLabel?: string;
-}
-
-// Authentication Types
-export interface AuthResponse {
-  token: string;
-  expiresIn: number;
-}
-
-export interface LoginRequest {
-  password: string;
-}
-
-export interface TokenValidation {
-  valid: boolean;
-  userId: string;
-  expiresAt: string;
-  remainingTime: number;
-}
-
-// Health Check Types
-export interface HealthStatus {
-  status: 'healthy' | 'degraded' | 'unhealthy';
-  timestamp: string;
-  version: string;
-  uptime: number;
-  services: {
-    database: 'connected' | 'disconnected' | 'error';
-    cache: 'available' | 'unavailable';
-    filesystem: 'writable' | 'readonly' | 'error';
-  };
-}
-
-// SSE Types
-export interface SSEStatus {
-  enabled: boolean;
-  clients: number;
-  maxClients: number;
-  heartbeatInterval: number;
-  timeout: number;
-  oldestConnection: string | null;
-  newestConnection: string | null;
-}
-
-export interface SSEExecutionEvent {
-  execution: ExecutionWithImage; // Now uses the complete ExecutionWithImage interface
-  timestamp: string;
-}
-
-export interface SSEHeartbeatEvent {
-  timestamp: string;
-  clients: number;
-}
-
-export interface SSEConnectionEvent {
-  clientId?: string;
-  timestamp: string;
-  message: string;
-}
-
-// Component Props Types
-export interface ImageCardProps {
-  execution: ExecutionWithImage;
-  onClick: (execution: ExecutionWithImage) => void;
-  loading?: boolean;
-}
-
-export interface ImageModalProps {
-  execution: ExecutionWithImage | null;
-  isOpen: boolean;
-  onClose: () => void;
-}
-
-export interface FilterBarProps {
-  filters: ExecutionFilters;
-  onFiltersChange: (filters: ExecutionFilters) => void;
-  isLoading?: boolean;
-}
-
-export interface StatusBadgeProps {
-  status: SaiExecution['status'];
-  size?: 'sm' | 'md' | 'lg';
-}
-
-export interface PaginationProps {
-  currentPage: number;
-  totalPages: number;
-  onPageChange: (page: number) => void;
-  hasNext: boolean;
-  hasPrev: boolean;
-  isLoading?: boolean;
-}
-
+// ============================================================================
 // Hook Types
-export interface UseAuthReturn {
-  isAuthenticated: boolean;
-  isLoading: boolean;
-  login: (password: string) => Promise<void>;
-  logout: () => void;
-  token: string | null;
-  error: string | null;
+// ============================================================================
+export type {
+  UseAuthReturn,
+  UseExecutionsReturn,
+  UseSSEReturn,
+} from './hooks';
+
+// ============================================================================
+// Utility Types
+// ============================================================================
+
+/**
+ * Make all properties of T optional recursively
+ */
+export type DeepPartial<T> = T extends object
+  ? { [P in keyof T]?: DeepPartial<T[P]> }
+  : T;
+
+/**
+ * Extract keys from T where value type is V
+ */
+export type KeysOfType<T, V> = {
+  [K in keyof T]-?: T[K] extends V ? K : never;
+}[keyof T];
+
+/**
+ * Nullable version of T
+ */
+export type Nullable<T> = T | null;
+
+/**
+ * Optional version of T
+ */
+export type Optional<T> = T | undefined;
+
+// ============================================================================
+// Error Types
+// ============================================================================
+
+export interface AppError {
+  message: string;
+  code: string;
+  status?: number;
+  details?: Record<string, any>;
 }
 
-export interface UseExecutionsReturn {
-  executions: ExecutionWithImage[];
-  isLoading: boolean;
-  error: string | null;
-  hasNext: boolean;
-  loadMore: () => void;
-  refresh: () => void;
-  updateFilters: (filters: ExecutionFilters) => void;
-  filters: ExecutionFilters;
-  analysisStatus: AnalysisStatus | null;
-  alerts: AnalysisAlert[];
-  triggerAnalysis: () => Promise<void>;
-  prependExecutions: (executions: ExecutionWithImage[]) => void;
+// ============================================================================
+// Theme Types
+// ============================================================================
+
+export type ThemeMode = 'light' | 'dark' | 'system';
+
+export interface ThemeStore {
+  mode: ThemeMode;
+  setMode: (mode: ThemeMode) => void;
+  isDark: boolean;
 }
 
-export interface UseSSEReturn {
-  isConnected: boolean;
-  lastEvent: any;
-  connectionStatus: 'connecting' | 'connected' | 'disconnected' | 'error';
-  clientCount: number;
-  liveStats: any;
-  systemHealth: any;
-  connect: () => void;
-}
-
+// ============================================================================
 // Store Types (Zustand)
+// ============================================================================
+
 export interface AuthStore {
   isAuthenticated: boolean;
   token: string | null;
@@ -397,140 +132,11 @@ export interface AuthStore {
 }
 
 export interface UIStore {
-  selectedExecution: ExecutionWithImage | null;
+  selectedExecution: ExecutionWithImageUrls | null;
   isModalOpen: boolean;
   filters: ExecutionFilters;
-  setSelectedExecution: (execution: ExecutionWithImage | null) => void;
+  setSelectedExecution: (execution: ExecutionWithImageUrls | null) => void;
   setModalOpen: (open: boolean) => void;
   setFilters: (filters: ExecutionFilters) => void;
   resetFilters: () => void;
-}
-
-// Error Types
-export interface AppError {
-  message: string;
-  code: string;
-  status?: number;
-  details?: Record<string, any>;
-}
-
-// Route Types
-export interface RouteParams {
-  executionId?: string;
-}
-
-// Expert Review Types
-export interface ExpertUser {
-  id: string;
-  name: string;
-  email: string;
-  certification?: string;
-  specialization: 'general' | 'wildfire' | 'industrial' | 'residential' | 'urban';
-  experienceYears: number;
-  isActive: boolean;
-  maxCaseload: number;
-  accuracyScore: number;
-  currentCaseload?: number;
-}
-
-export interface ExpertAssignment {
-  executionId: string;
-  expertReviewPriority: number;
-  expertReviewDeadline?: string;
-  cameraId?: string;
-  cameraLocation?: string;
-  aiAssessment: 'high' | 'medium' | 'low' | 'none';
-  aiConfidence?: number;
-  detectionTimestamp?: string;
-  ollamaAnalysisText?: string;
-  assignedExpertId?: string;
-  expertReviewStatus: 'pending' | 'in_review' | 'completed' | 'disputed';
-  deadlineStatus: 'OVERDUE' | 'URGENT' | 'ON_TIME';
-  executionStatus: string;
-  executionStartedAt: string;
-}
-
-export interface ExpertTags {
-  fire_indicators: string[];
-  environmental: string[];
-  false_positives: string[];
-  image_quality: string[];
-  urgency: string[];
-  complexity: string[];
-  fire_behavior: string[];
-  weather_impact: string[];
-}
-
-export interface ExpertSystemStats {
-  totalPendingReviews: number;
-  averageReviewTime: number;
-  expertAgreementRate: number;
-  qualityScores: {
-    aiAccuracy: number;
-    expertConsistency: number;
-    trainingDataQuality: number;
-  };
-}
-
-export interface IncidentAnalysis {
-  incidentId: string;
-  totalDetections: number;
-  camerasInvolved: number;
-  maxRiskLevel: 'high' | 'medium' | 'low' | 'none';
-  incidentStart: string;
-  incidentEnd: string;
-  responseRequired: boolean;
-  expertReviewed: number;
-  cameraList: string[];
-}
-
-// Enhanced Statistics Types
-export interface EnhancedExecutionStats extends ExecutionStats {
-  overview: {
-    totalExecutions: number;
-    successRate: number;
-    errorRate: number;
-    averageExecutionTime: number;
-    activeToday: number;
-  };
-  statusBreakdown: {
-    success: number;
-    error: number;
-    running: number;
-    waiting: number;
-    canceled: number;
-  };
-  recentActivity: {
-    lastHour: number;
-    last24Hours: number;
-    last7Days: number;
-    last30Days: number;
-  };
-  performanceMetrics: {
-    avgResponseTime: number;
-    minResponseTime: number;
-    maxResponseTime: number;
-    medianResponseTime: number;
-    p95ResponseTime: number;
-    p99ResponseTime: number;
-  };
-  hourlyDistribution: Array<{
-    hour: number;
-    count: number;
-  }>;
-  errorTrend: Array<{
-    date: string;
-    errors: number;
-    total: number;
-    errorRate: number;
-  }>;
-}
-
-// Theme Types
-export type ThemeMode = 'light' | 'dark' | 'system';
-
-export interface ThemeStore {
-  mode: ThemeMode;
-  setMode: (mode: ThemeMode) => void;
-  isDark: boolean;
 }
