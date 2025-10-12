@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { promises as fs } from 'fs';
-import { db } from '@/database/pool';
+import { db } from '@/database/dual-pool';
 import { cacheConfig, appConfig } from '@/config';
 import { HealthStatus } from '@/types';
 import { logger } from '@/utils/logger';

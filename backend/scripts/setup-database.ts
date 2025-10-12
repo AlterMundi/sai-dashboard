@@ -3,20 +3,20 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { Pool } from 'pg';
-import { databaseConfig } from '../src/config';
+import { n8nDatabaseConfig } from '../src/config';
 import { logger } from '../src/utils/logger';
 
 const setupDatabase = async (): Promise<void> => {
   let pool: Pool | null = null;
   
   try {
-    // Create superuser connection for setup
+    // Create superuser connection for setup (n8n database)
     const setupConfig = {
-      host: databaseConfig.host,
-      port: databaseConfig.port,
-      database: databaseConfig.database,
+      host: n8nDatabaseConfig.host,
+      port: n8nDatabaseConfig.port,
+      database: n8nDatabaseConfig.database,
       user: process.env.DB_SETUP_USER || 'postgres',
-      password: process.env.DB_SETUP_PASSWORD || process.env.DB_PASSWORD,
+      password: process.env.DB_SETUP_PASSWORD || n8nDatabaseConfig.password,
       ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
     };
 
@@ -77,7 +77,7 @@ const setupDatabase = async (): Promise<void> => {
     // Replace placeholder password if provided
     const processedSQL = sqlContent.replace(
       'CHANGE_THIS_PASSWORD',
-      databaseConfig.password
+      n8nDatabaseConfig.password
     );
 
     await pool.query(processedSQL);
@@ -108,8 +108,8 @@ const setupDatabase = async (): Promise<void> => {
     
     const readonlyPool = new Pool({
       ...setupConfig,
-      user: databaseConfig.username,
-      password: databaseConfig.password
+      user: n8nDatabaseConfig.username,
+      password: n8nDatabaseConfig.password
     });
 
     try {

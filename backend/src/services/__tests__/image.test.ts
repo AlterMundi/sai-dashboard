@@ -1,11 +1,11 @@
 import { ImageService } from '../image';
-import { db } from '../../database/pool';
+import { db } from '../../database/dual-pool';
 import { promises as fs } from 'fs';
 import { createReadStream, existsSync } from 'fs';
 import sharp from 'sharp';
 import { mockExecutionDataPayload } from '../../__tests__/setup';
 
-jest.mock('../../database/pool');
+jest.mock('../../database/dual-pool');
 jest.mock('fs');
 jest.mock('sharp');
 
