@@ -4,16 +4,18 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Badge } from './ui/badge';
-import { 
-  Filter, 
-  X, 
-  Search, 
-  MapPin, 
+import {
+  Filter,
+  X,
+  Search,
   Flame,
+  Wind,
   AlertTriangle,
-  Users,
+  RotateCcw,
   ChevronDown,
-  RotateCcw
+  Calendar,
+  Camera,
+  MessageCircle
 } from 'lucide-react';
 import { cn } from '@/utils';
 
@@ -25,21 +27,14 @@ interface FilterBarProps {
   className?: string;
 }
 
-interface FilterSection {
-  id: string;
-  label: string;
-  icon: React.ReactNode;
-  expanded: boolean;
-}
-
-export function FilterBar({ 
-  filters, 
-  onFiltersChange, 
-  onReset, 
+export function FilterBar({
+  filters,
+  onFiltersChange,
+  onReset,
   isLoading = false,
-  className 
+  className
 }: FilterBarProps) {
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['basic']));
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [searchTerm, setSearchTerm] = useState(filters.search || '');
 
   const handleFilterChange = useCallback((key: keyof ExecutionFilters, value: any) => {
@@ -55,442 +50,379 @@ export function FilterBar({
     const newFilters = { ...filters };
     delete newFilters[key];
     onFiltersChange({ ...newFilters, page: 0 });
-  }, [filters, onFiltersChange]);
 
-  const toggleSection = useCallback((sectionId: string) => {
-    setExpandedSections(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(sectionId)) {
-        newSet.delete(sectionId);
-      } else {
-        newSet.add(sectionId);
-      }
-      return newSet;
-    });
-  }, []);
+    if (key === 'search') {
+      setSearchTerm('');
+    }
+  }, [filters, onFiltersChange]);
 
   const getActiveFilterCount = useCallback(() => {
     const excludeKeys = ['page', 'limit', 'sortBy', 'sortOrder'];
-    return Object.entries(filters).filter(([key, value]) => 
-      !excludeKeys.includes(key) && 
-      value !== undefined && 
+    return Object.entries(filters).filter(([key, value]) =>
+      !excludeKeys.includes(key) &&
+      value !== undefined &&
       value !== '' &&
       value !== null
     ).length;
   }, [filters]);
 
-  const renderFilterSection = (section: FilterSection, content: React.ReactNode) => (
-    <div key={section.id} className="border border-gray-200 rounded-lg">
-      <button
-        onClick={() => toggleSection(section.id)}
-        className="w-full flex items-center justify-between p-3 text-left hover:bg-gray-50 transition-colors"
-      >
-        <div className="flex items-center gap-2">
-          {section.icon}
-          <span className="font-medium">{section.label}</span>
-        </div>
-        <ChevronDown 
-          className={cn(
-            "h-4 w-4 transition-transform",
-            expandedSections.has(section.id) ? "rotate-180" : ""
-          )} 
-        />
-      </button>
-      {expandedSections.has(section.id) && (
-        <div className="p-3 border-t border-gray-200 bg-gray-50">
-          {content}
-        </div>
-      )}
-    </div>
-  );
-
-  const activeFilterCount = getActiveFilterCount();
+  const activeCount = getActiveFilterCount();
 
   return (
-    <div className={cn("bg-white border border-gray-200 rounded-lg shadow-sm", className)}>
+    <div className={cn("bg-white border border-gray-200 rounded-lg p-4 space-y-4", className)}>
       {/* Header */}
-      <div className="p-4 border-b border-gray-200">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Filter className="h-5 w-5 text-gray-500" />
-            <h3 className="font-semibold text-gray-900">Filters</h3>
-            {activeFilterCount > 0 && (
-              <Badge variant="secondary">{activeFilterCount}</Badge>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            <Button 
-              variant="ghost" 
-              size="sm" 
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-2">
+          <Filter className="h-5 w-5 text-gray-600" />
+          <h3 className="font-semibold text-gray-900">Filters</h3>
+          {activeCount > 0 && (
+            <Badge variant="secondary" className="ml-2">
+              {activeCount} active
+            </Badge>
+          )}
+        </div>
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={() => setShowAdvanced(!showAdvanced)}
+            className="text-sm text-gray-600 hover:text-gray-900 flex items-center"
+          >
+            {showAdvanced ? 'Simple' : 'Advanced'}
+            <ChevronDown className={cn(
+              "h-4 w-4 ml-1 transition-transform",
+              showAdvanced && "rotate-180"
+            )} />
+          </button>
+          {activeCount > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
               onClick={onReset}
-              className="text-gray-600"
-              disabled={activeFilterCount === 0}
+              disabled={isLoading}
             >
               <RotateCcw className="h-4 w-4 mr-1" />
               Reset
             </Button>
-          </div>
+          )}
         </div>
       </div>
 
-      {/* Search Bar */}
-      <div className="p-4 border-b border-gray-200">
-        <form onSubmit={handleSearchSubmit} className="flex gap-2">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <Input
-              type="text"
-              placeholder="Search executions, analysis text, or expert notes..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-              disabled={isLoading}
-            />
-          </div>
-          <Button type="submit" size="sm" disabled={isLoading}>
-            Search
-          </Button>
-        </form>
-        {filters.search && (
-          <div className="mt-2">
-            <Badge variant="outline" className="gap-1">
-              Search: "{filters.search}"
-              <button onClick={() => clearFilter('search')}>
-                <X className="h-3 w-3" />
-              </button>
-            </Badge>
-          </div>
-        )}
+      {/* Search */}
+      <form onSubmit={handleSearchSubmit} className="flex gap-2">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Input
+            type="text"
+            placeholder="Search executions..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+        <Button type="submit" disabled={isLoading}>
+          Search
+        </Button>
+      </form>
+
+      {/* Basic Filters */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        {/* Status Filter */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Status
+          </label>
+          <Select
+            value={filters.status || ''}
+            onValueChange={(value) => handleFilterChange('status', value || undefined)}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="All statuses" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">All statuses</SelectItem>
+              <SelectItem value="success">Success</SelectItem>
+              <SelectItem value="error">Error</SelectItem>
+              <SelectItem value="running">Running</SelectItem>
+              <SelectItem value="canceled">Canceled</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Alert Level Filter */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
+            <AlertTriangle className="h-3.5 w-3.5 mr-1" />
+            Alert Level
+          </label>
+          <Select
+            value={filters.alertLevel || ''}
+            onValueChange={(value) => handleFilterChange('alertLevel', value || undefined)}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="All levels" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">All levels</SelectItem>
+              <SelectItem value="critical">Critical</SelectItem>
+              <SelectItem value="high">High</SelectItem>
+              <SelectItem value="medium">Medium</SelectItem>
+              <SelectItem value="low">Low</SelectItem>
+              <SelectItem value="none">None</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Date Preset Filter */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
+            <Calendar className="h-3.5 w-3.5 mr-1" />
+            Date Range
+          </label>
+          <Select
+            value={filters.datePreset || ''}
+            onValueChange={(value) => handleFilterChange('datePreset', value || undefined)}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="All time" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">All time</SelectItem>
+              <SelectItem value="today">Today</SelectItem>
+              <SelectItem value="yesterday">Yesterday</SelectItem>
+              <SelectItem value="last7days">Last 7 days</SelectItem>
+              <SelectItem value="last30days">Last 30 days</SelectItem>
+              <SelectItem value="thisMonth">This month</SelectItem>
+              <SelectItem value="lastMonth">Last month</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Has Image Filter */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Image
+          </label>
+          <Select
+            value={filters.hasImage !== undefined ? String(filters.hasImage) : ''}
+            onValueChange={(value) => handleFilterChange('hasImage', value === '' ? undefined : value === 'true')}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="All" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">All</SelectItem>
+              <SelectItem value="true">With image</SelectItem>
+              <SelectItem value="false">Without image</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
-      {/* Filter Sections */}
-      <div className="p-4 space-y-4">
-        {/* Basic Filters */}
-        {renderFilterSection(
-          { 
-            id: 'basic', 
-            label: 'Basic Filters', 
-            icon: <Filter className="h-4 w-4" />,
-            expanded: expandedSections.has('basic')
-          },
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-              <Select value={filters.status || ''} onValueChange={(value) => handleFilterChange('status', value || undefined)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Any status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">All statuses</SelectItem>
-                  <SelectItem value="success">Success</SelectItem>
-                  <SelectItem value="error">Error</SelectItem>
-                  <SelectItem value="running">Running</SelectItem>
-                  <SelectItem value="waiting">Waiting</SelectItem>
-                  <SelectItem value="canceled">Canceled</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+      {/* Advanced Filters */}
+      {showAdvanced && (
+        <div className="pt-4 border-t border-gray-200 space-y-4">
+          <h4 className="text-sm font-semibold text-gray-900">Advanced Filters</h4>
 
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {/* Fire Detection Filter */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Has Image</label>
-              <Select 
-                value={filters.hasImage !== undefined ? filters.hasImage.toString() : ''} 
-                onValueChange={(value) => handleFilterChange('hasImage', value === '' ? undefined : value === 'true')}
+              <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
+                <Flame className="h-3.5 w-3.5 mr-1 text-red-500" />
+                Fire Detection
+              </label>
+              <Select
+                value={filters.hasFire !== undefined ? String(filters.hasFire) : ''}
+                onValueChange={(value) => handleFilterChange('hasFire', value === '' ? undefined : value === 'true')}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Any" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All executions</SelectItem>
-                  <SelectItem value="true">With images</SelectItem>
-                  <SelectItem value="false">Without images</SelectItem>
+                  <SelectItem value="">Any</SelectItem>
+                  <SelectItem value="true">Detected</SelectItem>
+                  <SelectItem value="false">Not detected</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
+            {/* Smoke Detection Filter */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Telegram Delivered</label>
-              <Select 
-                value={filters.telegramSent !== undefined ? filters.telegramSent.toString() : ''} 
+              <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
+                <Wind className="h-3.5 w-3.5 mr-1 text-gray-600" />
+                Smoke Detection
+              </label>
+              <Select
+                value={filters.hasSmoke !== undefined ? String(filters.hasSmoke) : ''}
+                onValueChange={(value) => handleFilterChange('hasSmoke', value === '' ? undefined : value === 'true')}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Any" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Any</SelectItem>
+                  <SelectItem value="true">Detected</SelectItem>
+                  <SelectItem value="false">Not detected</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Camera ID Filter */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
+                <Camera className="h-3.5 w-3.5 mr-1" />
+                Camera ID
+              </label>
+              <Input
+                type="text"
+                placeholder="e.g., cam-01"
+                value={filters.cameraId || ''}
+                onChange={(e) => handleFilterChange('cameraId', e.target.value || undefined)}
+              />
+            </div>
+
+            {/* Telegram Sent Filter */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
+                <MessageCircle className="h-3.5 w-3.5 mr-1" />
+                Telegram Sent
+              </label>
+              <Select
+                value={filters.telegramSent !== undefined ? String(filters.telegramSent) : ''}
                 onValueChange={(value) => handleFilterChange('telegramSent', value === '' ? undefined : value === 'true')}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Any" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All executions</SelectItem>
-                  <SelectItem value="true">Delivered</SelectItem>
-                  <SelectItem value="false">Not delivered</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        )}
-
-        {/* Risk Assessment Filters */}
-        {renderFilterSection(
-          { 
-            id: 'risk', 
-            label: 'Risk Assessment', 
-            icon: <AlertTriangle className="h-4 w-4" />,
-            expanded: expandedSections.has('risk')
-          },
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">AI Risk Level</label>
-              <Select value={filters.riskLevel || ''} onValueChange={(value) => handleFilterChange('riskLevel', value || undefined)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Any risk level" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">All levels</SelectItem>
-                  <SelectItem value="high">High Risk</SelectItem>
-                  <SelectItem value="medium">Medium Risk</SelectItem>
-                  <SelectItem value="low">Low Risk</SelectItem>
-                  <SelectItem value="none">No Risk</SelectItem>
+                  <SelectItem value="">Any</SelectItem>
+                  <SelectItem value="true">Sent</SelectItem>
+                  <SelectItem value="false">Not sent</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
+            {/* Node ID Filter */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Alert Priority</label>
-              <Select value={filters.alertPriority || ''} onValueChange={(value) => handleFilterChange('alertPriority', value || undefined)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Any priority" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">All priorities</SelectItem>
-                  <SelectItem value="critical">Critical</SelectItem>
-                  <SelectItem value="high">High</SelectItem>
-                  <SelectItem value="normal">Normal</SelectItem>
-                  <SelectItem value="low">Low</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Response Required</label>
-              <Select 
-                value={filters.responseRequired !== undefined ? filters.responseRequired.toString() : ''} 
-                onValueChange={(value) => handleFilterChange('responseRequired', value === '' ? undefined : value === 'true')}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Any" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">All executions</SelectItem>
-                  <SelectItem value="true">Response required</SelectItem>
-                  <SelectItem value="false">No response needed</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        )}
-
-        {/* Detection Filters */}
-        {renderFilterSection(
-          { 
-            id: 'detection', 
-            label: 'Fire Detection', 
-            icon: <Flame className="h-4 w-4" />,
-            expanded: expandedSections.has('detection')
-          },
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Smoke Detected</label>
-              <Select 
-                value={filters.smokeDetected !== undefined ? filters.smokeDetected.toString() : ''} 
-                onValueChange={(value) => handleFilterChange('smokeDetected', value === '' ? undefined : value === 'true')}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Any" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">All</SelectItem>
-                  <SelectItem value="true">Detected</SelectItem>
-                  <SelectItem value="false">Not detected</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Flame Detected</label>
-              <Select 
-                value={filters.flameDetected !== undefined ? filters.flameDetected.toString() : ''} 
-                onValueChange={(value) => handleFilterChange('flameDetected', value === '' ? undefined : value === 'true')}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Any" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">All</SelectItem>
-                  <SelectItem value="true">Detected</SelectItem>
-                  <SelectItem value="false">Not detected</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Heat Signature</label>
-              <Select 
-                value={filters.heatSignatureDetected !== undefined ? filters.heatSignatureDetected.toString() : ''} 
-                onValueChange={(value) => handleFilterChange('heatSignatureDetected', value === '' ? undefined : value === 'true')}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Any" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">All</SelectItem>
-                  <SelectItem value="true">Detected</SelectItem>
-                  <SelectItem value="false">Not detected</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Motion Detected</label>
-              <Select 
-                value={filters.motionDetected !== undefined ? filters.motionDetected.toString() : ''} 
-                onValueChange={(value) => handleFilterChange('motionDetected', value === '' ? undefined : value === 'true')}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Any" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">All</SelectItem>
-                  <SelectItem value="true">Detected</SelectItem>
-                  <SelectItem value="false">Not detected</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        )}
-
-        {/* Device & Location Filters */}
-        {renderFilterSection(
-          { 
-            id: 'location', 
-            label: 'Device & Location', 
-            icon: <MapPin className="h-4 w-4" />,
-            expanded: expandedSections.has('location')
-          },
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Camera ID</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Node ID
+              </label>
               <Input
                 type="text"
-                placeholder="Enter camera ID"
-                value={filters.cameraId || ''}
-                onChange={(e) => handleFilterChange('cameraId', e.target.value || undefined)}
-                disabled={isLoading}
+                placeholder="e.g., node-01"
+                value={filters.nodeId || ''}
+                onChange={(e) => handleFilterChange('nodeId', e.target.value || undefined)}
               />
             </div>
 
+            {/* Location Filter */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Camera Location</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Location
+              </label>
               <Input
                 type="text"
-                placeholder="Enter location"
-                value={filters.cameraLocation || ''}
-                onChange={(e) => handleFilterChange('cameraLocation', e.target.value || undefined)}
-                disabled={isLoading}
+                placeholder="e.g., Building A"
+                value={filters.location || ''}
+                onChange={(e) => handleFilterChange('location', e.target.value || undefined)}
               />
             </div>
 
+            {/* Min Confidence Filter */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Fire Zone Risk</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Min Confidence
+              </label>
               <Input
-                type="text"
-                placeholder="Enter fire zone"
-                value={filters.fireZoneRisk || ''}
-                onChange={(e) => handleFilterChange('fireZoneRisk', e.target.value || undefined)}
-                disabled={isLoading}
+                type="number"
+                min="0"
+                max="1"
+                step="0.1"
+                placeholder="0.0 - 1.0"
+                value={filters.minConfidence || ''}
+                onChange={(e) => handleFilterChange('minConfidence', e.target.value ? parseFloat(e.target.value) : undefined)}
+              />
+            </div>
+
+            {/* Max Confidence Filter */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Max Confidence
+              </label>
+              <Input
+                type="number"
+                min="0"
+                max="1"
+                step="0.1"
+                placeholder="0.0 - 1.0"
+                value={filters.maxConfidence || ''}
+                onChange={(e) => handleFilterChange('maxConfidence', e.target.value ? parseFloat(e.target.value) : undefined)}
               />
             </div>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Expert Review Filters */}
-        {renderFilterSection(
-          { 
-            id: 'expert', 
-            label: 'Expert Review', 
-            icon: <Users className="h-4 w-4" />,
-            expanded: expandedSections.has('expert')
-          },
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Review Status</label>
-              <Select value={filters.expertReviewStatus || ''} onValueChange={(value) => handleFilterChange('expertReviewStatus', value || undefined)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Any status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">All statuses</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="in_review">In Review</SelectItem>
-                  <SelectItem value="completed">Completed</SelectItem>
-                  <SelectItem value="disputed">Disputed</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Expert Risk Assessment</label>
-              <Select value={filters.expertRiskAssessment || ''} onValueChange={(value) => handleFilterChange('expertRiskAssessment', value || undefined)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Any assessment" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">All assessments</SelectItem>
-                  <SelectItem value="high">Expert: High Risk</SelectItem>
-                  <SelectItem value="medium">Expert: Medium Risk</SelectItem>
-                  <SelectItem value="low">Expert: Low Risk</SelectItem>
-                  <SelectItem value="none">Expert: No Risk</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Training Data</label>
-              <Select 
-                value={filters.useForTraining !== undefined ? filters.useForTraining.toString() : ''} 
-                onValueChange={(value) => handleFilterChange('useForTraining', value === '' ? undefined : value === 'true')}
+      {/* Active Filters Display */}
+      {activeCount > 0 && (
+        <div className="flex flex-wrap gap-2 pt-3 border-t border-gray-200">
+          {filters.search && (
+            <Badge variant="secondary" className="flex items-center gap-1">
+              Search: {filters.search}
+              <button
+                onClick={() => clearFilter('search')}
+                className="ml-1 hover:text-gray-900"
               >
-                <SelectTrigger>
-                  <SelectValue placeholder="Any" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">All executions</SelectItem>
-                  <SelectItem value="true">Used for training</SelectItem>
-                  <SelectItem value="false">Not for training</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Active Filters Summary */}
-      {activeFilterCount > 0 && (
-        <div className="p-4 border-t border-gray-200 bg-gray-50">
-          <div className="flex flex-wrap gap-2">
-            {Object.entries(filters).map(([key, value]) => {
-              if (key === 'page' || key === 'limit' || value === undefined || value === '' || value === null) {
-                return null;
-              }
-              
-              const filterKey = key as keyof ExecutionFilters;
-              return (
-                <Badge key={key} variant="outline" className="gap-1">
-                  {key}: {String(value)}
-                  <button onClick={() => clearFilter(filterKey)}>
-                    <X className="h-3 w-3" />
-                  </button>
-                </Badge>
-              );
-            })}
-          </div>
+                <X className="h-3 w-3" />
+              </button>
+            </Badge>
+          )}
+          {filters.status && (
+            <Badge variant="secondary" className="flex items-center gap-1">
+              Status: {filters.status}
+              <button onClick={() => clearFilter('status')} className="ml-1">
+                <X className="h-3 w-3" />
+              </button>
+            </Badge>
+          )}
+          {filters.alertLevel && (
+            <Badge variant="secondary" className="flex items-center gap-1">
+              Alert: {filters.alertLevel}
+              <button onClick={() => clearFilter('alertLevel')} className="ml-1">
+                <X className="h-3 w-3" />
+              </button>
+            </Badge>
+          )}
+          {filters.hasFire !== undefined && (
+            <Badge variant="secondary" className="flex items-center gap-1">
+              Fire: {filters.hasFire ? 'detected' : 'not detected'}
+              <button onClick={() => clearFilter('hasFire')} className="ml-1">
+                <X className="h-3 w-3" />
+              </button>
+            </Badge>
+          )}
+          {filters.hasSmoke !== undefined && (
+            <Badge variant="secondary" className="flex items-center gap-1">
+              Smoke: {filters.hasSmoke ? 'detected' : 'not detected'}
+              <button onClick={() => clearFilter('hasSmoke')} className="ml-1">
+                <X className="h-3 w-3" />
+              </button>
+            </Badge>
+          )}
+          {filters.cameraId && (
+            <Badge variant="secondary" className="flex items-center gap-1">
+              Camera: {filters.cameraId}
+              <button onClick={() => clearFilter('cameraId')} className="ml-1">
+                <X className="h-3 w-3" />
+              </button>
+            </Badge>
+          )}
+          {filters.datePreset && (
+            <Badge variant="secondary" className="flex items-center gap-1">
+              Date: {filters.datePreset}
+              <button onClick={() => clearFilter('datePreset')} className="ml-1">
+                <X className="h-3 w-3" />
+              </button>
+            </Badge>
+          )}
         </div>
       )}
     </div>
