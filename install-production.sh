@@ -588,7 +588,6 @@ create_systemd_service() {
     sudo tee /etc/systemd/system/sai-dashboard-api.service > /dev/null << EOF
 [Unit]
 Description=SAI Dashboard API Server
-Documentation=https://github.com/sai-dashboard
 After=network.target postgresql.service
 Wants=postgresql.service
 
