@@ -38,7 +38,7 @@ erDiagram
     }
 
     execution_analysis {
-        bigint execution_id PK_FK "References executions.id"
+        bigint execution_id PK,FK "execution_id"
         uuid request_id "YOLO inference request ID"
         varchar yolo_model_version "YOLO model version (e.g., last.pt)"
         integer detection_count "Number of objects detected"
@@ -69,7 +69,7 @@ erDiagram
     }
 
     execution_images {
-        bigint execution_id PK_FK "References executions.id"
+        bigint execution_id PK,FK "execution_id"
         varchar original_path "Path to original JPEG (500 chars)"
         varchar thumbnail_path "Path to thumbnail WebP"
         varchar cached_path "Path to cached WebP"
@@ -83,7 +83,7 @@ erDiagram
     }
 
     execution_notifications {
-        bigint execution_id PK "References executions.id (implied FK)"
+        bigint execution_id PK,FK "execution_id"
         boolean telegram_sent "Alert sent to Telegram"
         bigint telegram_message_id "Telegram message ID"
         timestamp telegram_sent_at "When alert was sent"
