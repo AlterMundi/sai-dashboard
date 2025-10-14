@@ -99,7 +99,7 @@ export function Dashboard() {
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
             <p className="mt-2 text-gray-600">
-              Visual management for SAI image analysis workflow
+              Real-time fire and smoke detection monitoring
             </p>
           </div>
           
@@ -169,7 +169,7 @@ export function Dashboard() {
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search analysis results..."
+                  placeholder="Search by location, device, camera..."
                   className="block w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                 />
                 {searchQuery && (
@@ -227,28 +227,10 @@ export function Dashboard() {
                     <option value="">All statuses</option>
                     <option value="success">Success</option>
                     <option value="error">Error</option>
-                    <option value="running">Running</option>
-                    <option value="waiting">Waiting</option>
                   </select>
                 </div>
 
-                {/* Has Image Filter */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Images</label>
-                  <select
-                    value={filters.hasImage === undefined ? '' : filters.hasImage.toString()}
-                    onChange={(e) => applyQuickFilter({ 
-                      hasImage: e.target.value === '' ? undefined : e.target.value === 'true' 
-                    })}
-                    className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                  >
-                    <option value="">All executions</option>
-                    <option value="true">With images</option>
-                    <option value="false">Without images</option>
-                  </select>
-                </div>
-
-                {/* Risk Level Filter */}
+                {/* Alert Level Filter */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Alert Level</label>
                   <select
@@ -259,25 +241,86 @@ export function Dashboard() {
                     <option value="">All alert levels</option>
                     <option value="critical">Critical</option>
                     <option value="high">High</option>
-                    <option value="medium">Medium</option>
                     <option value="low">Low</option>
                     <option value="none">None</option>
                   </select>
                 </div>
 
-                {/* Telegram Delivery Filter */}
+                {/* Has Image Filter */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Telegram Delivery</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Has Image</label>
                   <select
-                    value={filters.telegramSent === undefined ? '' : filters.telegramSent.toString()}
-                    onChange={(e) => applyQuickFilter({ 
-                      telegramSent: e.target.value === '' ? undefined : e.target.value === 'true' 
+                    value={filters.hasImage === undefined ? '' : filters.hasImage.toString()}
+                    onChange={(e) => applyQuickFilter({
+                      hasImage: e.target.value === '' ? undefined : e.target.value === 'true'
                     })}
                     className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                   >
                     <option value="">All executions</option>
-                    <option value="true">Delivered to Telegram</option>
-                    <option value="false">Not delivered</option>
+                    <option value="true">With image</option>
+                    <option value="false">Without image</option>
+                  </select>
+                </div>
+
+                {/* Fire Detection Filter (NEW) */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Fire Detection</label>
+                  <select
+                    value={filters.hasFire === undefined ? '' : filters.hasFire.toString()}
+                    onChange={(e) => applyQuickFilter({
+                      hasFire: e.target.value === '' ? undefined : e.target.value === 'true'
+                    })}
+                    className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  >
+                    <option value="">Any</option>
+                    <option value="true">Detected</option>
+                    <option value="false">Not detected</option>
+                  </select>
+                </div>
+
+                {/* Smoke Detection Filter (NEW) */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Smoke Detection</label>
+                  <select
+                    value={filters.hasSmoke === undefined ? '' : filters.hasSmoke.toString()}
+                    onChange={(e) => applyQuickFilter({
+                      hasSmoke: e.target.value === '' ? undefined : e.target.value === 'true'
+                    })}
+                    className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  >
+                    <option value="">Any</option>
+                    <option value="true">Detected</option>
+                    <option value="false">Not detected</option>
+                  </select>
+                </div>
+
+                {/* Camera Type Filter (NEW) */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Camera Type</label>
+                  <select
+                    value={filters.cameraType || ''}
+                    onChange={(e) => applyQuickFilter({ cameraType: (e.target.value as any) || undefined })}
+                    className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  >
+                    <option value="">All types</option>
+                    <option value="onvif">ONVIF</option>
+                    <option value="rtsp">RTSP</option>
+                  </select>
+                </div>
+
+                {/* Telegram Sent Filter */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Telegram Sent</label>
+                  <select
+                    value={filters.telegramSent === undefined ? '' : filters.telegramSent.toString()}
+                    onChange={(e) => applyQuickFilter({
+                      telegramSent: e.target.value === '' ? undefined : e.target.value === 'true'
+                    })}
+                    className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  >
+                    <option value="">Any</option>
+                    <option value="true">Sent</option>
+                    <option value="false">Not sent</option>
                   </select>
                 </div>
 
@@ -353,40 +396,46 @@ export function Dashboard() {
               {/* Quick Filter Buttons */}
               <div className="mt-4 flex flex-wrap gap-2">
                 <button
-                  onClick={() => applyQuickFilter({ status: 'success', hasImage: true })}
-                  className="px-3 py-1 bg-success-100 text-success-700 rounded-full text-sm hover:bg-success-200 transition-colors"
+                  onClick={() => applyQuickFilter({ hasFire: true })}
+                  className="px-3 py-1 bg-red-100 text-red-700 rounded-full text-sm hover:bg-red-200 transition-colors"
                 >
-                  Successful with images
+                  🔥 Fire Detected
                 </button>
                 <button
-                  onClick={() => applyQuickFilter({ status: 'error' })}
-                  className="px-3 py-1 bg-danger-100 text-danger-700 rounded-full text-sm hover:bg-danger-200 transition-colors"
+                  onClick={() => applyQuickFilter({ hasSmoke: true })}
+                  className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm hover:bg-gray-200 transition-colors"
                 >
-                  Failed executions
+                  💨 Smoke Detected
+                </button>
+                <button
+                  onClick={() => applyQuickFilter({ alertLevel: 'critical' })}
+                  className="px-3 py-1 bg-red-200 text-red-900 rounded-full text-sm hover:bg-red-300 transition-colors font-semibold"
+                >
+                  ⚠️ Critical Alerts
                 </button>
                 <button
                   onClick={() => applyQuickFilter({ datePreset: 'today' })}
                   className="px-3 py-1 bg-primary-100 text-primary-700 rounded-full text-sm hover:bg-primary-200 transition-colors"
                 >
-                  Today
+                  📅 Today
                 </button>
                 <button
-                  onClick={() => applyQuickFilter({ alertLevel: 'high' })}
-                  className="px-3 py-1 bg-red-100 text-red-700 rounded-full text-sm hover:bg-red-200 transition-colors"
+                  onClick={() => applyQuickFilter({ cameraType: 'onvif' })}
+                  className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm hover:bg-blue-200 transition-colors"
                 >
-                  High Alert Only
+                  📹 ONVIF Cameras
+                </button>
+                <button
+                  onClick={() => applyQuickFilter({ status: 'success', hasImage: true })}
+                  className="px-3 py-1 bg-success-100 text-success-700 rounded-full text-sm hover:bg-success-200 transition-colors"
+                >
+                  ✓ With Images
                 </button>
                 <button
                   onClick={() => applyQuickFilter({ telegramSent: true })}
                   className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm hover:bg-blue-200 transition-colors"
                 >
-                  Telegram Delivered
-                </button>
-                <button
-                  onClick={() => applyQuickFilter({ sortBy: 'alert', sortOrder: 'desc' })}
-                  className="px-3 py-1 bg-orange-100 text-orange-700 rounded-full text-sm hover:bg-orange-200 transition-colors"
-                >
-                  Sort by Alert (Critical first)
+                  📱 Telegram Sent
                 </button>
               </div>
             </div>
