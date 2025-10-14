@@ -73,7 +73,33 @@ export function Dashboard() {
     onExecutionBatch,
   });
 
-  // Filter Management - ADDITIVE LOGIC
+  // Filter Management - ADDITIVE LOGIC with multi-select support
+  const toggleArrayFilter = useCallback((key: 'alertLevels' | 'cameraTypes', value: string) => {
+    setFilters(prev => {
+      const currentArray = (prev[key] as string[]) || [];
+      const hasValue = currentArray.includes(value);
+
+      let newArray: string[];
+      if (hasValue) {
+        // Remove value from array
+        newArray = currentArray.filter(v => v !== value);
+      } else {
+        // Add value to array
+        newArray = [...currentArray, value];
+      }
+
+      const newFilters = { ...prev, page: 0 };
+      if (newArray.length === 0) {
+        delete newFilters[key];
+      } else {
+        newFilters[key] = newArray as any;
+      }
+
+      console.log(`🔄 Array Toggle ${hasValue ? 'OFF' : 'ON'}:`, key, value, '→', newArray);
+      return newFilters;
+    });
+  }, []);
+
   const toggleFilter = useCallback((key: keyof ExecutionFilters, value: any) => {
     setFilters(prev => {
       const current = prev[key];
@@ -344,10 +370,10 @@ export function Dashboard() {
                   </button>
 
                   <button
-                    onClick={() => toggleFilter('alertLevel', 'critical')}
+                    onClick={() => toggleArrayFilter('alertLevels', 'critical')}
                     className={cn(
                       "inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors",
-                      filters.alertLevel === 'critical'
+                      filters.alertLevels?.includes('critical')
                         ? "bg-red-700 text-white shadow-md"
                         : "bg-red-200 text-red-900 hover:bg-red-300"
                     )}
@@ -357,10 +383,10 @@ export function Dashboard() {
                   </button>
 
                   <button
-                    onClick={() => toggleFilter('alertLevel', 'high')}
+                    onClick={() => toggleArrayFilter('alertLevels', 'high')}
                     className={cn(
                       "inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors",
-                      filters.alertLevel === 'high'
+                      filters.alertLevels?.includes('high')
                         ? "bg-orange-600 text-white shadow-md"
                         : "bg-orange-100 text-orange-700 hover:bg-orange-200"
                     )}
@@ -383,10 +409,10 @@ export function Dashboard() {
                   </button>
 
                   <button
-                    onClick={() => toggleFilter('cameraType', 'onvif')}
+                    onClick={() => toggleArrayFilter('cameraTypes', 'onvif')}
                     className={cn(
                       "inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors",
-                      filters.cameraType === 'onvif'
+                      filters.cameraTypes?.includes('onvif')
                         ? "bg-blue-600 text-white shadow-md"
                         : "bg-blue-100 text-blue-700 hover:bg-blue-200"
                     )}
