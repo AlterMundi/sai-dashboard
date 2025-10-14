@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { useInView } from 'react-intersection-observer';
 import { ImageCard } from './ImageCard';
 import { ImageModal } from './ImageModal';
@@ -63,6 +63,19 @@ export function ImageGallery({ initialFilters = {}, className, refreshTrigger, o
       onPrependRegister(prependExecutions);
     }
   }, [onPrependRegister, prependExecutions]);
+
+  // Memoize serialized filters to avoid unnecessary effect triggers
+  const initialFiltersJson = useMemo(() => JSON.stringify(initialFilters), [initialFilters]);
+  const currentFiltersRef = useRef<string>('');
+
+  // Watch for external filter changes from Dashboard
+  useEffect(() => {
+    // Only update if filters actually changed (deep comparison)
+    if (currentFiltersRef.current !== initialFiltersJson) {
+      currentFiltersRef.current = initialFiltersJson;
+      updateFilters(initialFilters);
+    }
+  }, [initialFiltersJson, initialFilters, updateFilters]);
 
 
   const handleCardClick = useCallback((execution: ExecutionWithImageUrls) => {
