@@ -47,7 +47,7 @@ export interface SaiEnhancedAnalysis {
   detectionCount?: number;
   hasFire?: boolean;
   hasSmoke?: boolean;
-  alertLevel?: 'none' | 'low' | 'medium' | 'high' | 'critical';
+  alertLevel?: 'none' | 'low' | 'high' | 'critical';  // 'medium' removed (doesn't exist in DB)
   detectionMode?: string;
   activeClasses?: string[];
   detections?: YoloDetection[];
@@ -282,31 +282,44 @@ export interface PaginationQuery {
 }
 
 export interface ExecutionFilters extends PaginationQuery {
-  status?: 'success' | 'error' | 'waiting' | 'running' | 'canceled';
+  // Basic filters (executions table)
+  status?: 'success' | 'error';  // Only these 2 exist in DB
   startDate?: string;
   endDate?: string;
   search?: string;
   hasImage?: boolean;
-  alertLevel?: 'none' | 'low' | 'medium' | 'high' | 'critical';
+
+  // YOLO-specific filters (execution_analysis table)
+  alertLevel?: 'none' | 'low' | 'high' | 'critical';  // 'medium' removed (doesn't exist in DB)
+  hasFire?: boolean;
+  hasSmoke?: boolean;
+  detectionCount?: number;  // NEW: Filter by number of detections
+  confidenceFire?: number;  // NEW: Fire-specific confidence (0.0-1.0)
+  confidenceSmoke?: number;  // NEW: Smoke-specific confidence (0.0-1.0)
+  detectionMode?: string;   // NEW: e.g., 'smoke-only'
+  minConfidence?: number;   // DEPRECATED: Use confidenceFire/confidenceSmoke instead
+  maxConfidence?: number;   // DEPRECATED: Use confidenceFire/confidenceSmoke instead
+
+  // Device/Camera filters (executions table)
+  cameraId?: string;
+  cameraType?: 'onvif' | 'rtsp';  // NEW: Camera protocol type
+  nodeId?: string;
+  deviceId?: string;
+  location?: string;
+
+  // Notification filters (execution_notifications table)
   telegramSent?: boolean;
+
+  // Date presets
   datePreset?: 'today' | 'yesterday' | 'last7days' | 'last30days' | 'thisMonth' | 'lastMonth';
+
+  // Sorting
   sortBy?: 'date' | 'status' | 'confidence' | 'camera' | 'alert';
   sortOrder?: 'asc' | 'desc';
 
-  // Enhanced filters for YOLO analysis fields
-  cameraId?: string;
-  nodeId?: string;
-  searchQuery?: string;
-  pageSize?: number;
-  verifiedByHuman?: boolean;
-  incidentId?: string;
-  fireType?: string;
-  minConfidence?: number;
-  maxConfidence?: number;
-  hasFire?: boolean;
-  hasSmoke?: boolean;
-  isDaylight?: boolean;
-  weatherConditions?: string;
+  // Legacy fields for compatibility
+  searchQuery?: string;  // Alias for 'search'
+  pageSize?: number;     // Alias for 'limit'
 }
 
 // Expert-specific filters

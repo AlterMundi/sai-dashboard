@@ -34,12 +34,25 @@ export class NewExecutionService {
       alertLevel,
       nodeId,
       cameraId,
+      cameraType,
+      deviceId,
+      location,
       searchQuery,
+      search,
       startDate,
       endDate,
       hasImage,
-      telegramSent
+      telegramSent,
+      hasFire,
+      hasSmoke,
+      detectionCount,
+      confidenceFire,
+      confidenceSmoke,
+      detectionMode
     } = filters;
+
+    // Handle search/searchQuery alias
+    const searchTerm = search || searchQuery;
 
     let whereConditions = ['1=1'];
     const queryParams: any[] = [];
@@ -73,6 +86,27 @@ export class NewExecutionService {
       queryParams.push(cameraId);
     }
 
+    // Camera type filtering (NEW)
+    if (cameraType) {
+      paramCount++;
+      whereConditions.push(`e.camera_type = $${paramCount}`);
+      queryParams.push(cameraType);
+    }
+
+    // Device ID filtering (NEW - was missing!)
+    if (deviceId) {
+      paramCount++;
+      whereConditions.push(`e.device_id = $${paramCount}`);
+      queryParams.push(deviceId);
+    }
+
+    // Location filtering (NEW - direct match)
+    if (location) {
+      paramCount++;
+      whereConditions.push(`e.location ILIKE $${paramCount}`);
+      queryParams.push(`%${location}%`);
+    }
+
     // Date range filtering
     if (startDate) {
       paramCount++;
@@ -86,15 +120,59 @@ export class NewExecutionService {
       queryParams.push(endDate);
     }
 
-    // Search query (location, device, camera)
-    if (searchQuery) {
+    // Search query (location, device, camera) - only if not already filtered by specific fields
+    if (searchTerm && !location && !deviceId && !cameraId) {
       paramCount++;
       whereConditions.push(`(
         e.location ILIKE $${paramCount} OR
         e.device_id ILIKE $${paramCount} OR
         e.camera_id ILIKE $${paramCount}
       )`);
-      queryParams.push(`%${searchQuery}%`);
+      queryParams.push(`%${searchTerm}%`);
+    }
+
+    // YOLO-specific filters (execution_analysis table)
+
+    // Fire detection filter (NEW - was missing!)
+    if (hasFire !== undefined) {
+      paramCount++;
+      whereConditions.push(`ea.has_fire = $${paramCount}`);
+      queryParams.push(hasFire);
+    }
+
+    // Smoke detection filter (NEW - was missing!)
+    if (hasSmoke !== undefined) {
+      paramCount++;
+      whereConditions.push(`ea.has_smoke = $${paramCount}`);
+      queryParams.push(hasSmoke);
+    }
+
+    // Detection count filter (NEW)
+    if (detectionCount !== undefined) {
+      paramCount++;
+      whereConditions.push(`ea.detection_count >= $${paramCount}`);
+      queryParams.push(detectionCount);
+    }
+
+    // Fire confidence filter (NEW)
+    if (confidenceFire !== undefined) {
+      paramCount++;
+      whereConditions.push(`ea.confidence_fire >= $${paramCount}`);
+      queryParams.push(confidenceFire);
+    }
+
+    // Smoke confidence filter (NEW)
+    if (confidenceSmoke !== undefined) {
+      paramCount++;
+      whereConditions.push(`ea.confidence_smoke >= $${paramCount}`);
+      queryParams.push(confidenceSmoke);
+    }
+
+    // Detection mode filter (NEW)
+    if (detectionMode) {
+      paramCount++;
+      whereConditions.push(`ea.detection_mode = $${paramCount}`);
+      queryParams.push(detectionMode);
     }
 
     // Has image filter
