@@ -365,30 +365,29 @@ clean_build_directories() {
 # Build frontend
 build_frontend() {
     [ "$SKIP_BUILD" = true ] && { info "Skipping frontend build (--skip-build)"; return; }
-    
-    cd "$SCRIPT_DIR/frontend"
 
     # Always clean dist to ensure fresh build with latest source changes
-    if [[ -d "dist" ]]; then
+    if [[ -d "$SCRIPT_DIR/frontend/dist" ]]; then
         info "Cleaning existing frontend build to ensure fresh build..."
-        rm -rf dist
+        rm -rf "$SCRIPT_DIR/frontend/dist"
     fi
 
     log "Building frontend for production..."
     local start_time=$(date +%s)
-    
-    # Install dependencies 
-    info "Installing frontend dependencies (this may take a moment)..."
+
+    # Install dependencies from root (workspace monorepo with dev dependencies)
+    info "Installing dependencies (workspace monorepo)..."
     if [ "$DRY_RUN" = true ]; then
-        info "[DRY RUN] Would install frontend dependencies"
+        info "[DRY RUN] Would install workspace dependencies"
     else
+        cd "$SCRIPT_DIR"
         if [ "$VERBOSE" = true ]; then
-            npm install
+            npm install --workspaces --include=dev
         else
-            npm install --silent >/dev/null 2>&1 || error "Failed to install frontend dependencies"
+            npm install --workspaces --include=dev --silent >/dev/null 2>&1 || error "Failed to install workspace dependencies"
         fi
     fi
-    success "Frontend dependencies installed"
+    success "Workspace dependencies installed"
     
     # Build with production settings
     info "Building React application (this may take 30-60 seconds)..."
@@ -398,37 +397,39 @@ build_frontend() {
         # Export environment variables for the build
         export VITE_BASE_PATH="/dashboard/"
         export VITE_API_URL="/dashboard/api"
-        
+
         # Verify environment variables are set
         info "Environment variables: VITE_BASE_PATH=${VITE_BASE_PATH}, VITE_API_URL=${VITE_API_URL}"
-        
+
+        # Build from root using workspace command
+        cd "$SCRIPT_DIR"
         if [ "$VERBOSE" = true ]; then
-            VITE_BASE_PATH="/dashboard/" VITE_API_URL="/dashboard/api" npm run build -- --mode production || error "Frontend build failed"
+            VITE_BASE_PATH="/dashboard/" VITE_API_URL="/dashboard/api" npm run build:frontend || error "Frontend build failed"
         else
-            VITE_BASE_PATH="/dashboard/" VITE_API_URL="/dashboard/api" npm run build -- --mode production >/dev/null 2>&1 || error "Frontend build failed"
+            VITE_BASE_PATH="/dashboard/" VITE_API_URL="/dashboard/api" npm run build:frontend >/dev/null 2>&1 || error "Frontend build failed"
         fi
     fi
-    
+
     if [ "$DRY_RUN" = false ]; then
-        if [[ ! -d "dist" ]]; then
+        if [[ ! -d "$SCRIPT_DIR/frontend/dist" ]]; then
             error "Frontend build failed - no dist directory created"
         fi
-        
+
         # Validate build output
-        if [[ ! -f "dist/index.html" ]]; then
+        if [[ ! -f "$SCRIPT_DIR/frontend/dist/index.html" ]]; then
             error "Frontend build incomplete - missing index.html"
         fi
         
         # Check for proper base path configuration
-        if ! grep -q "/dashboard/" dist/index.html 2>/dev/null; then
+        if ! grep -q "/dashboard/" "$SCRIPT_DIR/frontend/dist/index.html" 2>/dev/null; then
             warn "Frontend may not have correct base path configured"
         fi
-        
+
         # Validate that environment variables were properly embedded in built JavaScript
         info "Validating environment variable embedding in built assets..."
-        local js_files=$(find dist/assets -name "*.js" -type f 2>/dev/null)
+        local js_files=$(find "$SCRIPT_DIR/frontend/dist/assets" -name "*.js" -type f 2>/dev/null)
         local found_dashboard_api=false
-        
+
         for js_file in $js_files; do
             if grep -q "dashboard/api" "$js_file" 2>/dev/null; then
                 found_dashboard_api=true
@@ -451,64 +452,53 @@ build_frontend() {
 # Build backend
 build_backend() {
     [ "$SKIP_BUILD" = true ] && { info "Skipping backend build (--skip-build)"; return; }
-    
-    cd "$SCRIPT_DIR/backend"
 
     # Always clean dist to ensure fresh build with latest source changes
-    if [[ -d "dist" ]]; then
+    if [[ -d "$SCRIPT_DIR/backend/dist" ]]; then
         info "Cleaning existing backend build to ensure fresh build..."
-        rm -rf dist
+        rm -rf "$SCRIPT_DIR/backend/dist"
     fi
 
     log "Building backend for production..."
     local start_time=$(date +%s)
-    
-    # Install dependencies
-    info "Installing backend dependencies (this may take a moment)..."
-    if [ "$DRY_RUN" = true ]; then
-        info "[DRY RUN] Would install backend dependencies"
-    else
-        if [ "$VERBOSE" = true ]; then
-            npm install
-        else
-            npm install --silent >/dev/null 2>&1 || error "Failed to install backend dependencies"
-        fi
-    fi
-    success "Backend dependencies installed"
-    
-    # Build TypeScript using npm script
+
+    # Dependencies already installed from frontend build (workspace monorepo)
+    info "Using workspace dependencies (already installed)..."
+
+    # Build TypeScript using npm script from root
     info "Compiling TypeScript (this may take 20-40 seconds)..."
     if [ "$DRY_RUN" = true ]; then
         info "[DRY RUN] Would compile backend TypeScript"
     else
+        cd "$SCRIPT_DIR"
         if [ "$VERBOSE" = true ]; then
-            npm run build || error "Backend build failed"
+            npm run build:backend || error "Backend build failed"
         else
-            npm run build >/dev/null 2>&1 || error "Backend build failed"
+            npm run build:backend >/dev/null 2>&1 || error "Backend build failed"
         fi
     fi
-    
+
     if [ "$DRY_RUN" = false ]; then
-        if [[ ! -d "dist" ]]; then
+        if [[ ! -d "$SCRIPT_DIR/backend/dist" ]]; then
             error "Backend build failed - no dist directory created"
         fi
         
         # CRITICAL: Verify that tsc-alias resolved imports properly
         info "Verifying path alias resolution (critical check)..."
-        if grep -r "@/" dist/ >/dev/null 2>&1; then
+        if grep -r "@/" "$SCRIPT_DIR/backend/dist/" >/dev/null 2>&1; then
             error "❌ CRITICAL: Path aliases (@/) not resolved in compiled code. tsc-alias failed!"
             error "This will cause runtime failures. Fix tsconfig paths configuration."
             exit 1
         fi
         success "Path aliases resolved correctly"
-        
+
         # Verify main entry point exists
-        if [[ ! -f "dist/index.js" ]]; then
+        if [[ ! -f "$SCRIPT_DIR/backend/dist/index.js" ]]; then
             error "Backend build incomplete - missing dist/index.js"
         fi
-        
+
         # Check for self-contained routing
-        if ! grep -q "/dashboard/api" dist/index.js 2>/dev/null; then
+        if ! grep -q "/dashboard/api" "$SCRIPT_DIR/backend/dist/index.js" 2>/dev/null; then
             warn "Backend may not have self-contained API routing configured"
         fi
     fi
