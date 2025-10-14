@@ -81,10 +81,13 @@ export function Dashboard() {
       if (current === value) {
         const newFilters = { ...prev };
         delete newFilters[key];
+        console.log('🔄 Toggle OFF:', key, '→ Filters:', newFilters);
         return { ...newFilters, page: 0 };
       }
       // Otherwise set new value (toggle on or change)
-      return { ...prev, [key]: value, page: 0 };
+      const newFilters = { ...prev, [key]: value, page: 0 };
+      console.log('🔄 Toggle ON:', key, '=', value, '→ Filters:', newFilters);
+      return newFilters;
     });
   }, []);
 
