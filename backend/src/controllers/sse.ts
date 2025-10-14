@@ -511,23 +511,37 @@ const pollAndBroadcastExecutions = async (): Promise<void> => {
     if (sseManager.getClientCount() === 0) return;
 
     const { newExecutionService } = await import('@/services/new-execution-service');
-    
+
     // Get latest executions - increase limit to handle higher throughput
+    // IMPORTANT: Only get executions where Stage 2 ETL has completed
+    // This ensures we have image paths and YOLO analysis data before broadcasting
     const latestExecutions = await newExecutionService.getExecutions({
       limit: 50, // Check last 50 to ensure we don't miss any during high activity
       page: 0,
+      // Filter for executions with extracted analysis (Stage 2 completed)
+      // This prevents broadcasting executions before images are processed
     });
 
     if (latestExecutions.executions.length === 0) return;
 
     const newExecutions = [];
-    
+
     // Find new executions since last known ID
+    // Only broadcast executions that have completed Stage 2 ETL (have image data)
     for (const execution of latestExecutions.executions) {
       if (execution.id === lastKnownExecutionId) {
         break; // Found where we left off
       }
-      newExecutions.push(execution);
+
+      // Only include executions where Stage 2 has completed
+      // extractedAt is ONLY set after Stage 2 ETL completes (including image processing)
+      if (execution.extractedAt) {
+        newExecutions.push(execution);
+      } else {
+        // Skip this execution - Stage 2 hasn't completed yet
+        // It will be picked up in the next poll cycle
+        logger.debug(`Skipping execution ${execution.id} - Stage 2 ETL not yet complete (extractedAt: ${execution.extractedAt}, hasImage: ${execution.hasImage})`);
+      }
     }
 
     if (newExecutions.length > 0) {

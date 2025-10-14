@@ -744,13 +744,15 @@ export class Stage2ETLService extends EventEmitter {
         .webp({ quality: 75 })
         .toFile(thumbPath);
 
-      // Insert image metadata
+      // Insert image metadata with all paths
       await this.saiPool.query(`
         INSERT INTO execution_images (
-          execution_id, original_path, size_bytes, format, extracted_at
-        ) VALUES ($1, $2, $3, 'jpeg', NOW())
-        ON CONFLICT (execution_id) DO NOTHING
-      `, [executionId, originalPath, imageBuffer.length]);
+          execution_id, original_path, thumbnail_path, cached_path, size_bytes, format, extracted_at
+        ) VALUES ($1, $2, $3, $4, $5, 'jpeg', NOW())
+        ON CONFLICT (execution_id) DO UPDATE SET
+          thumbnail_path = EXCLUDED.thumbnail_path,
+          cached_path = EXCLUDED.cached_path
+      `, [executionId, originalPath, thumbPath, webpPath, imageBuffer.length]);
 
     } catch (error) {
       logger.error(`Failed to process image for execution ${executionId}:`, error);

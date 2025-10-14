@@ -54,22 +54,16 @@ export function SSEProvider({ children }: SSEProviderProps) {
   const connect = useCallback(() => {
     // Prevent concurrent connection attempts
     if (isConnectingRef.current) {
-      console.log('🚫 [SSE] Connection already in progress, skipping');
       return;
     }
     
     // Don't create multiple connections - be more strict
     if (eventSourceRef.current) {
       if (eventSourceRef.current.readyState === EventSource.CONNECTING || eventSourceRef.current.readyState === EventSource.OPEN) {
-        console.log('🚫 [SSE] EventSource already exists and active', {
-          readyState: eventSourceRef.current.readyState,
-          readyStateName: ['CONNECTING', 'OPEN', 'CLOSED'][eventSourceRef.current.readyState]
-        });
         return;
       }
       // Only cleanup if it's closed
       if (eventSourceRef.current.readyState === EventSource.CLOSED) {
-        console.log('🗑️ [SSE] Cleaning up closed EventSource');
         eventSourceRef.current = null;
       }
     }
@@ -83,24 +77,16 @@ export function SSEProvider({ children }: SSEProviderProps) {
       const eventSource = sseApi.createEventSource();
       eventSourceRef.current = eventSource;
 
-      console.log(`🔌 [SSE] Creating EventSource #${connectionId}`, {
-        url: eventSource.url,
-        readyState: eventSource.readyState,
-        withCredentials: eventSource.withCredentials,
-        timestamp: new Date().toISOString()
-      });
-      
       // Monitor readyState changes (reduced frequency for production)
       const readyStateMonitor = setInterval(() => {
         if (eventSource.readyState === EventSource.CONNECTING) {
-          console.log(`🔍 SSE Context: Still connecting #${connectionId}...`);
+          // Still connecting
         } else {
           clearInterval(readyStateMonitor);
         }
       }, 5000);
 
       eventSource.onopen = () => {
-        console.log(`✅ SSE Context: Connection #${connectionId} opened successfully`);
         setIsConnected(true);
         setConnectionStatus('connected');
         reconnectAttempts.current = 0;
@@ -110,13 +96,11 @@ export function SSEProvider({ children }: SSEProviderProps) {
       // Fallback: Check connection after 3 seconds if onopen hasn't fired
       setTimeout(() => {
         if (eventSource.readyState === EventSource.OPEN) {
-          console.log('SSE Context: Connection established via fallback check');
           setIsConnected(true);
           setConnectionStatus('connected');
           reconnectAttempts.current = 0;
           isConnectingRef.current = false; // Connection attempt completed
         } else if (eventSource.readyState === EventSource.CLOSED) {
-          console.log('SSE Context: Connection failed - EventSource closed during fallback check');
           isConnectingRef.current = false; // Connection attempt failed
         }
       }, 3000);
@@ -136,7 +120,6 @@ export function SSEProvider({ children }: SSEProviderProps) {
             const delay = baseReconnectDelay * Math.pow(2, reconnectAttempts.current);
             reconnectAttempts.current += 1;
             
-            console.log(`SSE Context: Attempting to reconnect in ${delay}ms (attempt ${reconnectAttempts.current}/${maxReconnectAttempts})`);
             
             reconnectTimeoutRef.current = setTimeout(() => {
               connect();
@@ -154,7 +137,6 @@ export function SSEProvider({ children }: SSEProviderProps) {
       eventSource.addEventListener('connection', (event) => {
         try {
           const data: SSEConnectionEvent = JSON.parse(event.data);
-          console.log('SSE Context: Connection event:', data);
           setLastEvent({ type: 'connection', data, timestamp: new Date() });
           
           // Set connected state when we receive the connection event
@@ -173,7 +155,6 @@ export function SSEProvider({ children }: SSEProviderProps) {
       eventSource.addEventListener('execution:new', (event) => {
         try {
           const data: SSEExecutionEvent = JSON.parse(event.data);
-          console.log('SSE Context: New execution received:', data.execution.id);
           const newEvent = { type: 'execution:new', data, timestamp: new Date() };
           setLastEvent(newEvent);
           
@@ -190,7 +171,6 @@ export function SSEProvider({ children }: SSEProviderProps) {
       eventSource.addEventListener('execution:error', (event) => {
         try {
           const data = JSON.parse(event.data);
-          console.log('SSE Context: Execution error received:', data.executionId);
           setLastEvent({ type: 'execution:error', data, timestamp: new Date() });
           
           // Use smart notification system
@@ -215,7 +195,6 @@ export function SSEProvider({ children }: SSEProviderProps) {
       eventSource.addEventListener('system:stats', (event) => {
         try {
           const data = JSON.parse(event.data);
-          console.log('SSE Context: System stats received:', data);
           setLastEvent({ type: 'system:stats', data, timestamp: new Date() });
           setLiveStats(data);
           
@@ -232,7 +211,6 @@ export function SSEProvider({ children }: SSEProviderProps) {
       eventSource.addEventListener('system:health', (event) => {
         try {
           const data = JSON.parse(event.data);
-          console.log('SSE Context: System health received:', data);
           setLastEvent({ type: 'system:health', data, timestamp: new Date() });
           setSystemHealth(data);
           
@@ -245,17 +223,10 @@ export function SSEProvider({ children }: SSEProviderProps) {
         }
       });
 
-      // Batch completion event - ENHANCED DEBUGGING
+      // Batch completion event
       eventSource.addEventListener('execution:batch', (event) => {
-        console.log('🚀 SSE Context: execution:batch event received!', {
-          type: event.type,
-          data: event.data,
-          lastEventId: event.lastEventId
-        });
-        
         try {
           const data = JSON.parse(event.data);
-          console.log('✅ SSE Context: Batch completion received:', data);
           const batchEvent = { type: 'execution:batch', data, timestamp: new Date() };
           setLastEvent(batchEvent);
           
@@ -272,7 +243,6 @@ export function SSEProvider({ children }: SSEProviderProps) {
       eventSource.addEventListener('execution:progress', (event) => {
         try {
           const data = JSON.parse(event.data);
-          console.log('SSE Context: Execution progress received:', data.executionId, data.progress);
           setLastEvent({ type: 'execution:progress', data, timestamp: new Date() });
           
           // Could trigger progress UI updates here
@@ -319,12 +289,10 @@ export function SSEProvider({ children }: SSEProviderProps) {
 
   // Initialize connection on mount
   useEffect(() => {
-    console.log('🚀 SSE Context: Provider mounted, initializing connection');
     connect();
 
     // Cleanup on unmount
     return () => {
-      console.log('🔌 SSE Context: Provider unmounting, cleaning up');
       cleanup();
     };
   }, [connect, cleanup]);
@@ -335,18 +303,15 @@ export function SSEProvider({ children }: SSEProviderProps) {
   // TODO: Implement more robust visibility detection or remove entirely
   useEffect(() => {
     // Temporarily disabled to fix constant SSE disconnections
-    console.log('SSE Context: Tab visibility management disabled to prevent connection issues');
   }, []);
 
   // Handle online/offline status
   useEffect(() => {
     const handleOnline = () => {
-      console.log('SSE Context: Browser online, attempting reconnection');
       connect();
     };
 
     const handleOffline = () => {
-      console.log('SSE Context: Browser offline, closing connection');
       cleanup();
       setConnectionStatus('disconnected');
       setIsConnected(false);
@@ -404,29 +369,22 @@ export function useSSEHandler(handlers: {
   const { lastEvent, ...sseState } = useSSE();
 
   useEffect(() => {
-    console.log('🔄 useSSEHandler: lastEvent changed:', lastEvent);
     if (!lastEvent) return;
 
-    console.log('🎯 useSSEHandler: Processing event type:', lastEvent.type);
     switch (lastEvent.type) {
       case 'execution:new':
-        console.log('📨 useSSEHandler: Calling onNewExecution');
         handlers.onNewExecution?.(lastEvent.data);
         break;
       case 'execution:error':
-        console.log('📨 useSSEHandler: Calling onExecutionError');
         handlers.onExecutionError?.(lastEvent.data);
         break;
       case 'execution:batch':
-        console.log('📨 useSSEHandler: Calling onExecutionBatch with data:', lastEvent.data);
         handlers.onExecutionBatch?.(lastEvent.data);
         break;
       case 'connection':
-        console.log('📨 useSSEHandler: Calling onConnection');
         handlers.onConnection?.(lastEvent.data);
         break;
       case 'heartbeat':
-        console.log('📨 useSSEHandler: Calling onHeartbeat');
         handlers.onHeartbeat?.(lastEvent.data);
         break;
     }
