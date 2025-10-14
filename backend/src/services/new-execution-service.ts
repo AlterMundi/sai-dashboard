@@ -168,8 +168,11 @@ export class NewExecutionService {
 
         -- Image data
         ei.original_path,
+        ei.thumbnail_path,
+        ei.cached_path,
         ei.size_bytes,
         ei.format,
+        ei.extracted_at,
 
         -- Notification data
         en.telegram_sent,
@@ -239,6 +242,8 @@ export class NewExecutionService {
 
         -- Image data
         ei.original_path,
+        ei.thumbnail_path,
+        ei.cached_path,
         ei.size_bytes,
         ei.format,
         ei.extracted_at,
@@ -433,8 +438,11 @@ export class NewExecutionService {
 
         -- Image data
         ei.original_path,
+        ei.thumbnail_path,
+        ei.cached_path,
         ei.size_bytes,
         ei.format,
+        ei.extracted_at,
 
         -- Notification data
         en.telegram_sent,
@@ -500,6 +508,8 @@ export class NewExecutionService {
       // Image data
       hasImage: !!row.original_path,
       imagePath: row.original_path || null,
+      thumbnailPath: row.thumbnail_path || null,
+      cachedPath: row.cached_path || null,
       imageSizeBytes: row.size_bytes || null,
       imageFormat: row.format || null,
       imageWidth: row.image_width || null,

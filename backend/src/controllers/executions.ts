@@ -88,7 +88,6 @@ export const getExecutionById = asyncHandler(async (req: Request, res: Response)
 
 export const getExecutionImage = asyncHandler(async (req: Request, res: Response): Promise<void> => {
   const executionId = parseInt(req.params.executionId);
-  const { variant = 'original' } = req.query;
 
   if (isNaN(executionId)) {
     res.status(400).json({
@@ -100,9 +99,19 @@ export const getExecutionImage = asyncHandler(async (req: Request, res: Response
     return;
   }
 
-  const execution = await newExecutionService.getExecutionById(executionId);
+  // Support both partition-based (new) and legacy directory structures
+  const partition = Math.floor(executionId / 1000);
+  const partitionJpegPath = `/mnt/raid1/n8n-backup/images/original/${partition}/${executionId}.jpg`;
+  const legacyJpegPath = `/mnt/raid1/n8n-backup/images/by-execution/${executionId}/original.jpg`;
 
-  if (!execution || !execution.hasImage) {
+  const fs = require('fs');
+  let imagePath: string;
+
+  if (fs.existsSync(partitionJpegPath)) {
+    imagePath = partitionJpegPath;
+  } else if (fs.existsSync(legacyJpegPath)) {
+    imagePath = legacyJpegPath;
+  } else {
     res.status(404).json({
       error: {
         message: 'Image not found',
@@ -112,30 +121,7 @@ export const getExecutionImage = asyncHandler(async (req: Request, res: Response
     return;
   }
 
-  // Use image service to serve the file
-  const imagePath = execution.imagePath;
-  if (!imagePath) {
-    res.status(404).json({
-      error: {
-        message: 'Image path not found',
-        code: 'IMAGE_PATH_NOT_FOUND'
-      }
-    });
-    return;
-  }
-
-  try {
-    // Serve image file directly
-    res.sendFile(imagePath);
-  } catch (error) {
-    logger.error('Failed to serve image:', error);
-    res.status(500).json({
-      error: {
-        message: 'Failed to serve image',
-        code: 'IMAGE_SERVE_ERROR'
-      }
-    });
-  }
+  res.sendFile(imagePath);
 });
 
 export const getExecutionImageWebP = asyncHandler(async (req: Request, res: Response): Promise<void> => {
@@ -151,24 +137,40 @@ export const getExecutionImageWebP = asyncHandler(async (req: Request, res: Resp
     return;
   }
 
-  // Look for WebP variant
-  const webpPath = `/mnt/raid1/n8n-backup/images/by-execution/${executionId}/high.webp`;
-  
-  try {
+  // Support both partition-based (new) and legacy directory structures
+  const partition = Math.floor(executionId / 1000);
+  const partitionWebpPath = `/mnt/raid1/n8n-backup/images/webp/${partition}/${executionId}.webp`;
+  const legacyWebpPath = `/mnt/raid1/n8n-backup/images/by-execution/${executionId}/high.webp`;
+
+  const fs = require('fs');
+  let webpPath: string | null = null;
+
+  if (fs.existsSync(partitionWebpPath)) {
+    webpPath = partitionWebpPath;
+  } else if (fs.existsSync(legacyWebpPath)) {
+    webpPath = legacyWebpPath;
+  }
+
+  if (webpPath) {
     res.sendFile(webpPath);
-  } catch (error) {
-    // Fall back to JPEG original
-    const execution = await newExecutionService.getExecutionById(executionId);
-    if (execution && execution.imagePath) {
-      res.sendFile(execution.imagePath);
-    } else {
-      res.status(404).json({
-        error: {
-          message: 'Image not found',
-          code: 'IMAGE_NOT_FOUND'
-        }
-      });
-    }
+    return;
+  }
+
+  // Fall back to JPEG original
+  const partitionJpegPath = `/mnt/raid1/n8n-backup/images/original/${partition}/${executionId}.jpg`;
+  const legacyJpegPath = `/mnt/raid1/n8n-backup/images/by-execution/${executionId}/original.jpg`;
+
+  if (fs.existsSync(partitionJpegPath)) {
+    res.sendFile(partitionJpegPath);
+  } else if (fs.existsSync(legacyJpegPath)) {
+    res.sendFile(legacyJpegPath);
+  } else {
+    res.status(404).json({
+      error: {
+        message: 'Image not found',
+        code: 'IMAGE_NOT_FOUND'
+      }
+    });
   }
 });
 
@@ -185,19 +187,30 @@ export const getExecutionThumbnail = asyncHandler(async (req: Request, res: Resp
     return;
   }
 
-  // Look for WebP thumbnail
-  const thumbnailPath = `/mnt/raid1/n8n-backup/images/by-execution/${executionId}/thumb.webp`;
-  
-  try {
-    res.sendFile(thumbnailPath);
-  } catch (error) {
+  // Support both partition-based (new) and legacy directory structures
+  const partition = Math.floor(executionId / 1000);
+  const partitionPath = `/mnt/raid1/n8n-backup/images/thumb/${partition}/${executionId}.webp`;
+  const legacyPath = `/mnt/raid1/n8n-backup/images/by-execution/${executionId}/thumb.webp`;
+
+  // Try partition-based path first, fallback to legacy
+  const fs = require('fs');
+  let thumbnailPath: string;
+
+  if (fs.existsSync(partitionPath)) {
+    thumbnailPath = partitionPath;
+  } else if (fs.existsSync(legacyPath)) {
+    thumbnailPath = legacyPath;
+  } else {
     res.status(404).json({
       error: {
         message: 'Thumbnail not found',
         code: 'THUMBNAIL_NOT_FOUND'
       }
     });
+    return;
   }
+
+  res.sendFile(thumbnailPath);
 });
 
 export const getExecutionData = asyncHandler(async (req: Request, res: Response): Promise<void> => {

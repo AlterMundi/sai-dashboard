@@ -36,7 +36,9 @@
     "tunnel:test": "./tests/deployment/ssh-tunnel-verification.sh"
   },
   "devDependencies": {
-    "concurrently": "^8.2.0"
+    "concurrently": "^8.2.0",
+    "tsc-alias": "^1.8.16",
+    "typescript": "^5.9.3"
   },
   "workspaces": [
     "backend",

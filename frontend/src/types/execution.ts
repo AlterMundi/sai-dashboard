@@ -75,6 +75,8 @@ export interface Execution {
   // ============================================================================
   hasImage: boolean;
   imagePath: string | null;
+  thumbnailPath: string | null;
+  cachedPath: string | null;
   imageSizeBytes: number | null;
   imageFormat: string | null;
   imageWidth: number | null;
