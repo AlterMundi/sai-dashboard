@@ -55,19 +55,21 @@ export interface ExecutionFilters {
   hasImage?: boolean;
 
   // YOLO-specific filters
-  alertLevel?: 'none' | 'low' | 'high' | 'critical';  // 'medium' removed (doesn't exist in DB)
+  alertLevel?: 'none' | 'low' | 'high' | 'critical';  // Single selection (legacy)
+  alertLevels?: ('none' | 'low' | 'high' | 'critical')[];  // Multi-select array
   hasFire?: boolean;
   hasSmoke?: boolean;
-  detectionCount?: number;  // NEW: Filter by number of detections
-  confidenceFire?: number;  // NEW: Fire-specific confidence (0.0-1.0)
-  confidenceSmoke?: number;  // NEW: Smoke-specific confidence (0.0-1.0)
-  detectionMode?: string;   // NEW: e.g., 'smoke-only'
+  detectionCount?: number;  // Filter by number of detections
+  confidenceFire?: number;  // Fire-specific confidence (0.0-1.0)
+  confidenceSmoke?: number;  // Smoke-specific confidence (0.0-1.0)
+  detectionMode?: string;   // e.g., 'smoke-only'
   minConfidence?: number;   // DEPRECATED: Use confidenceFire/confidenceSmoke instead
   maxConfidence?: number;   // DEPRECATED: Use confidenceFire/confidenceSmoke instead
 
   // Device/Camera filters
   cameraId?: string;
-  cameraType?: 'onvif' | 'rtsp';  // NEW: Camera protocol type
+  cameraType?: 'onvif' | 'rtsp';  // Single selection (legacy)
+  cameraTypes?: ('onvif' | 'rtsp')[];  // Multi-select array
   nodeId?: string;
   deviceId?: string;
   location?: string;

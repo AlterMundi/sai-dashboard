@@ -32,9 +32,11 @@ export class NewExecutionService {
       pageSize = 50,
       status,
       alertLevel,
+      alertLevels,
       nodeId,
       cameraId,
       cameraType,
+      cameraTypes,
       deviceId,
       location,
       searchQuery,
@@ -65,8 +67,14 @@ export class NewExecutionService {
       queryParams.push(status);
     }
 
-    // Alert level filter
-    if (alertLevel) {
+    // Alert level filter (single or multi-select)
+    if (alertLevels && alertLevels.length > 0) {
+      // Multi-select: alert_level IN ('critical', 'high')
+      paramCount++;
+      whereConditions.push(`ea.alert_level = ANY($${paramCount})`);
+      queryParams.push(alertLevels);
+    } else if (alertLevel) {
+      // Legacy single selection
       paramCount++;
       whereConditions.push(`ea.alert_level = $${paramCount}`);
       queryParams.push(alertLevel);
@@ -86,8 +94,14 @@ export class NewExecutionService {
       queryParams.push(cameraId);
     }
 
-    // Camera type filtering (NEW)
-    if (cameraType) {
+    // Camera type filtering (single or multi-select)
+    if (cameraTypes && cameraTypes.length > 0) {
+      // Multi-select: camera_type IN ('onvif', 'rtsp')
+      paramCount++;
+      whereConditions.push(`e.camera_type = ANY($${paramCount})`);
+      queryParams.push(cameraTypes);
+    } else if (cameraType) {
+      // Legacy single selection
       paramCount++;
       whereConditions.push(`e.camera_type = $${paramCount}`);
       queryParams.push(cameraType);
