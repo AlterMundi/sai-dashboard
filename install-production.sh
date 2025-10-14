@@ -367,13 +367,13 @@ build_frontend() {
     [ "$SKIP_BUILD" = true ] && { info "Skipping frontend build (--skip-build)"; return; }
     
     cd "$SCRIPT_DIR/frontend"
-    
-    # Check if build exists and force flag
-    if [[ -d "dist" ]] && [ "$FORCE_REBUILD" = false ]; then
-        info "Frontend build already exists. Use -f to force rebuild."
-        return
+
+    # Always clean dist to ensure fresh build with latest source changes
+    if [[ -d "dist" ]]; then
+        info "Cleaning existing frontend build to ensure fresh build..."
+        rm -rf dist
     fi
-    
+
     log "Building frontend for production..."
     local start_time=$(date +%s)
     
@@ -453,13 +453,13 @@ build_backend() {
     [ "$SKIP_BUILD" = true ] && { info "Skipping backend build (--skip-build)"; return; }
     
     cd "$SCRIPT_DIR/backend"
-    
-    # Check if build exists and force flag
-    if [[ -d "dist" ]] && [ "$FORCE_REBUILD" = false ]; then
-        info "Backend build already exists. Use -f to force rebuild."
-        return
+
+    # Always clean dist to ensure fresh build with latest source changes
+    if [[ -d "dist" ]]; then
+        info "Cleaning existing backend build to ensure fresh build..."
+        rm -rf dist
     fi
-    
+
     log "Building backend for production..."
     local start_time=$(date +%s)
     
