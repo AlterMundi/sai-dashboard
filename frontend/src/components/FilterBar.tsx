@@ -141,8 +141,6 @@ export function FilterBar({
               <SelectItem value="">All statuses</SelectItem>
               <SelectItem value="success">Success</SelectItem>
               <SelectItem value="error">Error</SelectItem>
-              <SelectItem value="running">Running</SelectItem>
-              <SelectItem value="canceled">Canceled</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -164,7 +162,6 @@ export function FilterBar({
               <SelectItem value="">All levels</SelectItem>
               <SelectItem value="critical">Critical</SelectItem>
               <SelectItem value="high">High</SelectItem>
-              <SelectItem value="medium">Medium</SelectItem>
               <SelectItem value="low">Low</SelectItem>
               <SelectItem value="none">None</SelectItem>
             </SelectContent>
@@ -276,6 +273,88 @@ export function FilterBar({
                 placeholder="e.g., cam-01"
                 value={filters.cameraId || ''}
                 onChange={(e) => handleFilterChange('cameraId', e.target.value || undefined)}
+              />
+            </div>
+
+            {/* Camera Type Filter (NEW) */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
+                <Camera className="h-3.5 w-3.5 mr-1" />
+                Camera Type
+              </label>
+              <Select
+                value={filters.cameraType || ''}
+                onValueChange={(value) => handleFilterChange('cameraType', value || undefined)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="All types" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">All types</SelectItem>
+                  <SelectItem value="onvif">ONVIF</SelectItem>
+                  <SelectItem value="rtsp">RTSP</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Device ID Filter */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Device ID
+              </label>
+              <Input
+                type="text"
+                placeholder="e.g., device-01"
+                value={filters.deviceId || ''}
+                onChange={(e) => handleFilterChange('deviceId', e.target.value || undefined)}
+              />
+            </div>
+
+            {/* Detection Count Filter (NEW) */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Min Detections
+              </label>
+              <Input
+                type="number"
+                min="0"
+                placeholder="e.g., 2"
+                value={filters.detectionCount || ''}
+                onChange={(e) => handleFilterChange('detectionCount', e.target.value ? parseInt(e.target.value) : undefined)}
+              />
+            </div>
+
+            {/* Fire Confidence Filter (NEW) */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
+                <Flame className="h-3.5 w-3.5 mr-1 text-red-500" />
+                Fire Confidence
+              </label>
+              <Input
+                type="number"
+                min="0"
+                max="1"
+                step="0.1"
+                placeholder="0.0 - 1.0"
+                value={filters.confidenceFire || ''}
+                onChange={(e) => handleFilterChange('confidenceFire', e.target.value ? parseFloat(e.target.value) : undefined)}
+              />
+            </div>
+
+            {/* Smoke Confidence Filter (NEW) */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
+                <Wind className="h-3.5 w-3.5 mr-1 text-gray-600" />
+                Smoke Confidence
+              </label>
+              <Input
+                type="number"
+                min="0"
+                max="1"
+                step="0.1"
+                placeholder="0.0 - 1.0"
+                value={filters.confidenceSmoke || ''}
+                onChange={(e) => handleFilterChange('confidenceSmoke', e.target.value ? parseFloat(e.target.value) : undefined)}
               />
             </div>
 

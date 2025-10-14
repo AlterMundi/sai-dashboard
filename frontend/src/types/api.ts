@@ -48,21 +48,26 @@ export interface ExecutionFilters {
   limit?: number;
 
   // Basic filters
-  status?: 'success' | 'error' | 'waiting' | 'running' | 'canceled';
+  status?: 'success' | 'error';  // Only these 2 exist in DB
   startDate?: string;
   endDate?: string;
   search?: string;
   hasImage?: boolean;
 
   // YOLO-specific filters
-  alertLevel?: 'none' | 'low' | 'medium' | 'high' | 'critical';
+  alertLevel?: 'none' | 'low' | 'high' | 'critical';  // 'medium' removed (doesn't exist in DB)
   hasFire?: boolean;
   hasSmoke?: boolean;
-  minConfidence?: number;
-  maxConfidence?: number;
+  detectionCount?: number;  // NEW: Filter by number of detections
+  confidenceFire?: number;  // NEW: Fire-specific confidence (0.0-1.0)
+  confidenceSmoke?: number;  // NEW: Smoke-specific confidence (0.0-1.0)
+  detectionMode?: string;   // NEW: e.g., 'smoke-only'
+  minConfidence?: number;   // DEPRECATED: Use confidenceFire/confidenceSmoke instead
+  maxConfidence?: number;   // DEPRECATED: Use confidenceFire/confidenceSmoke instead
 
   // Device/Camera filters
   cameraId?: string;
+  cameraType?: 'onvif' | 'rtsp';  // NEW: Camera protocol type
   nodeId?: string;
   deviceId?: string;
   location?: string;
