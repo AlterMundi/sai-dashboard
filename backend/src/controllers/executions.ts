@@ -20,11 +20,29 @@ export const getExecutions = asyncHandler(async (req: Request, res: Response): P
     endDate,
     search,
     alertLevel,
+    alertLevels,
     nodeId,
     cameraId,
+    cameraType,
+    cameraTypes,
+    deviceId,
+    location,
     hasImage,
-    telegramSent
+    hasFire,
+    hasSmoke,
+    telegramSent,
+    datePreset,
+    sortBy,
+    sortOrder
   } = req.query;
+
+  // Parse array parameters (alertLevels, cameraTypes)
+  const parseArrayParam = (param: any): string[] | undefined => {
+    if (!param) return undefined;
+    if (Array.isArray(param)) return param as string[];
+    if (typeof param === 'string') return param.split(',').filter(Boolean);
+    return undefined;
+  };
 
   const filters: ExecutionFilters = {
     page: parseIntSafe(page as string, 1),
@@ -34,10 +52,20 @@ export const getExecutions = asyncHandler(async (req: Request, res: Response): P
     endDate: endDate as string,
     searchQuery: search as string,
     alertLevel: alertLevel as any,
+    alertLevels: parseArrayParam(alertLevels) as any,
     nodeId: nodeId as string,
     cameraId: cameraId as string,
+    cameraType: cameraType as any,
+    cameraTypes: parseArrayParam(cameraTypes) as any,
+    deviceId: deviceId as string,
+    location: location as string,
     hasImage: hasImage === 'true' ? true : hasImage === 'false' ? false : undefined,
-    telegramSent: telegramSent === 'true' ? true : telegramSent === 'false' ? false : undefined
+    hasFire: hasFire === 'true' ? true : hasFire === 'false' ? false : undefined,
+    hasSmoke: hasSmoke === 'true' ? true : hasSmoke === 'false' ? false : undefined,
+    telegramSent: telegramSent === 'true' ? true : telegramSent === 'false' ? false : undefined,
+    datePreset: datePreset as any,
+    sortBy: sortBy as any,
+    sortOrder: sortOrder as any
   };
 
   // Get executions from NEW system only

@@ -4,15 +4,22 @@ import { LoadingSpinner } from './ui/LoadingSpinner';
 import { DynamicTimeAgo } from './ui/DynamicTimeAgo';
 import { executionsApi } from '@/services/api';
 import { formatDuration, cn } from '@/utils';
-import { ImageCardProps } from '@/types';
-import { Calendar, Clock, AlertTriangle, CheckCircle, MessageCircle, Flame, Wind, Camera, MapPin } from 'lucide-react';
+import { ImageCardProps, ProcessingStage } from '@/types';
+import { Calendar, Clock, AlertTriangle, CheckCircle, MessageCircle, Flame, Wind, Camera, MapPin, RefreshCw, X } from 'lucide-react';
 
 export function ImageCard({ execution, onClick, loading = false }: ImageCardProps) {
   const [imageLoading, setImageLoading] = useState(true);
   const [imageError, setImageError] = useState(false);
 
+  // Check if this is an execution with processing stage info
+  const processingStage = (execution as any).processingStage as ProcessingStage | undefined;
+  const isStage1Only = processingStage === 'stage1';
+  const isProcessing = processingStage === 'stage1' && !execution.hasImage; // Stage 1 but no image yet
+  const hasStage2Error = processingStage === 'failed';
+
   // Use hasImage from the execution data directly
-  const thumbnailUrl = execution.hasImage
+  // For Stage 1 only executions, show placeholder until Stage 2 completes
+  const thumbnailUrl = execution.hasImage && !isStage1Only
     ? executionsApi.getImageUrl(execution.id, true)
     : undefined;
 
@@ -83,14 +90,43 @@ export function ImageCard({ execution, onClick, loading = false }: ImageCardProp
           </>
         ) : (
           <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-400">
-            <AlertTriangle className="h-8 w-8 mb-2" />
-            <span className="text-sm">No image</span>
+            {isStage1Only ? (
+              <>
+                <RefreshCw className="h-8 w-8 mb-2 animate-spin text-blue-500" />
+                <span className="text-sm">Processing image...</span>
+              </>
+            ) : hasStage2Error ? (
+              <>
+                <X className="h-8 w-8 mb-2 text-red-500" />
+                <span className="text-sm">Processing failed</span>
+              </>
+            ) : (
+              <>
+                <AlertTriangle className="h-8 w-8 mb-2" />
+                <span className="text-sm">No image</span>
+              </>
+            )}
           </div>
         )}
 
         {/* Status Badge Overlay */}
-        <div className="absolute top-2 right-2">
+        <div className="absolute top-2 right-2 flex flex-col items-end space-y-1">
           <StatusBadge status={execution.status} size="sm" />
+
+          {/* Processing Stage Indicator */}
+          {isStage1Only && (
+            <div className="bg-blue-600 text-white text-xs px-2 py-0.5 rounded font-medium flex items-center">
+              <RefreshCw className="h-3 w-3 mr-1 animate-spin" />
+              Processing
+            </div>
+          )}
+
+          {hasStage2Error && (
+            <div className="bg-red-600 text-white text-xs px-2 py-0.5 rounded font-medium flex items-center">
+              <X className="h-3 w-3 mr-1" />
+              Failed
+            </div>
+          )}
         </div>
 
         {/* Alert Level Badge */}
@@ -112,16 +148,22 @@ export function ImageCard({ execution, onClick, loading = false }: ImageCardProp
         <div className="absolute bottom-2 left-2 flex space-x-1">
           {execution.hasFire && (
             <div
-              className="bg-red-600 bg-opacity-90 text-white rounded-full p-1.5"
-              title="Fire detected"
+              className={cn(
+                "text-white rounded-full p-1.5",
+                isStage1Only ? "bg-gray-400" : "bg-red-600 bg-opacity-90"
+              )}
+              title={isStage1Only ? "Fire detection pending" : "Fire detected"}
             >
               <Flame className="h-3.5 w-3.5" />
             </div>
           )}
           {execution.hasSmoke && (
             <div
-              className="bg-gray-700 bg-opacity-90 text-white rounded-full p-1.5"
-              title="Smoke detected"
+              className={cn(
+                "text-white rounded-full p-1.5",
+                isStage1Only ? "bg-gray-400" : "bg-gray-700 bg-opacity-90"
+              )}
+              title={isStage1Only ? "Smoke detection pending" : "Smoke detected"}
             >
               <Wind className="h-3.5 w-3.5" />
             </div>
@@ -169,7 +211,7 @@ export function ImageCard({ execution, onClick, loading = false }: ImageCardProp
         </div>
 
         {/* Detection Summary */}
-        {hasDetections && (
+        {hasDetections && !isStage1Only && (
           <div className="mb-3">
             <p className="text-sm text-gray-700 font-medium">
               {execution.hasFire && execution.hasSmoke && 'Fire & Smoke detected'}
@@ -183,8 +225,34 @@ export function ImageCard({ execution, onClick, loading = false }: ImageCardProp
           </div>
         )}
 
+        {/* Stage 1 Processing Message */}
+        {isStage1Only && (
+          <div className="mb-3 p-2 bg-blue-50 border border-blue-200 rounded text-sm text-blue-700">
+            <div className="flex items-center">
+              <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+              <span>Analysis in progress...</span>
+            </div>
+            <p className="text-xs text-blue-600 mt-1">
+              YOLO detection and image processing will be available shortly
+            </p>
+          </div>
+        )}
+
+        {/* Stage 2 Error Message */}
+        {hasStage2Error && (
+          <div className="mb-3 p-2 bg-red-50 border border-red-200 rounded text-sm text-red-700">
+            <div className="flex items-center">
+              <X className="h-4 w-4 mr-2" />
+              <span>Analysis failed</span>
+            </div>
+            <p className="text-xs text-red-600 mt-1">
+              Could not extract YOLO data from workflow execution
+            </p>
+          </div>
+        )}
+
         {/* Confidence Bars */}
-        {(execution.confidenceFire !== null || execution.confidenceSmoke !== null) && (
+        {(execution.confidenceFire !== null || execution.confidenceSmoke !== null) && !isStage1Only && (
           <div className="mb-3 space-y-1.5">
             {execution.confidenceFire !== null && execution.confidenceFire > 0 && (
               <div>

@@ -297,6 +297,75 @@ export function FilterBar({
               </Select>
             </div>
 
+            {/* Detection Count Filter (NEW) */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Min Detections
+              </label>
+              <Input
+                type="number"
+                min="0"
+                placeholder="e.g., 2"
+                value={filters.detectionCount || ''}
+                onChange={(e) => handleFilterChange('detectionCount', e.target.value ? parseInt(e.target.value) : undefined)}
+              />
+            </div>
+
+            {/* Fire Confidence Filter (NEW) */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
+                <Flame className="h-3.5 w-3.5 mr-1 text-red-500" />
+                Fire Confidence
+              </label>
+              <Input
+                type="number"
+                min="0"
+                max="1"
+                step="0.1"
+                placeholder="0.0 - 1.0"
+                value={filters.confidenceFire || ''}
+                onChange={(e) => handleFilterChange('confidenceFire', e.target.value ? parseFloat(e.target.value) : undefined)}
+              />
+            </div>
+
+            {/* Smoke Confidence Filter (NEW) */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
+                <Wind className="h-3.5 w-3.5 mr-1 text-gray-600" />
+                Smoke Confidence
+              </label>
+              <Input
+                type="number"
+                min="0"
+                max="1"
+                step="0.1"
+                placeholder="0.0 - 1.0"
+                value={filters.confidenceSmoke || ''}
+                onChange={(e) => handleFilterChange('confidenceSmoke', e.target.value ? parseFloat(e.target.value) : undefined)}
+              />
+            </div>
+
+            {/* Detection Mode Filter (NEW) */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Detection Mode
+              </label>
+              <Select
+                value={filters.detectionMode || ''}
+                onValueChange={(value) => handleFilterChange('detectionMode', value || undefined)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Any mode" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Any mode</SelectItem>
+                  <SelectItem value="smoke-only">Smoke Only</SelectItem>
+                  <SelectItem value="fire-only">Fire Only</SelectItem>
+                  <SelectItem value="both">Both</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
             {/* Device ID Filter */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -490,6 +559,46 @@ export function FilterBar({
             <Badge variant="secondary" className="flex items-center gap-1">
               Camera: {filters.cameraId}
               <button onClick={() => clearFilter('cameraId')} className="ml-1">
+                <X className="h-3 w-3" />
+              </button>
+            </Badge>
+          )}
+          {filters.cameraType && (
+            <Badge variant="secondary" className="flex items-center gap-1">
+              Camera Type: {filters.cameraType}
+              <button onClick={() => clearFilter('cameraType')} className="ml-1">
+                <X className="h-3 w-3" />
+              </button>
+            </Badge>
+          )}
+          {filters.detectionCount && (
+            <Badge variant="secondary" className="flex items-center gap-1">
+              Min Detections: {filters.detectionCount}
+              <button onClick={() => clearFilter('detectionCount')} className="ml-1">
+                <X className="h-3 w-3" />
+              </button>
+            </Badge>
+          )}
+          {filters.confidenceFire !== undefined && (
+            <Badge variant="secondary" className="flex items-center gap-1">
+              Fire Conf: ≥{filters.confidenceFire}
+              <button onClick={() => clearFilter('confidenceFire')} className="ml-1">
+                <X className="h-3 w-3" />
+              </button>
+            </Badge>
+          )}
+          {filters.confidenceSmoke !== undefined && (
+            <Badge variant="secondary" className="flex items-center gap-1">
+              Smoke Conf: ≥{filters.confidenceSmoke}
+              <button onClick={() => clearFilter('confidenceSmoke')} className="ml-1">
+                <X className="h-3 w-3" />
+              </button>
+            </Badge>
+          )}
+          {filters.detectionMode && (
+            <Badge variant="secondary" className="flex items-center gap-1">
+              Mode: {filters.detectionMode}
+              <button onClick={() => clearFilter('detectionMode')} className="ml-1">
                 <X className="h-3 w-3" />
               </button>
             </Badge>

@@ -180,7 +180,7 @@ run_integration_tests_api() {
         log_warning "API is not running. Starting backend service..."
         
         cd "$BACKEND_DIR"
-        if ! npm run dev >/dev/null 2>&1 &; then
+        if ! npm run dev >/dev/null 2>&1 & then
             log_error "Failed to start backend API"
             return 1
         fi

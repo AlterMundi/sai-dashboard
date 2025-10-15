@@ -50,7 +50,9 @@ export class NewExecutionService {
       detectionCount,
       confidenceFire,
       confidenceSmoke,
-      detectionMode
+      detectionMode,
+      detectionClasses,
+      minDetectionConfidence
     } = filters;
 
     // Handle search/searchQuery alias
@@ -110,8 +112,8 @@ export class NewExecutionService {
     // Device ID filtering (NEW - was missing!)
     if (deviceId) {
       paramCount++;
-      whereConditions.push(`e.device_id = $${paramCount}`);
-      queryParams.push(deviceId);
+      whereConditions.push(`e.device_id ILIKE $${paramCount}`);
+      queryParams.push(`%${deviceId}%`);
     }
 
     // Location filtering (NEW - direct match)
@@ -188,6 +190,39 @@ export class NewExecutionService {
       whereConditions.push(`ea.detection_mode = $${paramCount}`);
       queryParams.push(detectionMode);
     }
+
+    // Camera type filtering (NEW - was missing!)
+    if (cameraTypes && cameraTypes.length > 0) {
+      // Multi-select: camera_type IN ('onvif', 'rtsp')
+      paramCount++;
+      whereConditions.push(`e.camera_type = ANY($${paramCount})`);
+      queryParams.push(cameraTypes);
+    } else if (cameraType) {
+      // Legacy single selection
+      paramCount++;
+      whereConditions.push(`e.camera_type = $${paramCount}`);
+      queryParams.push(cameraType);
+    }
+
+    // Advanced detection filters (JSONB)
+    if (detectionClasses && detectionClasses.length > 0) {
+      // Filter by specific detection classes in the JSONB array
+      paramCount++;
+      whereConditions.push(`ea.active_classes && $${paramCount}`);
+      queryParams.push(detectionClasses);
+    }
+
+    if (minDetectionConfidence !== undefined) {
+      // Filter by minimum confidence in any detection
+      paramCount++;
+      whereConditions.push(`ea.confidence_score >= $${paramCount}`);
+      queryParams.push(minDetectionConfidence);
+    }
+
+    // JSONB detection queries (advanced)
+    // Example: Find executions with fire detections above 0.8 confidence
+    // WHERE detections @> '[{"class": "fire"}]'::jsonb
+    //   AND detections @@ '$[*] ? (@.class == "fire" && @.confidence > 0.8)'
 
     // Has image filter
     if (hasImage !== undefined) {
@@ -494,6 +529,7 @@ export class NewExecutionService {
   /**
    * Search executions by analysis content
    * SINGLE SOURCE: sai_dashboard database only
+   * OPTIMIZED: Uses GIN indexes on JSONB fields for fast text search
    */
   async searchExecutions(query: string, limit: number = 50): Promise<ExecutionWithImage[]> {
     const searchQuery = `
@@ -548,7 +584,11 @@ export class NewExecutionService {
       WHERE (
         e.location ILIKE $1 OR
         e.device_id ILIKE $1 OR
-        e.camera_id ILIKE $1
+        e.camera_id ILIKE $1 OR
+        -- JSONB text search in detections (uses GIN index)
+        ea.detections::text ILIKE $1 OR
+        -- Array search in active_classes
+        EXISTS (SELECT 1 FROM unnest(ea.active_classes) AS class WHERE class ILIKE $1)
       )
       ORDER BY e.execution_timestamp DESC
       LIMIT $2
@@ -652,6 +692,7 @@ export class NewExecutionService {
   /**
    * Get enhanced statistics with detailed breakdowns
    * SINGLE SOURCE: sai_dashboard database only
+   * OPTIMIZED: Uses efficient aggregation queries with proper indexing
    */
   async getEnhancedStatistics(): Promise<{
     basicStats: any;

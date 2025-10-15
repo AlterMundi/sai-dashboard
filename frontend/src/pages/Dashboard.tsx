@@ -3,7 +3,7 @@ import { Layout } from '@/components/Layout';
 import { ImageGallery } from '@/components/ImageGallery';
 import { LoadingState } from '@/components/ui/LoadingSpinner';
 import { LiveStatsCard, SystemHealthIndicator } from '@/components/LiveStatsCard';
-import { useExecutionStats, useDailySummary } from '@/hooks/useExecutions';
+import { useExecutionStats, useDailySummary, useExecutions } from '@/hooks/useExecutions';
 import { executionsApi } from '@/services/api';
 import { useSSEHandler, useSSE } from '@/contexts/SSEContext';
 import { ExecutionFilters } from '@/types';
@@ -36,6 +36,18 @@ export function Dashboard() {
   useDailySummary(7);
   const { isConnected, systemHealth } = useSSE();
 
+  const {
+    executions: galleryExecutions,
+    isLoading: galleryLoading,
+    error: galleryError,
+    hasNext,
+    loadMore,
+    refresh,
+    updateFilters,
+    prependExecutions,
+    updateExecutionStage,
+  } = useExecutions(filters, batchUpdateTrigger);
+
   // Handle real-time updates via SSE
   const onNewExecution = useCallback(() => {
     // New executions are handled automatically by the gallery's own data fetching
@@ -67,10 +79,42 @@ export function Dashboard() {
     }
   }, [filters]);
 
+  // Handle Stage 2 ETL completion
+  const onStage2Complete = useCallback((data: any) => {
+    console.log('🔄 Dashboard: Stage 2 completion received', data);
+
+    // Update the specific execution with new Stage 2 data
+    if (updateExecutionStage && data.execution_id) {
+      updateExecutionStage(data.execution_id, 'stage2', {
+        has_fire: data.extracted?.has_fire,
+        has_smoke: data.extracted?.has_smoke,
+        alert_level: data.extracted?.alert_level,
+        detection_count: data.extracted?.detection_count,
+        has_image: data.extracted?.has_image,
+        telegram_sent: data.extracted?.telegram_sent,
+      });
+    }
+  }, [updateExecutionStage]);
+
+  // Handle Stage 2 ETL failure
+  const onStage2Failure = useCallback((data: any) => {
+    console.log('❌ Dashboard: Stage 2 failure received', data);
+
+    // Update the execution to mark it as failed
+    if (updateExecutionStage && data.execution_id) {
+      updateExecutionStage(data.execution_id, 'failed', {
+        stage2Error: data.error,
+        retryCount: data.retry_count,
+      });
+    }
+  }, [updateExecutionStage]);
+
   useSSEHandler({
     onNewExecution,
     onExecutionError,
     onExecutionBatch,
+    onStage2Complete,
+    onStage2Failure,
   });
 
   // Filter Management - ADDITIVE LOGIC with multi-select support
@@ -96,6 +140,27 @@ export function Dashboard() {
       }
 
       console.log(`🔄 Array Toggle ${hasValue ? 'OFF' : 'ON'}:`, key, value, '→', newArray);
+      return newFilters;
+    });
+  }, []);
+
+  // Handle Stage 2 dependent filters - only apply if Stage 2 data is available
+  const toggleStage2Filter = useCallback((key: keyof ExecutionFilters, value: any) => {
+    // For Stage 2 dependent filters, we need to be careful about data availability
+    // For now, apply the filter but log that it may not work for Stage 1 only data
+    console.log(`⚠️  Applying Stage 2 dependent filter: ${key}=${value} (may not work for Stage 1 only data)`);
+    setFilters(prev => {
+      const current = prev[key];
+      // If same value, clear it (toggle off)
+      if (current === value) {
+        const newFilters = { ...prev };
+        delete newFilters[key];
+        console.log('🔄 Toggle OFF:', key, '→ Filters:', newFilters);
+        return { ...newFilters, page: 0 };
+      }
+      // Otherwise set new value (toggle on or change)
+      const newFilters = { ...prev, [key]: value, page: 0 };
+      console.log('🔄 Toggle ON:', key, '=', value, '→ Filters:', newFilters);
       return newFilters;
     });
   }, []);
@@ -344,7 +409,7 @@ export function Dashboard() {
                 <h3 className="text-sm font-semibold text-gray-700 mb-3">Quick Filters (Click to toggle)</h3>
                 <div className="flex flex-wrap gap-2">
                   <button
-                    onClick={() => toggleFilter('hasFire', true)}
+                    onClick={() => toggleStage2Filter('hasFire', true)}
                     className={cn(
                       "inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors",
                       filters.hasFire === true
@@ -357,7 +422,7 @@ export function Dashboard() {
                   </button>
 
                   <button
-                    onClick={() => toggleFilter('hasSmoke', true)}
+                    onClick={() => toggleStage2Filter('hasSmoke', true)}
                     className={cn(
                       "inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors",
                       filters.hasSmoke === true
@@ -435,7 +500,7 @@ export function Dashboard() {
                   </button>
 
                   <button
-                    onClick={() => toggleFilter('telegramSent', true)}
+                    onClick={() => toggleStage2Filter('telegramSent', true)}
                     className={cn(
                       "inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors",
                       filters.telegramSent === true
@@ -471,8 +536,8 @@ export function Dashboard() {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Alert Level</label>
                     <select
-                      value={filters.alertLevel || ''}
-                      onChange={(e) => updateFilter('alertLevel', e.target.value || undefined)}
+                      value={filters.alertLevels?.[0] || ''}
+                      onChange={(e) => updateFilter('alertLevels', e.target.value ? [e.target.value] : undefined)}
                       className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                     >
                       <option value="">All</option>
@@ -505,8 +570,8 @@ export function Dashboard() {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Camera Type</label>
                     <select
-                      value={filters.cameraType || ''}
-                      onChange={(e) => updateFilter('cameraType', e.target.value || undefined)}
+                      value={filters.cameraTypes?.[0] || ''}
+                      onChange={(e) => updateFilter('cameraTypes', e.target.value ? [e.target.value] : undefined)}
                       className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                     >
                       <option value="">All</option>
@@ -547,6 +612,8 @@ export function Dashboard() {
           initialFilters={filters}
           refreshTrigger={batchUpdateTrigger}
           onPrependRegister={(prependFn) => { galleryPrependRef.current = prependFn; }}
+          onStage2Complete={onStage2Complete}
+          onStage2Failure={onStage2Failure}
         />
       </div>
     </Layout>

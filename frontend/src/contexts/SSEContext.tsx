@@ -1,6 +1,14 @@
 import { createContext, useContext, useState, useEffect, useRef, useCallback, ReactNode } from 'react';
 import { sseApi } from '@/services/api';
-import { UseSSEReturn, SSEExecutionEvent, SSEHeartbeatEvent, SSEConnectionEvent } from '@/types';
+import {
+  UseSSEReturn,
+  SSEExecutionEvent,
+  SSEHeartbeatEvent,
+  SSEConnectionEvent,
+  SSEStage2CompletionEvent,
+  SSEStage2FailureEvent,
+  SSEEtlStatusEvent
+} from '@/types';
 import toast from 'react-hot-toast';
 import { useNotifications } from '@/hooks/useNotifications';
 import { NotificationOverlay } from '@/components/notifications/NotificationOverlay';
@@ -244,10 +252,46 @@ export function SSEProvider({ children }: SSEProviderProps) {
         try {
           const data = JSON.parse(event.data);
           setLastEvent({ type: 'execution:progress', data, timestamp: new Date() });
-          
+
           // Could trigger progress UI updates here
         } catch (error) {
           console.warn('SSE Context: Failed to parse execution:progress event:', error);
+        }
+      });
+
+      // Stage 2 completion event
+      eventSource.addEventListener('etl:stage2:complete', (event) => {
+        try {
+          const data: SSEStage2CompletionEvent = JSON.parse(event.data);
+          setLastEvent({ type: 'etl:stage2:complete', data, timestamp: new Date() });
+
+          // Events are handled through useSSEHandler hook
+        } catch (error) {
+          console.warn('SSE Context: Failed to parse etl:stage2:complete event:', error);
+        }
+      });
+
+      // Stage 2 failure event
+      eventSource.addEventListener('etl:stage2:failed', (event) => {
+        try {
+          const data: SSEStage2FailureEvent = JSON.parse(event.data);
+          setLastEvent({ type: 'etl:stage2:failed', data, timestamp: new Date() });
+
+          // Events are handled through useSSEHandler hook
+        } catch (error) {
+          console.warn('SSE Context: Failed to parse etl:stage2:failed event:', error);
+        }
+      });
+
+      // ETL status event
+      eventSource.addEventListener('etl:status', (event) => {
+        try {
+          const data: SSEEtlStatusEvent = JSON.parse(event.data);
+          setLastEvent({ type: 'etl:status', data, timestamp: new Date() });
+
+          // Events are handled through useSSEHandler hook
+        } catch (error) {
+          console.warn('SSE Context: Failed to parse etl:status event:', error);
         }
       });
 
@@ -365,6 +409,9 @@ export function useSSEHandler(handlers: {
   onExecutionBatch?: (data: any) => void;
   onConnection?: (data: SSEConnectionEvent) => void;
   onHeartbeat?: (data: SSEHeartbeatEvent) => void;
+  onStage2Complete?: (data: SSEStage2CompletionEvent) => void;
+  onStage2Failure?: (data: SSEStage2FailureEvent) => void;
+  onEtlStatus?: (data: SSEEtlStatusEvent) => void;
 }) {
   const { lastEvent, ...sseState } = useSSE();
 
@@ -386,6 +433,15 @@ export function useSSEHandler(handlers: {
         break;
       case 'heartbeat':
         handlers.onHeartbeat?.(lastEvent.data);
+        break;
+      case 'etl:stage2:complete':
+        handlers.onStage2Complete?.(lastEvent.data);
+        break;
+      case 'etl:stage2:failed':
+        handlers.onStage2Failure?.(lastEvent.data);
+        break;
+      case 'etl:status':
+        handlers.onEtlStatus?.(lastEvent.data);
         break;
     }
   }, [lastEvent, handlers]);

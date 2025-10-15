@@ -13,9 +13,11 @@ interface ImageGalleryProps {
   className?: string;
   refreshTrigger?: number;
   onPrependRegister?: (prependFn: (executions: ExecutionWithImageUrls[]) => void) => void;
+  onStage2Complete?: (executionId: number, data: any) => void;
+  onStage2Failure?: (executionId: number, error: string) => void;
 }
 
-export function ImageGallery({ initialFilters = {}, className, refreshTrigger, onPrependRegister }: ImageGalleryProps) {
+export function ImageGallery({ initialFilters = {}, className, refreshTrigger, onPrependRegister, onStage2Complete, onStage2Failure }: ImageGalleryProps) {
   const [selectedExecution, setSelectedExecution] = useState<ExecutionWithImageUrls | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -32,6 +34,7 @@ export function ImageGallery({ initialFilters = {}, className, refreshTrigger, o
     updateFilters,
     filters,
     prependExecutions,
+    updateExecutionStage,
   } = useExecutions(initialFilters, refreshTrigger);
 
   // Intersection observer for infinite scroll
@@ -63,6 +66,28 @@ export function ImageGallery({ initialFilters = {}, className, refreshTrigger, o
       onPrependRegister(prependExecutions);
     }
   }, [onPrependRegister, prependExecutions]);
+
+  // Handle Stage 2 completion updates
+  const handleStage2Complete = useCallback((executionId: number, data: any) => {
+    if (updateExecutionStage) {
+      updateExecutionStage(executionId, 'stage2', {
+        has_fire: data.has_fire,
+        has_smoke: data.has_smoke,
+        alert_level: data.alert_level,
+        detection_count: data.detection_count,
+        has_image: data.has_image,
+        telegram_sent: data.telegram_sent,
+      });
+    }
+    onStage2Complete?.(executionId, data);
+  }, [updateExecutionStage, onStage2Complete]);
+
+  const handleStage2Failure = useCallback((executionId: number, error: string) => {
+    if (updateExecutionStage) {
+      updateExecutionStage(executionId, 'failed', { stage2Error: error });
+    }
+    onStage2Failure?.(executionId, error);
+  }, [updateExecutionStage, onStage2Failure]);
 
   // Memoize serialized filters to avoid unnecessary effect triggers
   const initialFiltersJson = useMemo(() => JSON.stringify(initialFilters), [initialFilters]);
