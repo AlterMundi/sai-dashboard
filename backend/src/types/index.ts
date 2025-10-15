@@ -296,10 +296,10 @@ export interface ExecutionFilters extends PaginationQuery {
   alertLevels?: ('none' | 'low' | 'high' | 'critical')[];  // Multi-select array
   hasFire?: boolean;
   hasSmoke?: boolean;
-  detectionCount?: number;  // Filter by number of detections
+  detectionCount?: number;  // Filter by minimum number of detections
   confidenceFire?: number;  // Fire-specific confidence (0.0-1.0)
   confidenceSmoke?: number;  // Smoke-specific confidence (0.0-1.0)
-  detectionMode?: string;   // e.g., 'smoke-only'
+  detectionMode?: string;   // e.g., 'smoke-only', 'fire-only', 'both'
   minConfidence?: number;   // DEPRECATED: Use confidenceFire/confidenceSmoke instead
   maxConfidence?: number;   // DEPRECATED: Use confidenceFire/confidenceSmoke instead
 
@@ -324,6 +324,10 @@ export interface ExecutionFilters extends PaginationQuery {
   // Legacy fields for compatibility
   searchQuery?: string;  // Alias for 'search'
   pageSize?: number;     // Alias for 'limit'
+
+  // Advanced JSONB detection filters (future enhancement)
+  detectionClasses?: string[];  // Filter by specific detection classes
+  minDetectionConfidence?: number;  // Minimum confidence for any detection
 }
 
 // Expert-specific filters

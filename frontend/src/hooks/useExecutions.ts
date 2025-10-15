@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { executionsApi } from '@/services/api';
-import { ExecutionWithImageUrls, ExecutionFilters, UseExecutionsReturn, ExecutionStats, DailySummary } from '@/types';
+import { ExecutionWithImageUrls, ExecutionFilters, UseExecutionsReturn, ExecutionStats, DailySummary, ProcessingStage } from '@/types';
 
 export function useExecutions(
   initialFilters: ExecutionFilters = {},
@@ -92,6 +92,33 @@ export function useExecutions(
     });
   }, []);
 
+  // Update execution processing stage (for Stage 2 completion)
+  const updateExecutionStage = useCallback((executionId: number, stage: ProcessingStage, additionalData?: any) => {
+    setExecutions(prev => prev.map(exec => {
+      if (exec.id === executionId) {
+        const updatedExec = {
+          ...exec,
+          processingStage: stage,
+          ...additionalData
+        };
+
+        // If Stage 2 completed, update the execution data with new information
+        if (stage === 'stage2' && additionalData) {
+          updatedExec.hasFire = additionalData.has_fire ?? exec.hasFire;
+          updatedExec.hasSmoke = additionalData.has_smoke ?? exec.hasSmoke;
+          updatedExec.alertLevel = additionalData.alert_level ?? exec.alertLevel;
+          updatedExec.detectionCount = additionalData.detection_count ?? exec.detectionCount;
+          updatedExec.hasImage = additionalData.has_image ?? exec.hasImage;
+          updatedExec.telegramSent = additionalData.telegram_sent ?? exec.telegramSent;
+        }
+
+        console.log(`🔄 Updated execution ${executionId} to stage ${stage}`);
+        return updatedExec;
+      }
+      return exec;
+    }));
+  }, []);
+
   // Initial fetch
   useEffect(() => {
     fetchExecutions(filters, true);
@@ -115,6 +142,7 @@ export function useExecutions(
     updateFilters,
     filters,
     prependExecutions,
+    updateExecutionStage,
   };
 }
 

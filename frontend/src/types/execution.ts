@@ -107,6 +107,22 @@ export interface ExecutionWithImageUrls extends Execution {
 }
 
 /**
+ * Processing stage status for two-stage ETL
+ */
+export type ProcessingStage = 'stage1' | 'stage2' | 'failed';
+
+/**
+ * Execution with processing stage information
+ * Used to track data availability in two-stage ETL
+ */
+export interface ExecutionWithProcessingStage extends ExecutionWithImageUrls {
+  processingStage: ProcessingStage;
+  stage2CompletedAt?: string | null;
+  stage2Error?: string | null;
+  retryCount?: number;
+}
+
+/**
  * Execution status union type
  */
 export type ExecutionStatus = Execution['status'];

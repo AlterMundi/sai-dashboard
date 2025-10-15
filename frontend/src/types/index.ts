@@ -15,10 +15,12 @@
 export type {
   Execution,
   ExecutionWithImageUrls,
+  ExecutionWithProcessingStage,
   ExecutionStatus,
   AlertLevel,
   DetectionMode,
   YoloDetection,
+  ProcessingStage,
 } from './execution';
 
 // ============================================================================
@@ -38,6 +40,9 @@ export type {
   SSEExecutionEvent,
   SSEHeartbeatEvent,
   SSEConnectionEvent,
+  SSEStage2CompletionEvent,
+  SSEStage2FailureEvent,
+  SSEEtlStatusEvent,
 } from './api';
 
 // ============================================================================

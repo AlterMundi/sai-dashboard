@@ -6,6 +6,7 @@
 
 import { ExecutionWithImageUrls } from './execution';
 import { ExecutionFilters } from './api';
+import { ProcessingStage } from './execution';
 
 /**
  * useAuth hook return type
@@ -32,6 +33,7 @@ export interface UseExecutionsReturn {
   updateFilters: (filters: ExecutionFilters) => void;
   filters: ExecutionFilters;
   prependExecutions: (executions: ExecutionWithImageUrls[]) => void;
+  updateExecutionStage: (executionId: number, stage: ProcessingStage, additionalData?: any) => void;
 }
 
 /**

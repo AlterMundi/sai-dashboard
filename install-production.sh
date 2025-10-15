@@ -53,43 +53,40 @@ success() {
 
 # Show usage
 show_usage() {
-    cat << EOF
-${BOLD}SAI Dashboard Production Installation Script v${VERSION}${NC}
-
-${BOLD}Usage:${NC}
-    $0 [OPTIONS]
-
-${BOLD}Options:${NC}
-    ${CYAN}-h, --help${NC}              Show this help message
-    ${CYAN}-v, --verbose${NC}           Enable verbose output
-    ${CYAN}-d, --dry-run${NC}           Simulate installation without making changes
-    ${CYAN}-f, --force${NC}             Force rebuild even if builds exist
-    ${CYAN}-c, --clean${NC}             Clean build directories before building
-    
-    ${BOLD}Skip Phases:${NC}
-    ${CYAN}--skip-prereq${NC}           Skip prerequisite checks
-    ${CYAN}--skip-quality${NC}          Skip pre-build quality checks
-    ${CYAN}--skip-build${NC}            Skip build phase (use existing builds)
-    ${CYAN}--skip-deploy${NC}           Skip deployment phase
-    ${CYAN}--skip-service${NC}          Skip service configuration
-    ${CYAN}--skip-verify${NC}           Skip post-installation verification
-    
-    ${BOLD}Individual Phases:${NC}
-    ${CYAN}--only-build${NC}            Only run build phase
-    ${CYAN}--only-deploy${NC}           Only run deployment phase
-    ${CYAN}--only-verify${NC}           Only run verification phase
-
-${BOLD}Examples:${NC}
-    ${CYAN}$0${NC}                      # Complete installation (default)
-    ${CYAN}$0 --skip-quality${NC}       # Fast installation, skip quality checks
-    ${CYAN}$0 --only-build${NC}         # Build only, don't deploy
-    ${CYAN}$0 --dry-run${NC}            # Simulate without changes
-    ${CYAN}$0 -f --only-deploy${NC}     # Force redeploy with existing builds
-
-${BOLD}Default Behavior:${NC}
-    Runs complete installation with all quality checks enabled.
-
-EOF
+    printf "%b" "${BOLD}SAI Dashboard Production Installation Script v${VERSION}${NC}\n"
+    printf "\n"
+    printf "%b" "${BOLD}Usage:${NC}\n"
+    printf "    $0 [OPTIONS]\n"
+    printf "\n"
+    printf "%b" "${BOLD}Options:${NC}\n"
+    printf "    ${CYAN}-h, --help${NC}              Show this help message\n"
+    printf "    ${CYAN}-v, --verbose${NC}           Enable verbose output\n"
+    printf "    ${CYAN}-d, --dry-run${NC}           Simulate installation without making changes\n"
+    printf "    ${CYAN}-f, --force${NC}             Force rebuild even if builds exist\n"
+    printf "    ${CYAN}-c, --clean${NC}             Clean build directories before building\n"
+    printf "\n"
+    printf "%b" "${BOLD}Skip Phases:${NC}\n"
+    printf "    ${CYAN}--skip-prereq${NC}           Skip prerequisite checks\n"
+    printf "    ${CYAN}--skip-quality${NC}          Skip pre-build quality checks\n"
+    printf "    ${CYAN}--skip-build${NC}            Skip build phase (use existing builds)\n"
+    printf "    ${CYAN}--skip-deploy${NC}           Skip deployment phase\n"
+    printf "    ${CYAN}--skip-service${NC}          Skip service configuration\n"
+    printf "    ${CYAN}--skip-verify${NC}           Skip post-installation verification\n"
+    printf "\n"
+    printf "%b" "${BOLD}Individual Phases:${NC}\n"
+    printf "    ${CYAN}--only-build${NC}            Only run build phase\n"
+    printf "    ${CYAN}--only-deploy${NC}           Only run deployment phase\n"
+    printf "    ${CYAN}--only-verify${NC}           Only run verification phase\n"
+    printf "\n"
+    printf "%b" "${BOLD}Examples:${NC}\n"
+    printf "    ${CYAN}$0${NC}                      # Complete installation (default)\n"
+    printf "    ${CYAN}$0 --skip-quality${NC}       # Fast installation, skip quality checks\n"
+    printf "    ${CYAN}$0 --only-build${NC}         # Build only, don't deploy\n"
+    printf "    ${CYAN}$0 --dry-run${NC}            # Simulate without changes\n"
+    printf "    ${CYAN}$0 -f --only-deploy${NC}     # Force redeploy with existing builds\n"
+    printf "\n"
+    printf "%b" "${BOLD}Default Behavior:${NC}\n"
+    printf "    Runs complete installation with all quality checks enabled.\n"
     exit 0
 }
 
@@ -290,7 +287,7 @@ pre_build_checks() {
         info "[DRY RUN] Would validate backend TypeScript"
     else
         if [ "$NO_TYPE_CHECK" = "1" ]; then
-            warning "Skipping TypeScript validation (NO_TYPE_CHECK=1)"
+            warn "Skipping TypeScript validation (NO_TYPE_CHECK=1)"
         elif [ "$VERBOSE" = true ]; then
             npm run type-check || error "Backend TypeScript validation failed"
         else
@@ -999,53 +996,53 @@ verify_installation() {
 # Show deployment info
 show_deployment_info() {
     log "🎉 SAI Dashboard Production Installation Complete!"
-    echo ""
-    echo -e "${BLUE}📋 Deployment Information:${NC}"
-    echo "  • Frontend: $WEB_ROOT/sai-dashboard/"
-    echo "  • Backend:  /opt/sai-dashboard/backend/"
-    echo "  • Config:   /opt/sai-dashboard/.env"
-    echo "  • Cache:    /mnt/raid1/n8n-backup/images/"
-    echo "  • Logs:     journalctl -u sai-dashboard-api.service -f"
-    echo ""
-    echo -e "${BLUE}🌐 Access URLs (via public proxy):${NC}"
-    echo "  • Dashboard: https://sai.altermundi.net/dashboard/"
-    echo "  • API:       https://sai.altermundi.net/dashboard/api/"
-    echo ""
-    echo -e "${BLUE}🔧 Management Commands:${NC}"
-    echo "  • Status:  sudo systemctl status sai-dashboard-api"
-    echo "  • Restart: sudo systemctl restart sai-dashboard-api" 
-    echo "  • Logs:    sudo journalctl -u sai-dashboard-api -f"
-    echo ""
-    echo -e "${BLUE}📁 Login Credentials:${NC}"
-    echo "  • Password: $(grep DASHBOARD_PASSWORD /opt/sai-dashboard/.env | cut -d'=' -f2)"
+    printf "\n"
+    printf "%b" "${BLUE}📋 Deployment Information:${NC}\n"
+    printf "  • Frontend: $WEB_ROOT/sai-dashboard/\n"
+    printf "  • Backend:  /opt/sai-dashboard/backend/\n"
+    printf "  • Config:   /opt/sai-dashboard/.env\n"
+    printf "  • Cache:    /mnt/raid1/n8n-backup/images/\n"
+    printf "  • Logs:     journalctl -u sai-dashboard-api.service -f\n"
+    printf "\n"
+    printf "%b" "${BLUE}🌐 Access URLs (via public proxy):${NC}\n"
+    printf "  • Dashboard: https://sai.altermundi.net/dashboard/\n"
+    printf "  • API:       https://sai.altermundi.net/dashboard/api/\n"
+    printf "\n"
+    printf "%b" "${BLUE}🔧 Management Commands:${NC}\n"
+    printf "  • Status:  sudo systemctl status sai-dashboard-api\n"
+    printf "  • Restart: sudo systemctl restart sai-dashboard-api\n"
+    printf "  • Logs:    sudo journalctl -u sai-dashboard-api -f\n"
+    printf "\n"
+    printf "%b" "${BLUE}📁 Login Credentials:${NC}\n"
+    printf "  • Password: $(grep DASHBOARD_PASSWORD /opt/sai-dashboard/.env | cut -d'=' -f2)\n"
 }
 
 # Show installation summary
 show_summary() {
-    echo
-    echo -e "${BOLD}${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e "${BOLD}         SAI Dashboard Installation Summary         ${NC}"
-    echo -e "${BOLD}${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo
-    
+    printf "\n"
+    printf "%b" "${BOLD}${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
+    printf "%b" "${BOLD}         SAI Dashboard Installation Summary         ${NC}\n"
+    printf "%b" "${BOLD}${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
+    printf "\n"
+
     local total_time=$(($(date +%s) - SCRIPT_START_TIME))
     local minutes=$((total_time / 60))
     local seconds=$((total_time % 60))
-    
-    echo -e "${BOLD}Installation completed in: ${CYAN}${minutes}m ${seconds}s${NC}"
-    echo
-    
-    echo -e "${BOLD}Steps executed:${NC}"
-    [ "$SKIP_PREREQ" = false ] && echo -e "  ${GREEN}✓${NC} Prerequisites checked"
-    [ "$SKIP_QUALITY" = false ] && echo -e "  ${GREEN}✓${NC} Quality checks passed"
-    [ "$SKIP_BUILD" = false ] && echo -e "  ${GREEN}✓${NC} Applications built"
-    [ "$SKIP_DEPLOY" = false ] && echo -e "  ${GREEN}✓${NC} Files deployed"
-    [ "$SKIP_SERVICE" = false ] && echo -e "  ${GREEN}✓${NC} Services configured"
-    [ "$SKIP_VERIFY" = false ] && echo -e "  ${GREEN}✓${NC} Installation verified"
-    
-    echo
-    echo -e "${BOLD}${GREEN}🎉 Installation successful!${NC}"
-    echo -e "${BOLD}${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+
+    printf "%b" "${BOLD}Installation completed in: ${CYAN}${minutes}m ${seconds}s${NC}\n"
+    printf "\n"
+
+    printf "%b" "${BOLD}Steps executed:${NC}\n"
+    [ "$SKIP_PREREQ" = false ] && printf "%b" "  ${GREEN}✓${NC} Prerequisites checked\n"
+    [ "$SKIP_QUALITY" = false ] && printf "%b" "  ${GREEN}✓${NC} Quality checks passed\n"
+    [ "$SKIP_BUILD" = false ] && printf "%b" "  ${GREEN}✓${NC} Applications built\n"
+    [ "$SKIP_DEPLOY" = false ] && printf "%b" "  ${GREEN}✓${NC} Files deployed\n"
+    [ "$SKIP_SERVICE" = false ] && printf "%b" "  ${GREEN}✓${NC} Services configured\n"
+    [ "$SKIP_VERIFY" = false ] && printf "%b" "  ${GREEN}✓${NC} Installation verified\n"
+
+    printf "\n"
+    printf "%b" "${BOLD}${GREEN}🎉 Installation successful!${NC}\n"
+    printf "%b" "${BOLD}${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
 }
 
 # Main installation function
@@ -1063,7 +1060,7 @@ main() {
     echo -e "${BOLD}${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo
     
-    [ "$DRY_RUN" = true ] && echo -e "${YELLOW}${BOLD}DRY RUN MODE - No changes will be made${NC}\n"
+    [ "$DRY_RUN" = true ] && printf "%b" "${YELLOW}${BOLD}DRY RUN MODE - No changes will be made${NC}\n"
     
     log "Starting installation process..."
     

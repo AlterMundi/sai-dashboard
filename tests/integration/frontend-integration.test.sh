@@ -389,11 +389,11 @@ echo -e "${GREEN}Tests Passed: $TESTS_PASSED${NC}"
 echo -e "${RED}Tests Failed: $TESTS_FAILED${NC}"
 
 if [[ $TESTS_FAILED -gt 0 ]]; then
-    echo
-    echo -e "${RED}❌ Some frontend integration tests failed.${NC}"
+    printf "\n"
+    printf "%b" "${RED}❌ Some frontend integration tests failed.${NC}\n"
     exit 1
 else
-    echo
-    echo -e "${GREEN}✅ All frontend integration tests passed!${NC}"
+    printf "\n"
+    printf "%b" "${GREEN}✅ All frontend integration tests passed!${NC}\n"
     exit 0
 fi
