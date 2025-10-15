@@ -152,8 +152,8 @@ export function FilterBar({
             Alert Level
           </label>
           <Select
-            value={filters.alertLevel || ''}
-            onValueChange={(value) => handleFilterChange('alertLevel', value || undefined)}
+            value={filters.alertLevels?.[0] || ''}
+            onValueChange={(value) => handleFilterChange('alertLevels', value ? [value] : undefined)}
           >
             <SelectTrigger>
               <SelectValue placeholder="All levels" />
@@ -283,8 +283,8 @@ export function FilterBar({
                 Camera Type
               </label>
               <Select
-                value={filters.cameraType || ''}
-                onValueChange={(value) => handleFilterChange('cameraType', value || undefined)}
+                value={filters.cameraTypes?.[0] || ''}
+                onValueChange={(value) => handleFilterChange('cameraTypes', value ? [value] : undefined)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="All types" />
@@ -531,10 +531,10 @@ export function FilterBar({
               </button>
             </Badge>
           )}
-          {filters.alertLevel && (
+          {filters.alertLevels && filters.alertLevels.length > 0 && (
             <Badge variant="secondary" className="flex items-center gap-1">
-              Alert: {filters.alertLevel}
-              <button onClick={() => clearFilter('alertLevel')} className="ml-1">
+              Alert: {filters.alertLevels[0]}
+              <button onClick={() => clearFilter('alertLevels')} className="ml-1">
                 <X className="h-3 w-3" />
               </button>
             </Badge>
@@ -563,10 +563,10 @@ export function FilterBar({
               </button>
             </Badge>
           )}
-          {filters.cameraType && (
+          {filters.cameraTypes && filters.cameraTypes.length > 0 && (
             <Badge variant="secondary" className="flex items-center gap-1">
-              Camera Type: {filters.cameraType}
-              <button onClick={() => clearFilter('cameraType')} className="ml-1">
+              Camera Type: {filters.cameraTypes[0]}
+              <button onClick={() => clearFilter('cameraTypes')} className="ml-1">
                 <X className="h-3 w-3" />
               </button>
             </Badge>

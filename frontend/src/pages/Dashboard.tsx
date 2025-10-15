@@ -37,16 +37,10 @@ export function Dashboard() {
   const { isConnected, systemHealth } = useSSE();
 
   const {
-    executions: galleryExecutions,
-    isLoading: galleryLoading,
-    error: galleryError,
-    hasNext,
-    loadMore,
-    refresh,
-    updateFilters,
-    prependExecutions,
     updateExecutionStage,
   } = useExecutions(filters, batchUpdateTrigger);
+
+  // Remove unused variables
 
   // Handle real-time updates via SSE
   const onNewExecution = useCallback(() => {
