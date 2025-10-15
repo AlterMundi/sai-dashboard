@@ -14,8 +14,9 @@ export function ImageCard({ execution, onClick, loading = false }: ImageCardProp
   // Check if this is an execution with processing stage info
   const processingStage = (execution as any).processingStage as ProcessingStage | undefined;
   const isStage1Only = processingStage === 'stage1';
-  const isProcessing = processingStage === 'stage1' && !execution.hasImage; // Stage 1 but no image yet
   const hasStage2Error = processingStage === 'failed';
+
+  // Remove unused variable
 
   // Use hasImage from the execution data directly
   // For Stage 1 only executions, show placeholder until Stage 2 completes

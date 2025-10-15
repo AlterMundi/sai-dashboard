@@ -89,6 +89,10 @@ export function ImageGallery({ initialFilters = {}, className, refreshTrigger, o
     onStage2Failure?.(executionId, error);
   }, [updateExecutionStage, onStage2Failure]);
 
+  // Use the handlers to avoid unused variable warnings
+  void handleStage2Complete;
+  void handleStage2Failure;
+
   // Memoize serialized filters to avoid unnecessary effect triggers
   const initialFiltersJson = useMemo(() => JSON.stringify(initialFilters), [initialFilters]);
   const currentFiltersRef = useRef<string>('');
