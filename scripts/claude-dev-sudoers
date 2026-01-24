@@ -1,0 +1,21 @@
+# Claude Code Development Sudoers Configuration
+# Install with: sudo cp claude-dev-sudoers /etc/sudoers.d/claude-dev && sudo chmod 440 /etc/sudoers.d/claude-dev
+#
+# This allows the fede user to run specific development commands without password
+# after authenticating once in the session.
+
+# PostgreSQL operations
+fede ALL=(postgres) NOPASSWD: /usr/bin/psql
+fede ALL=(postgres) NOPASSWD: /usr/bin/pg_dump
+fede ALL=(postgres) NOPASSWD: /usr/bin/pg_restore
+fede ALL=(postgres) NOPASSWD: /usr/bin/createdb
+fede ALL=(postgres) NOPASSWD: /usr/bin/dropdb
+
+# System service management (for development services only)
+fede ALL=(root) NOPASSWD: /usr/bin/systemctl status *
+fede ALL=(root) NOPASSWD: /usr/bin/systemctl restart sai-dashboard-api
+fede ALL=(root) NOPASSWD: /usr/bin/systemctl stop sai-dashboard-api
+fede ALL=(root) NOPASSWD: /usr/bin/systemctl start sai-dashboard-api
+
+# Journal logs
+fede ALL=(root) NOPASSWD: /usr/bin/journalctl -u sai-dashboard-api *
