@@ -167,9 +167,17 @@ export const appConfig = {
 // LEGACY: databaseConfig removed - use n8nDatabaseConfig or saiDatabaseConfig instead
 // export const databaseConfig: DatabaseConfig = { ... }
 
+// Resolve IMAGE_BASE_PATH relative to project root (where .env is located)
+// This ensures paths like "./image-cache" work regardless of current working directory
+const projectRoot = resolve(__dirname, '../../..');
+const rawImageBasePath = process.env.IMAGE_BASE_PATH || '/mnt/raid1/n8n-backup/images';
+const resolvedImageBasePath = rawImageBasePath.startsWith('/')
+  ? rawImageBasePath
+  : resolve(projectRoot, rawImageBasePath);
+
 export const cacheConfig: CacheConfig = {
   path: process.env.CACHE_PATH || '/cache',
-  basePath: process.env.IMAGE_BASE_PATH || '/mnt/raid1/n8n/backup/images',
+  basePath: resolvedImageBasePath,
   enableThumbnails: process.env.ENABLE_THUMBNAIL_GENERATION === 'true',
   thumbnailSize: parseInt(process.env.THUMBNAIL_SIZE || '200', 10),
   thumbnailQuality: parseInt(process.env.THUMBNAIL_QUALITY || '70', 10),

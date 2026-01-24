@@ -69,3 +69,5 @@ temp/
 *.zip
 *.tar.gz
 *.7z
+# Local image cache for development
+image-cache/

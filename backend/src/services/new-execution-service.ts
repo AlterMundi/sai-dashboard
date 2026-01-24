@@ -660,6 +660,34 @@ export class NewExecutionService {
   }
 
   /**
+   * Get image paths for an execution
+   * Returns relative paths from execution_images table
+   */
+  async getImagePaths(executionId: number): Promise<{
+    originalPath: string | null;
+    thumbnailPath: string | null;
+    cachedPath: string | null;
+  } | null> {
+    const query = `
+      SELECT original_path, thumbnail_path, cached_path
+      FROM execution_images
+      WHERE execution_id = $1
+    `;
+
+    const results = await dualDb.query(query, [executionId]);
+
+    if (results.length === 0) {
+      return null;
+    }
+
+    return {
+      originalPath: results[0].original_path,
+      thumbnailPath: results[0].thumbnail_path,
+      cachedPath: results[0].cached_path
+    };
+  }
+
+  /**
    * Get raw execution data (for debugging/analysis)
    * SINGLE SOURCE: sai_dashboard database only
    */
