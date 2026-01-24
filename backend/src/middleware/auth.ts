@@ -64,7 +64,13 @@ export const apiRateLimit = rateLimit({
   },
   skip: (req) => {
     // Skip rate limiting for health checks
-    return req.path === '/api/health';
+    if (req.path === '/api/health') return true;
+    // Skip rate limiting in development for localhost
+    if (appConfig.nodeEnv === 'development' &&
+        (req.ip === '127.0.0.1' || req.ip === '::1' || req.ip === '::ffff:127.0.0.1')) {
+      return true;
+    }
+    return false;
   }
 });
 
@@ -78,7 +84,12 @@ export const burstRateLimit = rateLimit({
     }
   },
   standardHeaders: false,
-  legacyHeaders: false
+  legacyHeaders: false,
+  skip: (req) => {
+    // Skip burst limiting in development for localhost
+    return appConfig.nodeEnv === 'development' &&
+           (req.ip === '127.0.0.1' || req.ip === '::1' || req.ip === '::ffff:127.0.0.1');
+  }
 });
 
 export const generateToken = (sessionData: Omit<SessionData, 'createdAt' | 'expiresAt'>): string => {

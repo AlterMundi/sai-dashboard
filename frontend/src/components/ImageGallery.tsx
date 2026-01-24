@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { useInView } from 'react-intersection-observer';
 import { ImageCard } from './ImageCard';
+import { ExecutionListItem } from './ExecutionListItem';
 import { ImageModal } from './ImageModal';
 import { LoadingSpinner, LoadingState } from './ui/LoadingSpinner';
 import { useExecutions } from '@/hooks/useExecutions';
@@ -233,11 +234,36 @@ export function ImageGallery({ initialFilters = {}, className, refreshTrigger, o
             </div>
           )}
 
-          {/* Executions Grid */}
-          {executions.length > 0 && (
+          {/* Executions Grid/List */}
+          {executions.length > 0 && viewMode === 'grid' && (
             <div className={gridClasses[viewMode]}>
               {executions.map((execution) => (
                 <ImageCard
+                  key={execution.id}
+                  execution={execution}
+                  onClick={handleCardClick}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* List View */}
+          {executions.length > 0 && viewMode === 'list' && (
+            <div className="space-y-2">
+              {/* List Header */}
+              <div className="hidden sm:flex items-center gap-4 px-3 py-2 bg-gray-50 rounded-lg text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <div className="w-16">Image</div>
+                <div className="w-32">ID / Time</div>
+                <div className="flex-1">Camera / Location</div>
+                <div className="w-20">Alert</div>
+                <div className="w-24">Detections</div>
+                <div className="w-16 text-center">Count</div>
+                <div className="w-24 text-right">Status</div>
+                <div className="w-10"></div>
+              </div>
+              {/* List Items */}
+              {executions.map((execution) => (
+                <ExecutionListItem
                   key={execution.id}
                   execution={execution}
                   onClick={handleCardClick}
