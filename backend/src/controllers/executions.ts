@@ -1,15 +1,96 @@
 /**
- * NEW Execution Controller - Clean and Simple
- * Single source of truth: Uses ONLY newExecutionService and sai_dashboard
- * Merciless replacement of old complex logic with clean new approach
+ * Execution Controller - Clean Image Path Resolution
+ *
+ * Image paths are stored as RELATIVE paths in the database.
+ * This controller resolves them using IMAGE_BASE_PATH at runtime.
+ *
+ * Path resolution: IMAGE_BASE_PATH + relative_path = filesystem_path
+ * Example: ./image-cache + original/410/410000.jpg = ./image-cache/original/410/410000.jpg
  */
 
 import { Request, Response } from 'express';
 import { newExecutionService } from '@/services/new-execution-service';
-import { imageService } from '@/services/image';
+import { cacheConfig } from '@/config';
 import { ExecutionFilters } from '@/types';
 import { logger } from '@/utils/logger';
 import { asyncHandler, parseIntSafe } from '@/utils';
+import path from 'path';
+import fs from 'fs';
+
+/**
+ * Resolve a relative image path to an absolute filesystem path
+ * Uses IMAGE_BASE_PATH from configuration
+ */
+function resolveImagePath(relativePath: string | null): string | null {
+  if (!relativePath) return null;
+
+  // If path is already absolute (legacy data), return as-is
+  if (relativePath.startsWith('/')) {
+    return relativePath;
+  }
+
+  return path.join(cacheConfig.basePath, relativePath);
+}
+
+/**
+ * Build relative path for an execution image (when DB path not available)
+ * Used as fallback when execution_images record doesn't exist
+ */
+function buildRelativePath(executionId: number, type: 'original' | 'thumb' | 'webp'): string {
+  const partition = Math.floor(executionId / 1000);
+  const ext = type === 'original' ? 'jpg' : 'webp';
+  return `${type}/${partition}/${executionId}.${ext}`;
+}
+
+/**
+ * Legacy path patterns for backward compatibility
+ */
+function buildLegacyPath(executionId: number, type: 'original' | 'thumb' | 'webp'): string {
+  const filenames: Record<string, string> = {
+    original: 'original.jpg',
+    thumb: 'thumb.webp',
+    webp: 'high.webp'
+  };
+  return path.join(cacheConfig.basePath, 'by-execution', executionId.toString(), filenames[type]);
+}
+
+/**
+ * Find image path - tries DB path, then partition path, then legacy path
+ */
+async function findImagePath(
+  executionId: number,
+  type: 'original' | 'thumb' | 'webp'
+): Promise<string | null> {
+  // 1. Try to get path from database
+  const dbPaths = await newExecutionService.getImagePaths(executionId);
+
+  if (dbPaths) {
+    const relativePath = type === 'original' ? dbPaths.originalPath :
+                         type === 'thumb' ? dbPaths.thumbnailPath :
+                         dbPaths.cachedPath;
+
+    if (relativePath) {
+      const fullPath = resolveImagePath(relativePath);
+      if (fullPath && fs.existsSync(fullPath)) {
+        return fullPath;
+      }
+    }
+  }
+
+  // 2. Try partition-based path
+  const partitionPath = path.join(cacheConfig.basePath, buildRelativePath(executionId, type));
+  if (fs.existsSync(partitionPath)) {
+    return partitionPath;
+  }
+
+  // 3. Try legacy path structure
+  const legacyPath = buildLegacyPath(executionId, type);
+  if (fs.existsSync(legacyPath)) {
+    return legacyPath;
+  }
+
+  return null;
+}
 
 export const getExecutions = asyncHandler(async (req: Request, res: Response): Promise<void> => {
   const {
@@ -127,19 +208,9 @@ export const getExecutionImage = asyncHandler(async (req: Request, res: Response
     return;
   }
 
-  // Support both partition-based (new) and legacy directory structures
-  const partition = Math.floor(executionId / 1000);
-  const partitionJpegPath = `/mnt/raid1/n8n-backup/images/original/${partition}/${executionId}.jpg`;
-  const legacyJpegPath = `/mnt/raid1/n8n-backup/images/by-execution/${executionId}/original.jpg`;
+  const imagePath = await findImagePath(executionId, 'original');
 
-  const fs = require('fs');
-  let imagePath: string;
-
-  if (fs.existsSync(partitionJpegPath)) {
-    imagePath = partitionJpegPath;
-  } else if (fs.existsSync(legacyJpegPath)) {
-    imagePath = legacyJpegPath;
-  } else {
+  if (!imagePath) {
     res.status(404).json({
       error: {
         message: 'Image not found',
@@ -149,7 +220,7 @@ export const getExecutionImage = asyncHandler(async (req: Request, res: Response
     return;
   }
 
-  res.sendFile(imagePath);
+  res.sendFile(path.resolve(imagePath));
 });
 
 export const getExecutionImageWebP = asyncHandler(async (req: Request, res: Response): Promise<void> => {
@@ -165,41 +236,24 @@ export const getExecutionImageWebP = asyncHandler(async (req: Request, res: Resp
     return;
   }
 
-  // Support both partition-based (new) and legacy directory structures
-  const partition = Math.floor(executionId / 1000);
-  const partitionWebpPath = `/mnt/raid1/n8n-backup/images/webp/${partition}/${executionId}.webp`;
-  const legacyWebpPath = `/mnt/raid1/n8n-backup/images/by-execution/${executionId}/high.webp`;
+  // Try WebP first, fall back to original JPEG
+  let imagePath = await findImagePath(executionId, 'webp');
 
-  const fs = require('fs');
-  let webpPath: string | null = null;
-
-  if (fs.existsSync(partitionWebpPath)) {
-    webpPath = partitionWebpPath;
-  } else if (fs.existsSync(legacyWebpPath)) {
-    webpPath = legacyWebpPath;
+  if (!imagePath) {
+    imagePath = await findImagePath(executionId, 'original');
   }
 
-  if (webpPath) {
-    res.sendFile(webpPath);
-    return;
-  }
-
-  // Fall back to JPEG original
-  const partitionJpegPath = `/mnt/raid1/n8n-backup/images/original/${partition}/${executionId}.jpg`;
-  const legacyJpegPath = `/mnt/raid1/n8n-backup/images/by-execution/${executionId}/original.jpg`;
-
-  if (fs.existsSync(partitionJpegPath)) {
-    res.sendFile(partitionJpegPath);
-  } else if (fs.existsSync(legacyJpegPath)) {
-    res.sendFile(legacyJpegPath);
-  } else {
+  if (!imagePath) {
     res.status(404).json({
       error: {
         message: 'Image not found',
         code: 'IMAGE_NOT_FOUND'
       }
     });
+    return;
   }
+
+  res.sendFile(path.resolve(imagePath));
 });
 
 export const getExecutionThumbnail = asyncHandler(async (req: Request, res: Response): Promise<void> => {
@@ -215,20 +269,9 @@ export const getExecutionThumbnail = asyncHandler(async (req: Request, res: Resp
     return;
   }
 
-  // Support both partition-based (new) and legacy directory structures
-  const partition = Math.floor(executionId / 1000);
-  const partitionPath = `/mnt/raid1/n8n-backup/images/thumb/${partition}/${executionId}.webp`;
-  const legacyPath = `/mnt/raid1/n8n-backup/images/by-execution/${executionId}/thumb.webp`;
+  const thumbnailPath = await findImagePath(executionId, 'thumb');
 
-  // Try partition-based path first, fallback to legacy
-  const fs = require('fs');
-  let thumbnailPath: string;
-
-  if (fs.existsSync(partitionPath)) {
-    thumbnailPath = partitionPath;
-  } else if (fs.existsSync(legacyPath)) {
-    thumbnailPath = legacyPath;
-  } else {
+  if (!thumbnailPath) {
     res.status(404).json({
       error: {
         message: 'Thumbnail not found',
@@ -238,7 +281,7 @@ export const getExecutionThumbnail = asyncHandler(async (req: Request, res: Resp
     return;
   }
 
-  res.sendFile(thumbnailPath);
+  res.sendFile(path.resolve(thumbnailPath));
 });
 
 export const getExecutionData = asyncHandler(async (req: Request, res: Response): Promise<void> => {
@@ -273,9 +316,9 @@ export const getExecutionData = asyncHandler(async (req: Request, res: Response)
 
 export const getDailySummary = asyncHandler(async (req: Request, res: Response): Promise<void> => {
   const days = parseIntSafe(req.query.days as string, 7);
-  
+
   const summary = await newExecutionService.getDailySummary(days);
-  
+
   res.json({
     data: summary
   });
@@ -283,7 +326,7 @@ export const getDailySummary = asyncHandler(async (req: Request, res: Response):
 
 export const getExecutionStats = asyncHandler(async (req: Request, res: Response): Promise<void> => {
   const stats = await newExecutionService.getExecutionStats();
-  
+
   res.json({
     data: stats
   });
@@ -304,7 +347,7 @@ export const searchExecutions = asyncHandler(async (req: Request, res: Response)
   }
 
   const executions = await newExecutionService.searchExecutions(query.trim(), limit);
-  
+
   res.json({
     data: executions,
     meta: {
@@ -316,7 +359,7 @@ export const searchExecutions = asyncHandler(async (req: Request, res: Response)
 
 export const getEnhancedStatistics = asyncHandler(async (req: Request, res: Response): Promise<void> => {
   const stats = await newExecutionService.getEnhancedStatistics();
-  
+
   res.json({
     data: stats
   });

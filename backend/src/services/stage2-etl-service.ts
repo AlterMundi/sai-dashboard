@@ -824,51 +824,57 @@ export class Stage2ETLService extends EventEmitter {
 
   /**
    * Process and cache image - all formats in parallel
+   *
+   * Stores RELATIVE paths in database (e.g., "original/410/410000.jpg")
+   * The application resolves these at runtime using IMAGE_BASE_PATH config
    */
   private async processImage(executionId: number, imageBase64: string): Promise<void> {
     try {
       const partition = Math.floor(executionId / 1000);
 
-      // Create directories
-      const originalDir = path.join(this.IMAGE_CACHE_PATH, 'original', partition.toString());
-      const webpDir = path.join(this.IMAGE_CACHE_PATH, 'webp', partition.toString());
-      const thumbDir = path.join(this.IMAGE_CACHE_PATH, 'thumb', partition.toString());
+      // Define RELATIVE paths (stored in database)
+      const originalRelPath = `original/${partition}/${executionId}.jpg`;
+      const webpRelPath = `webp/${partition}/${executionId}.webp`;
+      const thumbRelPath = `thumb/${partition}/${executionId}.webp`;
 
+      // Define ABSOLUTE paths (used for filesystem operations)
+      const originalAbsPath = path.join(this.IMAGE_CACHE_PATH, originalRelPath);
+      const webpAbsPath = path.join(this.IMAGE_CACHE_PATH, webpRelPath);
+      const thumbAbsPath = path.join(this.IMAGE_CACHE_PATH, thumbRelPath);
+
+      // Create directories
       await Promise.all([
-        fs.mkdir(originalDir, { recursive: true }),
-        fs.mkdir(webpDir, { recursive: true }),
-        fs.mkdir(thumbDir, { recursive: true })
+        fs.mkdir(path.dirname(originalAbsPath), { recursive: true }),
+        fs.mkdir(path.dirname(webpAbsPath), { recursive: true }),
+        fs.mkdir(path.dirname(thumbAbsPath), { recursive: true })
       ]);
 
       const imageBuffer = Buffer.from(imageBase64, 'base64');
 
-      // Define paths
-      const originalPath = path.join(originalDir, `${executionId}.jpg`);
-      const webpPath = path.join(webpDir, `${executionId}.webp`);
-      const thumbPath = path.join(thumbDir, `${executionId}.webp`);
-
       // Process all image formats in parallel
       await Promise.all([
         // Save original JPEG
-        sharp(imageBuffer).jpeg({ quality: 95 }).toFile(originalPath),
+        sharp(imageBuffer).jpeg({ quality: 95 }).toFile(originalAbsPath),
         // Create WebP variant
-        sharp(imageBuffer).webp({ quality: 85 }).toFile(webpPath),
+        sharp(imageBuffer).webp({ quality: 85 }).toFile(webpAbsPath),
         // Create thumbnail
         sharp(imageBuffer)
           .resize(300, 300, { fit: 'inside', withoutEnlargement: true })
           .webp({ quality: 75 })
-          .toFile(thumbPath)
+          .toFile(thumbAbsPath)
       ]);
 
-      // Insert image metadata with all paths
+      // Insert image metadata with RELATIVE paths (portable across environments)
       await this.saiPool.query(`
         INSERT INTO execution_images (
           execution_id, original_path, thumbnail_path, cached_path, size_bytes, format, extracted_at
         ) VALUES ($1, $2, $3, $4, $5, 'jpeg', NOW())
         ON CONFLICT (execution_id) DO UPDATE SET
+          original_path = EXCLUDED.original_path,
           thumbnail_path = EXCLUDED.thumbnail_path,
-          cached_path = EXCLUDED.cached_path
-      `, [executionId, originalPath, thumbPath, webpPath, imageBuffer.length]);
+          cached_path = EXCLUDED.cached_path,
+          size_bytes = EXCLUDED.size_bytes
+      `, [executionId, originalRelPath, thumbRelPath, webpRelPath, imageBuffer.length]);
 
     } catch (error) {
       logger.error(`Failed to process image for execution ${executionId}:`, error);
