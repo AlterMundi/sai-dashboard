@@ -8,10 +8,15 @@ config({ path: resolve(__dirname, '../../../.env') });
 /**
  * Validation: Required environment variables
  * These MUST be set for the application to start
+ * Note: DB passwords are optional in development (local peer auth)
  */
 const requiredEnvVars = [
   'DASHBOARD_PASSWORD',
   'SESSION_SECRET',
+] as const;
+
+// DB passwords required in production only
+const productionRequiredVars = [
   'N8N_DB_PASSWORD',
   'SAI_DB_PASSWORD',
 ] as const;
@@ -23,6 +28,15 @@ const warningVars: Array<{ key: string; message: string }> = [];
 for (const envVar of requiredEnvVars) {
   if (!process.env[envVar]) {
     missingVars.push(envVar);
+  }
+}
+
+// Check production-only required variables
+if (process.env.NODE_ENV === 'production') {
+  for (const envVar of productionRequiredVars) {
+    if (!process.env[envVar]) {
+      missingVars.push(envVar);
+    }
   }
 }
 
@@ -165,12 +179,13 @@ export const cacheConfig: CacheConfig = {
 };
 
 // N8N Database Configuration (for ETL services)
+// Note: Empty password string is valid for local peer auth
 export const n8nDatabaseConfig = {
   host: process.env.N8N_DB_HOST || 'localhost',
   port: parseInt(process.env.N8N_DB_PORT || '5432', 10),
   database: process.env.N8N_DB_NAME || 'n8n',
   username: process.env.N8N_DB_USER || 'n8n_user',
-  password: process.env.N8N_DB_PASSWORD || '',
+  password: process.env.N8N_DB_PASSWORD ?? '',
 };
 
 // SAI Dashboard Database Configuration (separate database)
@@ -179,7 +194,7 @@ export const saiDatabaseConfig = {
   port: parseInt(process.env.SAI_DB_PORT || '5432', 10),
   database: process.env.SAI_DB_NAME || 'sai_dashboard',
   username: process.env.SAI_DB_USER || 'sai_dashboard_user',
-  password: process.env.SAI_DB_PASSWORD || '',
+  password: process.env.SAI_DB_PASSWORD ?? '',
 };
 
 export const isDevelopment = appConfig.nodeEnv === 'development';

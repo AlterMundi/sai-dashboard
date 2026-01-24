@@ -9,14 +9,15 @@
  * recursively resolved to access actual values.
  *
  * Processes:
- * - Polls etl_processing_queue for pending Stage 2 work
+ * - Uses LISTEN/NOTIFY for immediate response + polling as fallback
+ * - Claims batches atomically with SKIP LOCKED (no race conditions)
  * - Fetches and parses execution_data JSON from n8n
  * - Resolves n8n's compact reference format
  * - Extracts YOLO inference results (detections, confidences, alert levels)
  * - Extracts camera metadata (device_id, location, camera_id)
- * - Extracts annotated images
- * - Updates executions, execution_analysis tables
- * - Marks queue item as completed or failed (with retry)
+ * - Extracts annotated images (processed in parallel)
+ * - Updates executions, execution_analysis tables in atomic transactions
+ * - Cleans up stale workers periodically
  *
  * Data Integrity:
  * - ALL extracted fields are nullable (honest about missing data)
@@ -29,7 +30,7 @@
  * See: docs/N8N_DATA_FORMAT.md
  */
 
-import { Pool } from 'pg';
+import { Pool, PoolClient } from 'pg';
 import { EventEmitter } from 'events';
 import sharp from 'sharp';
 import fs from 'fs/promises';
@@ -95,18 +96,23 @@ interface Stage2ExtractionResult {
 
 /**
  * Stage 2 ETL Service
- * Async deep processing with retry logic
+ * Async deep processing with retry logic, LISTEN/NOTIFY, and SKIP LOCKED
  */
 export class Stage2ETLService extends EventEmitter {
   private n8nPool: Pool;
   private saiPool: Pool;
+  private listenerClient: PoolClient | null = null;
   private isRunning = false;
   private processingInterval: NodeJS.Timeout | null = null;
+  private cleanupInterval: NodeJS.Timeout | null = null;
   private workerId: string;
 
   // Configuration
   private readonly BATCH_SIZE = 10;
-  private readonly POLL_INTERVAL_MS = 5000; // Process queue every 5 seconds
+  private readonly POLL_INTERVAL_MS = 30000;  // Reduced: NOTIFY handles immediate processing
+  private readonly CLEANUP_INTERVAL_MS = 60000;  // Cleanup stale workers every 60s
+  private readonly STALE_THRESHOLD_MINUTES = 5;
+  private readonly STATEMENT_TIMEOUT_MS = 30000;  // 30 second query timeout
   private readonly IMAGE_CACHE_PATH = cacheConfig.basePath;
 
   // Performance metrics
@@ -117,6 +123,8 @@ export class Stage2ETLService extends EventEmitter {
     detectionsFound: 0,
     avgProcessingTimeMs: 0,
     lastProcessedAt: null as Date | null,
+    notifyEventsReceived: 0,
+    staleWorkersRecovered: 0,
     startedAt: new Date()
   };
 
@@ -132,7 +140,8 @@ export class Stage2ETLService extends EventEmitter {
       user: n8nDatabaseConfig.username,
       password: n8nDatabaseConfig.password,
       max: 5,
-      idleTimeoutMillis: 30000
+      idleTimeoutMillis: 30000,
+      statement_timeout: this.STATEMENT_TIMEOUT_MS
     });
 
     // SAI Dashboard database pool (write operations)
@@ -143,7 +152,8 @@ export class Stage2ETLService extends EventEmitter {
       user: saiDatabaseConfig.username,
       password: saiDatabaseConfig.password,
       max: 10,
-      idleTimeoutMillis: 30000
+      idleTimeoutMillis: 30000,
+      statement_timeout: this.STATEMENT_TIMEOUT_MS
     });
   }
 
@@ -162,8 +172,14 @@ export class Stage2ETLService extends EventEmitter {
       // Test database connections
       await this.testConnections();
 
-      // Start processing loop
+      // Setup LISTEN for immediate notification
+      await this.setupNotifyListener();
+
+      // Start polling loop (fallback for missed notifications)
       this.startProcessingLoop();
+
+      // Start stale worker cleanup loop
+      this.startCleanupLoop();
 
       this.isRunning = true;
       logger.info('✅ Stage 2 ETL Service started successfully', {
@@ -171,8 +187,9 @@ export class Stage2ETLService extends EventEmitter {
         workerId: this.workerId,
         batchSize: this.BATCH_SIZE,
         pollInterval: this.POLL_INTERVAL_MS,
+        cleanupInterval: this.CLEANUP_INTERVAL_MS,
         imageCachePath: this.IMAGE_CACHE_PATH,
-        mode: 'YOLO Fire Detection'
+        mode: 'YOLO Fire Detection (LISTEN/NOTIFY + SKIP LOCKED)'
       });
 
       this.emit('started');
@@ -196,6 +213,22 @@ export class Stage2ETLService extends EventEmitter {
       this.processingInterval = null;
     }
 
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+      this.cleanupInterval = null;
+    }
+
+    // Release listener client
+    if (this.listenerClient) {
+      try {
+        await this.listenerClient.query('UNLISTEN stage2_queue');
+        this.listenerClient.release();
+        this.listenerClient = null;
+      } catch (error) {
+        logger.warn('Error releasing listener client:', error);
+      }
+    }
+
     await this.n8nPool.end();
     await this.saiPool.end();
 
@@ -204,6 +237,8 @@ export class Stage2ETLService extends EventEmitter {
       totalFailed: this.metrics.failed,
       imagesExtracted: this.metrics.imagesExtracted,
       detectionsFound: this.metrics.detectionsFound,
+      notifyEventsReceived: this.metrics.notifyEventsReceived,
+      staleWorkersRecovered: this.metrics.staleWorkersRecovered,
       avgTimeMs: this.metrics.avgProcessingTimeMs
     });
 
@@ -236,7 +271,30 @@ export class Stage2ETLService extends EventEmitter {
   }
 
   /**
-   * Start processing loop (polls queue every N seconds)
+   * Setup LISTEN for pg_notify events
+   * Allows immediate processing when new items are queued
+   */
+  private async setupNotifyListener(): Promise<void> {
+    this.listenerClient = await this.saiPool.connect();
+
+    // Setup notification handler
+    this.listenerClient.on('notification', async (msg) => {
+      if (msg.channel === 'stage2_queue' && this.isRunning) {
+        this.metrics.notifyEventsReceived++;
+        logger.debug(`📬 Received stage2_queue notification for execution ${msg.payload}`);
+
+        // Process immediately (don't wait for polling interval)
+        setImmediate(() => this.processBatch());
+      }
+    });
+
+    // Subscribe to channel
+    await this.listenerClient.query('LISTEN stage2_queue');
+    logger.info('📡 LISTEN configured for stage2_queue channel');
+  }
+
+  /**
+   * Start processing loop (polling fallback)
    */
   private startProcessingLoop(): void {
     this.processingInterval = setInterval(async () => {
@@ -250,23 +308,59 @@ export class Stage2ETLService extends EventEmitter {
   }
 
   /**
-   * Process next batch from queue
+   * Start cleanup loop for stale workers
+   */
+  private startCleanupLoop(): void {
+    this.cleanupInterval = setInterval(async () => {
+      if (this.isRunning) {
+        await this.cleanupStaleWorkers();
+      }
+    }, this.CLEANUP_INTERVAL_MS);
+  }
+
+  /**
+   * Cleanup stale workers that got stuck
+   */
+  private async cleanupStaleWorkers(): Promise<void> {
+    try {
+      const result = await this.saiPool.query(
+        "SELECT etl_cleanup_stale_workers($1::interval) as recovered",
+        [`${this.STALE_THRESHOLD_MINUTES} minutes`]
+      );
+
+      const recovered = result.rows[0]?.recovered || 0;
+      if (recovered > 0) {
+        this.metrics.staleWorkersRecovered += recovered;
+        logger.warn(`🔧 Recovered ${recovered} stale queue items`, {
+          threshold: `${this.STALE_THRESHOLD_MINUTES} minutes`
+        });
+      }
+    } catch (error) {
+      logger.error('❌ Error cleaning up stale workers:', error);
+    }
+  }
+
+  /**
+   * Process next batch from queue using atomic SKIP LOCKED claim
    */
   private async processBatch(): Promise<void> {
     try {
-      // Get next batch of pending items (priority order)
-      const pending = await this.getNextBatch();
+      // Atomically claim a batch (SKIP LOCKED prevents race conditions)
+      const claimed = await this.claimBatch();
 
-      if (pending.length === 0) {
+      if (claimed.length === 0) {
         logger.debug('Stage 2: No pending items in queue');
         return;
       }
 
-      logger.info(`📦 Stage 2: Processing batch of ${pending.length} executions`);
+      logger.info(`📦 Stage 2: Processing batch of ${claimed.length} executions`);
+
+      // Batch fetch all execution_data in one query
+      const executionDataMap = await this.batchFetchExecutionData(claimed);
 
       // Process each item
-      for (const item of pending) {
-        await this.processStage2(item.execution_id);
+      for (const executionId of claimed) {
+        await this.processStage2(executionId, executionDataMap.get(executionId));
       }
 
     } catch (error) {
@@ -275,70 +369,73 @@ export class Stage2ETLService extends EventEmitter {
   }
 
   /**
-   * Get next batch from queue
+   * Atomically claim a batch of items using SKIP LOCKED
+   * This prevents race conditions between multiple workers
    */
-  private async getNextBatch(): Promise<Array<{ execution_id: number }>> {
-    const result = await this.saiPool.query(`
-      SELECT execution_id
-      FROM etl_processing_queue
-      WHERE status = 'pending'
-        AND stage = 'stage2'
-        AND attempts < max_attempts
-      ORDER BY priority ASC, queued_at ASC
-      LIMIT $1
-    `, [this.BATCH_SIZE]);
+  private async claimBatch(): Promise<number[]> {
+    const result = await this.saiPool.query(
+      'SELECT execution_id FROM etl_claim_batch($1, $2)',
+      [this.workerId, this.BATCH_SIZE]
+    );
 
-    return result.rows;
+    return result.rows.map(row => row.execution_id);
+  }
+
+  /**
+   * Batch fetch execution_data for multiple executions
+   * Much more efficient than N individual queries
+   */
+  private async batchFetchExecutionData(executionIds: number[]): Promise<Map<number, any[]>> {
+    const result = await this.n8nPool.query(`
+      SELECT "executionId", data
+      FROM execution_data
+      WHERE "executionId" = ANY($1::bigint[])
+    `, [executionIds]);
+
+    const dataMap = new Map<number, any[]>();
+    for (const row of result.rows) {
+      try {
+        dataMap.set(row.executionId, JSON.parse(row.data));
+      } catch (error) {
+        logger.warn(`Failed to parse execution_data for ${row.executionId}:`, error);
+      }
+    }
+
+    return dataMap;
   }
 
   /**
    * Process Stage 2 for a single execution
    */
-  private async processStage2(executionId: number): Promise<void> {
+  private async processStage2(executionId: number, executionDataRaw?: any[]): Promise<void> {
     const startTime = Date.now();
 
     try {
-      // Mark as processing
-      const marked = await this.markProcessing(executionId);
-      if (!marked) {
-        logger.debug(`⏭️  Execution ${executionId} already being processed by another worker`);
-        return;
-      }
-
       logger.info(`🔍 Stage 2: Processing execution ${executionId} (YOLO extraction)`);
 
-      // 1. Fetch execution_data JSON from n8n
-      const executionDataRaw = await this.fetchExecutionData(executionId);
+      // Check if we have execution data
       if (!executionDataRaw) {
         throw new Error('execution_data not found in n8n database');
       }
 
-      // 2. Extract all available information with n8n format resolution
+      // 1. Extract all available information with n8n format resolution
       const extracted = this.extractFromExecutionData(executionDataRaw);
 
-      // 3. Update executions table (device/location/camera metadata)
-      if (extracted.device_id || extracted.camera_id || extracted.location) {
-        await this.updateExecution(executionId, extracted);
-      }
+      // 2. Perform all database updates in a single transaction
+      await this.performAtomicUpdates(executionId, extracted);
 
-      // 4. Insert/update execution_analysis (includes detections JSONB)
-      await this.upsertAnalysis(executionId, extracted);
-
-      // 5. Track detection metrics (detections stored in JSONB, not separate table)
+      // 3. Track detection metrics
       if (extracted.detections && extracted.detections.length > 0) {
         this.metrics.detectionsFound += extracted.detections.length;
       }
 
-      // 6. Process and cache image (if present)
+      // 4. Process and cache image (if present) - all formats in parallel
       if (extracted.image_base64) {
         await this.processImage(executionId, extracted.image_base64);
         this.metrics.imagesExtracted++;
       }
 
-      // 7. Insert notification status
-      await this.insertNotification(executionId, extracted);
-
-      // Mark as completed
+      // 5. Mark as completed
       const processingTime = Date.now() - startTime;
       await this.markCompleted(executionId, processingTime);
 
@@ -377,20 +474,36 @@ export class Stage2ETLService extends EventEmitter {
   }
 
   /**
-   * Fetch execution_data from n8n database
+   * Perform all database updates atomically in a single transaction
+   * This ensures data consistency - either all updates succeed or none
    */
-  private async fetchExecutionData(executionId: number): Promise<any[] | null> {
-    const result = await this.n8nPool.query(`
-      SELECT data
-      FROM execution_data
-      WHERE "executionId" = $1
-    `, [executionId]);
+  private async performAtomicUpdates(
+    executionId: number,
+    extracted: Stage2ExtractionResult
+  ): Promise<void> {
+    const client = await this.saiPool.connect();
 
-    if (result.rows.length === 0) {
-      return null;
+    try {
+      await client.query('BEGIN');
+
+      // 1. Update executions table (device/location/camera metadata)
+      if (extracted.device_id || extracted.camera_id || extracted.location) {
+        await this.updateExecution(client, executionId, extracted);
+      }
+
+      // 2. Insert/update execution_analysis (includes detections JSONB)
+      await this.upsertAnalysis(client, executionId, extracted);
+
+      // 3. Insert notification status
+      await this.insertNotification(client, executionId, extracted);
+
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
     }
-
-    return JSON.parse(result.rows[0].data);
   }
 
   /**
@@ -596,7 +709,7 @@ export class Stage2ETLService extends EventEmitter {
 
   /**
    * ========================================================================
-   * DATABASE UPDATE OPERATIONS
+   * DATABASE UPDATE OPERATIONS (use client for transactions)
    * ========================================================================
    */
 
@@ -604,6 +717,7 @@ export class Stage2ETLService extends EventEmitter {
    * Update executions table with device/location metadata
    */
   private async updateExecution(
+    client: PoolClient,
     executionId: number,
     extracted: Stage2ExtractionResult
   ): Promise<void> {
@@ -619,7 +733,7 @@ export class Stage2ETLService extends EventEmitter {
       }
     }
 
-    await this.saiPool.query(`
+    await client.query(`
       UPDATE executions
       SET
         device_id = COALESCE($2, device_id),
@@ -645,10 +759,11 @@ export class Stage2ETLService extends EventEmitter {
    * ALL fields nullable (data integrity principle)
    */
   private async upsertAnalysis(
+    client: PoolClient,
     executionId: number,
     extracted: Stage2ExtractionResult
   ): Promise<void> {
-    await this.saiPool.query(`
+    await client.query(`
       INSERT INTO execution_analysis (
         execution_id,
         request_id,
@@ -708,7 +823,7 @@ export class Stage2ETLService extends EventEmitter {
   }
 
   /**
-   * Process and cache image
+   * Process and cache image - all formats in parallel
    */
   private async processImage(executionId: number, imageBase64: string): Promise<void> {
     try {
@@ -732,17 +847,18 @@ export class Stage2ETLService extends EventEmitter {
       const webpPath = path.join(webpDir, `${executionId}.webp`);
       const thumbPath = path.join(thumbDir, `${executionId}.webp`);
 
-      // Save original JPEG
-      await sharp(imageBuffer).jpeg({ quality: 95 }).toFile(originalPath);
-
-      // Create WebP variant
-      await sharp(imageBuffer).webp({ quality: 85 }).toFile(webpPath);
-
-      // Create thumbnail
-      await sharp(imageBuffer)
-        .resize(300, 300, { fit: 'inside', withoutEnlargement: true })
-        .webp({ quality: 75 })
-        .toFile(thumbPath);
+      // Process all image formats in parallel
+      await Promise.all([
+        // Save original JPEG
+        sharp(imageBuffer).jpeg({ quality: 95 }).toFile(originalPath),
+        // Create WebP variant
+        sharp(imageBuffer).webp({ quality: 85 }).toFile(webpPath),
+        // Create thumbnail
+        sharp(imageBuffer)
+          .resize(300, 300, { fit: 'inside', withoutEnlargement: true })
+          .webp({ quality: 75 })
+          .toFile(thumbPath)
+      ]);
 
       // Insert image metadata with all paths
       await this.saiPool.query(`
@@ -764,10 +880,11 @@ export class Stage2ETLService extends EventEmitter {
    * Insert notification status
    */
   private async insertNotification(
+    client: PoolClient,
     executionId: number,
     extracted: Stage2ExtractionResult
   ): Promise<void> {
-    await this.saiPool.query(`
+    await client.query(`
       INSERT INTO execution_notifications (
         execution_id, telegram_sent, telegram_message_id, telegram_sent_at
       ) VALUES ($1, $2, $3, $4)
@@ -785,14 +902,6 @@ export class Stage2ETLService extends EventEmitter {
    * QUEUE MANAGEMENT
    * ========================================================================
    */
-
-  private async markProcessing(executionId: number): Promise<boolean> {
-    const result = await this.saiPool.query(
-      'SELECT etl_start_processing($1, $2) as marked',
-      [executionId, this.workerId]
-    );
-    return result.rows[0].marked;
-  }
 
   private async markCompleted(executionId: number, processingTimeMs: number): Promise<void> {
     await this.saiPool.query('SELECT etl_mark_completed($1, $2)', [
