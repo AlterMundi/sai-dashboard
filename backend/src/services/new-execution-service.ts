@@ -191,19 +191,6 @@ export class NewExecutionService {
       queryParams.push(detectionMode);
     }
 
-    // Camera type filtering (NEW - was missing!)
-    if (cameraTypes && cameraTypes.length > 0) {
-      // Multi-select: camera_type IN ('onvif', 'rtsp')
-      paramCount++;
-      whereConditions.push(`e.camera_type = ANY($${paramCount})`);
-      queryParams.push(cameraTypes);
-    } else if (cameraType) {
-      // Legacy single selection
-      paramCount++;
-      whereConditions.push(`e.camera_type = $${paramCount}`);
-      queryParams.push(cameraType);
-    }
-
     // Advanced detection filters (JSONB)
     if (detectionClasses && detectionClasses.length > 0) {
       // Filter by specific detection classes in the JSONB array
@@ -417,12 +404,12 @@ export class NewExecutionService {
       LEFT JOIN execution_analysis ea ON e.id = ea.execution_id
       LEFT JOIN execution_images ei ON e.id = ei.execution_id
       LEFT JOIN execution_notifications en ON e.id = en.execution_id
-      WHERE e.execution_timestamp >= CURRENT_DATE - INTERVAL '${days} days'
+      WHERE e.execution_timestamp >= CURRENT_DATE - make_interval(days => $1)
       GROUP BY DATE(e.execution_timestamp)
       ORDER BY date DESC
     `;
 
-    const results = await dualDb.query(query);
+    const results = await dualDb.query(query, [days]);
 
     return results.map((row: any) => {
       const totalExecutions = parseInt(row.total_executions);
