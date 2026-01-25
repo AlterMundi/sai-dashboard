@@ -37,174 +37,53 @@ export interface YoloDetection {
 }
 
 // Enhanced Analysis Types for SAI System (YOLO-based)
+// NOTE: This interface matches the actual database schema (execution_analysis + related tables)
 export interface SaiEnhancedAnalysis {
   // Primary Key
   executionId: string;
 
-  // YOLO Inference Results
+  // YOLO Inference Results (execution_analysis table)
   requestId?: string;
   yoloModelVersion?: string;
   detectionCount?: number;
   hasFire?: boolean;
   hasSmoke?: boolean;
-  alertLevel?: 'none' | 'low' | 'high' | 'critical';  // 'medium' removed (doesn't exist in DB)
+  alertLevel?: 'none' | 'low' | 'high' | 'critical';
   detectionMode?: string;
   activeClasses?: string[];
   detections?: YoloDetection[];
 
-  // Confidence Scores
+  // Confidence Scores (execution_analysis table)
   confidenceFire?: number;
   confidenceSmoke?: number;
   confidenceScore?: number;  // Max confidence
 
-  // Node & Device Context
+  // Node & Device Context (executions table)
   nodeId?: string;
   deviceId?: string;
   cameraId?: string;
-  cameraLocation?: string;
   cameraType?: string;
+  location?: string;
 
-  // Image Data
+  // Image Data (execution_images table)
   hasImage: boolean;
-
-  // Image Quality Metrics
   imageWidth?: number;
   imageHeight?: number;
   imageSizeBytes?: number;
   imageFormat?: string;
 
-  // Processing Metrics
+  // Processing Metrics (execution_analysis table)
   yoloProcessingTimeMs?: number;
-  processingTimeMs?: number;
 
-  // Alert & Response
-  falsePositiveFlag?: boolean;
-  verifiedByHuman?: boolean;
-  humanVerifier?: string;
-
-  // Communication Status
+  // Notification Status (execution_notifications table)
   telegramDelivered: boolean;
   telegramMessageId?: string;
-  telegramChatId?: string;
-  emailSent?: boolean;
-  smsSent?: boolean;
 
-  // Geographic Context
-  latitude?: number;
-  longitude?: number;
-  elevation?: number;
-  fireZoneRisk?: string;
-  location?: string;
-
-  // Temporal Context
-  detectionTimestamp?: Date;
+  // Temporal Context (executions table)
   captureTimestamp?: Date;
-  isDaylight?: boolean;
-  weatherConditions?: string;
-  temperatureCelsius?: number;
-  humidityPercent?: number;
-  windSpeedKmh?: number;
 
-  // Correlation & Incidents
-  incidentId?: string;
-  relatedExecutionIds?: string[];
-  duplicateOf?: string;
-
-  // Processing Metadata
+  // Processing Metadata (execution_analysis table)
   processedAt: Date;
-  processingVersion: string;
-  extractionMethod: string;
-}
-
-export interface ExpertReview {
-  // Expert Review Status
-  expertReviewStatus: 'pending' | 'in_review' | 'completed' | 'disputed';
-  expertReviewPriority: 1 | 2 | 3 | 4 | 5; // 1=urgent, 5=training
-  assignedExpertId?: string;
-  expertReviewDeadline?: Date;
-  
-  // Expert Judgment
-  expertRiskAssessment?: 'high' | 'medium' | 'low' | 'none';
-  expertConfidence?: number;
-  expertAgreesWithAi?: boolean;
-  expertNotes?: string;
-  expertReasoning?: string;
-  
-  // Tagging System
-  expertTags?: string[];
-  fireType?: string;
-  fireStage?: string;
-  fireCause?: string;
-  
-  // Validation Metadata
-  reviewedAt?: Date;
-  reviewDurationMinutes?: number;
-  expertName?: string;
-  expertCertification?: string;
-  expertExperienceYears?: number;
-  
-  // Quality Assurance
-  needsSecondOpinion?: boolean;
-  secondReviewerId?: string;
-  secondExpertAgrees?: boolean;
-  consensusReached?: boolean;
-  escalatedToSupervisor?: boolean;
-  
-  // Training & Learning
-  useForTraining: boolean;
-  trainingWeight?: number;
-  imageClarityRating?: number; // 1-5
-  detectionDifficulty?: number; // 1-5
-  
-  // Feedback Loop
-  aiImprovementSuggestions?: string;
-  feedbackCategory?: string;
-  recommendedCameraAdjustment?: string;
-  
-  // Legal & Compliance
-  legalEvidenceQuality?: 'admissible' | 'standard' | 'poor' | 'unusable';
-  chainOfCustodyMaintained?: boolean;
-  expertSignatureHash?: string;
-  
-  // Performance Tracking
-  expertAccuracyScore?: number;
-  reviewComplexityScore?: number;
-  expertSpecialization?: string;
-}
-
-// Combined interface for complete analysis with expert review
-export interface ComprehensiveAnalysis extends SaiEnhancedAnalysis, ExpertReview {}
-
-// Expert user interface
-export interface ExpertUser {
-  id: string;
-  name: string;
-  email: string;
-  certification: string;
-  specialization: string;
-  experienceYears: number;
-  isActive: boolean;
-  maxCaseload: number;
-  currentCaseload: number;
-  accuracyScore?: number;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// Incident grouping interface
-export interface FireIncident {
-  incidentId: string;
-  startTime: Date;
-  endTime?: Date;
-  maxRiskLevel: 'high' | 'medium' | 'low' | 'none';
-  camerasInvolved: string[];
-  totalDetections: number;
-  responseDispatched: boolean;
-  incidentStatus: 'active' | 'monitoring' | 'resolved' | 'false_alarm';
-  geographicCenter?: { latitude: number; longitude: number };
-  affectedRadius?: number; // in meters
-  createdAt: Date;
-  updatedAt: Date;
 }
 
 export interface ExecutionWithImage {
@@ -330,19 +209,6 @@ export interface ExecutionFilters extends PaginationQuery {
   minDetectionConfidence?: number;  // Minimum confidence for any detection
 }
 
-// Expert-specific filters
-export interface ExpertReviewFilters extends PaginationQuery {
-  expertReviewStatus?: 'pending' | 'in_review' | 'completed' | 'disputed';
-  assignedExpertId?: string;
-  expertReviewPriority?: 1 | 2 | 3 | 4 | 5;
-  needsSecondOpinion?: boolean;
-  escalatedToSupervisor?: boolean;
-  consensusReached?: boolean;
-  expertSpecialization?: string;
-  reviewDeadlinePast?: boolean;
-  useForTraining?: boolean;
-}
-
 export interface DatabaseConfig {
   host: string;
   port: number;
@@ -388,10 +254,8 @@ export interface SSEClient {
 }
 
 export interface SSEMessage {
-  type: 'execution:new' | 'execution:error' | 'execution:progress' | 'execution:batch' | 'heartbeat' | 'connection' | 
+  type: 'execution:new' | 'execution:error' | 'execution:progress' | 'execution:batch' | 'heartbeat' | 'connection' |
         'system:stats' | 'system:health' | 'system:notification' |
-        'expert:assigned' | 'expert:review_completed' | 'expert:review' |
-        'incident:created' | 'incident:update' |
         'alert:critical' | 'emergency:response_required' |
         string; // Allow dynamic system messages
   data?: Record<string, unknown>;
@@ -470,28 +334,13 @@ export interface ExecutionStatistics {
     hasSmoke: number;
     bothDetected: number;
   };
-  expertReviewStats?: {
-    pending: number;
-    inReview: number;
-    completed: number;
-    disputed: number;
-    averageReviewTime: number;
-    expertAgreementRate: number;
-  };
   cameraPerformance?: Array<{
     cameraId: string;
     location?: string;
     totalDetections: number;
     fireDetections: number;
     smokeDetections: number;
-    falsePositives: number;
   }>;
-  incidentStatistics?: {
-    activeIncidents: number;
-    resolvedIncidents: number;
-    multiCameraIncidents: number;
-    averageIncidentDuration: number;
-  };
 }
 
 // API response helpers with enhanced types
@@ -504,16 +353,6 @@ export interface UseExecutionsReturn {
   refresh: () => Promise<void>;
   updateFilters: (filters: ExecutionFilters) => void;
   filters: ExecutionFilters;
-}
-
-// Expert dashboard specific return type
-export interface UseExpertReviewReturn {
-  assignments: ComprehensiveAnalysis[];
-  isLoading: boolean;
-  error: string | null;
-  submitReview: (executionId: string, review: Partial<ExpertReview>) => Promise<void>;
-  requestSecondOpinion: (executionId: string, reason: string) => Promise<void>;
-  escalateToSupervisor: (executionId: string, reason: string) => Promise<void>;
 }
 
 export interface ExecutionStats {
