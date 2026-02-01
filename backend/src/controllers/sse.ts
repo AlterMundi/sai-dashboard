@@ -62,30 +62,43 @@ class SSEManager {
 
   sendToClient(clientId: string, message: SSEMessage): boolean {
     const client = this.clients.get(clientId);
-    
+
     if (!client) {
       return false;
     }
 
     try {
       const sseMessage = this.formatSSEMessage(message);
-      
-      // Log raw SSE messages occasionally for debugging (every 10th heartbeat)
+
       if (appConfig.sse.debug && (message.type !== 'heartbeat' || Math.random() < 0.1)) {
-        logger.info(`📤 SSE message sent to client ${clientId}:`, {
+        logger.info(`SSE message sent to client ${clientId}:`, {
           type: message.type,
           messageLength: sseMessage.length
         });
       }
-      
-      (client.response as any).write(sseMessage);
-      
-      // CRITICAL: Flush the response to ensure immediate delivery
+
+      const canContinue = (client.response as any).write(sseMessage);
+
+      // Flush the response to ensure immediate delivery
       if (typeof (client.response as any).flush === 'function') {
         (client.response as any).flush();
       }
-      
+
       client.lastPing = new Date();
+
+      // Backpressure: if write() returned false, the kernel buffer is full.
+      // Wait for drain; if it doesn't come within 30s, disconnect the slow client.
+      if (!canContinue) {
+        const drainTimeout = setTimeout(() => {
+          logger.warn('SSE slow client disconnected (no drain within 30s)', { clientId });
+          this.removeClient(clientId);
+        }, 30000);
+
+        (client.response as any).once('drain', () => {
+          clearTimeout(drainTimeout);
+        });
+      }
+
       return true;
 
     } catch (error) {
@@ -93,7 +106,7 @@ class SSEManager {
         clientId,
         error: error instanceof Error ? error.message : 'Unknown error'
       });
-      
+
       this.removeClient(clientId);
       return false;
     }
