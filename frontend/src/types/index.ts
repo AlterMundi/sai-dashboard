@@ -52,7 +52,6 @@ export type {
   ImageCardProps,
   ImageModalProps,
   ImageGalleryProps,
-  FilterBarProps,
   StatusBadgeProps,
   AlertLevelBadgeProps,
   DetectionBadgeProps,

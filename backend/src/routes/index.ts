@@ -26,22 +26,6 @@ import {
   getEnhancedStatistics,
   triggerAnalysisProcessing
 } from '@/controllers/executions';
-/* Disabled: Expert Review System (requires legacy Ollama fields)
-import {
-  getExpertAssignments,
-  submitExpertReview,
-  requestSecondOpinion,
-  escalateToSupervisor,
-  getExpertPerformance,
-  getSystemReviewStats,
-  updateReviewStatus,
-  getAvailableExpertTags,
-  triggerAnalysisBackfill,
-  getComprehensiveAnalysis,
-  processExecutionAnalysis,
-  getIncidentAnalysis
-} from '@/controllers/expert-review';
-*/
 import {
   connectSSE,
   getSSEStatus
@@ -186,46 +170,16 @@ executionRouter.get('/:executionId/data', getExecutionData);
 
 // Image routes moved to public section above for HTML <img> tag compatibility
 
-// Enhanced analysis endpoints (DISABLED - Requires Expert Review System)
-// executionRouter.get('/:executionId/analysis', getComprehensiveAnalysis);
-// executionRouter.post('/:executionId/process', processExecutionAnalysis);
-
 // Manual analysis trigger
 executionRouter.post('/trigger-analysis', triggerAnalysisProcessing);
 
 router.use('/executions', executionRouter);
 
-// =================================================================
-// Expert Review Routes (DISABLED - Requires Legacy Ollama Fields)
-// =================================================================
-/*
-const expertRouter = Router();
-
-// Expert assignments and workflow
-expertRouter.get('/assignments', getExpertAssignments);
-expertRouter.post('/assignments/:executionId/review', submitExpertReview);
-expertRouter.post('/assignments/:executionId/second-opinion', requestSecondOpinion);
-expertRouter.post('/assignments/:executionId/escalate', escalateToSupervisor);
-expertRouter.patch('/assignments/:executionId/status', updateReviewStatus);
-
-// Expert performance and analytics
-expertRouter.get('/performance', getExpertPerformance);
-expertRouter.get('/system/stats', getSystemReviewStats);
-
-// Expert tools and utilities
-expertRouter.get('/tags', getAvailableExpertTags);
-expertRouter.post('/system/backfill', triggerAnalysisBackfill);
-
-router.use('/expert', expertRouter);
-*/
 
 // =================================================================
 // Incident Analysis Routes (Protected)
 // =================================================================
 const incidentRouter = Router();
-
-// Incident correlation and analysis (DISABLED - Requires Expert Review System)
-// incidentRouter.get('/:incidentId', getIncidentAnalysis);
 
 // Multi-camera incident detection
 incidentRouter.get('/', async (req, res) => {
