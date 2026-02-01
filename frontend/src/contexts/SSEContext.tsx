@@ -85,15 +85,6 @@ export function SSEProvider({ children }: SSEProviderProps) {
       const eventSource = sseApi.createEventSource();
       eventSourceRef.current = eventSource;
 
-      // Monitor readyState changes (reduced frequency for production)
-      const readyStateMonitor = setInterval(() => {
-        if (eventSource.readyState === EventSource.CONNECTING) {
-          // Still connecting
-        } else {
-          clearInterval(readyStateMonitor);
-        }
-      }, 5000);
-
       eventSource.onopen = () => {
         setIsConnected(true);
         setConnectionStatus('connected');
@@ -101,17 +92,17 @@ export function SSEProvider({ children }: SSEProviderProps) {
         isConnectingRef.current = false;
       };
 
-      // Fallback: Check connection after 3 seconds if onopen hasn't fired
+      // Fallback: Check connection after 10 seconds if onopen hasn't fired
       setTimeout(() => {
         if (eventSource.readyState === EventSource.OPEN) {
           setIsConnected(true);
           setConnectionStatus('connected');
           reconnectAttempts.current = 0;
-          isConnectingRef.current = false; // Connection attempt completed
+          isConnectingRef.current = false;
         } else if (eventSource.readyState === EventSource.CLOSED) {
-          isConnectingRef.current = false; // Connection attempt failed
+          isConnectingRef.current = false;
         }
-      }, 3000);
+      }, 10000);
 
       eventSource.onerror = (error) => {
         console.error(`❌ SSE Context: Connection #${connectionId} error:`, error);
@@ -312,17 +303,6 @@ export function SSEProvider({ children }: SSEProviderProps) {
         }
       };
 
-      // Connection state monitoring (cleanup intervals on close)
-      const connectionMonitor = setInterval(() => {
-        if (eventSource.readyState === EventSource.CLOSED) {
-          clearInterval(connectionMonitor);
-        }
-      }, 10000);
-      
-      // Clear monitor when connection closes
-      eventSource.addEventListener('error', () => clearInterval(connectionMonitor));
-      eventSource.addEventListener('open', () => clearInterval(connectionMonitor));
-
     } catch (error) {
       console.error('SSE Context: Failed to create SSE connection:', error);
       setConnectionStatus('error');
@@ -341,13 +321,6 @@ export function SSEProvider({ children }: SSEProviderProps) {
     };
   }, [connect, cleanup]);
 
-
-  // Handle visibility change (reconnect when tab becomes visible)
-  // DISABLED: Tab visibility detection was too sensitive and causing constant reconnects
-  // TODO: Implement more robust visibility detection or remove entirely
-  useEffect(() => {
-    // Temporarily disabled to fix constant SSE disconnections
-  }, []);
 
   // Handle online/offline status
   useEffect(() => {

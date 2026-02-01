@@ -1,10 +1,9 @@
-import { useState } from 'react';
 import { StatusBadge } from './ui/StatusBadge';
 import { LoadingSpinner } from './ui/LoadingSpinner';
 import { DynamicTimeAgo } from './ui/DynamicTimeAgo';
-import { executionsApi } from '@/services/api';
 import { cn } from '@/utils';
-import { ExecutionWithImageUrls, ProcessingStage } from '@/types';
+import { ExecutionWithImageUrls } from '@/types';
+import { useImageCard, alertLevelColors } from '@/hooks/useImageCard';
 import {
   AlertTriangle,
   Flame,
@@ -24,39 +23,20 @@ interface ExecutionListItemProps {
 }
 
 export function ExecutionListItem({ execution, onClick, loading = false }: ExecutionListItemProps) {
-  const [imageLoading, setImageLoading] = useState(true);
-  const [imageError, setImageError] = useState(false);
-
-  const processingStage = (execution as any).processingStage as ProcessingStage | undefined;
-  const isStage1Only = processingStage === 'stage1';
-  const hasStage2Error = processingStage === 'failed';
-
-  const thumbnailUrl = execution.hasImage && !isStage1Only
-    ? executionsApi.getImageUrl(execution.id, true)
-    : undefined;
-
-  const handleImageLoad = () => {
-    setImageLoading(false);
-    setImageError(false);
-  };
-
-  const handleImageError = () => {
-    setImageLoading(false);
-    setImageError(true);
-  };
+  const {
+    imageLoading,
+    imageError,
+    isStage1Only,
+    hasStage2Error,
+    thumbnailUrl,
+    handleImageLoad,
+    handleImageError,
+  } = useImageCard(execution);
 
   const handleClick = () => {
     if (!loading) {
       onClick(execution);
     }
-  };
-
-  const alertLevelColors: Record<string, string> = {
-    critical: 'bg-red-600 text-white',
-    high: 'bg-orange-500 text-white',
-    medium: 'bg-yellow-500 text-gray-900',
-    low: 'bg-blue-500 text-white',
-    none: 'bg-gray-200 text-gray-600',
   };
 
   return (
