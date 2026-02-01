@@ -27,19 +27,10 @@ export function Dashboard() {
 
   const {
     updateExecutionStage,
+    totalResults,
   } = useExecutions(filters, batchUpdateTrigger);
 
-  // Remove unused variables
-
   // Handle real-time updates via SSE
-  const onNewExecution = useCallback(() => {
-    // New executions are handled automatically by the gallery's own data fetching
-  }, []);
-
-  const onExecutionError = useCallback(() => {
-    // Handle execution errors if needed
-  }, []);
-
   const onExecutionBatch = useCallback(async (batchData: any) => {
     console.log('📦 Dashboard: Batch update received', batchData);
 
@@ -93,8 +84,6 @@ export function Dashboard() {
   }, [updateExecutionStage]);
 
   useSSEHandler({
-    onNewExecution,
-    onExecutionError,
     onExecutionBatch,
     onStage2Complete,
     onStage2Failure,
@@ -173,11 +162,12 @@ export function Dashboard() {
           filters={filters}
           onFiltersChange={setFilters}
           onReset={clearAllFilters}
-          totalResults={0} // TODO: Get actual count from API response
+          totalResults={totalResults}
           currentPage={1}
-          totalPages={1}
+          totalPages={Math.ceil(totalResults / 50)}
           pageSize={50}
           lastUpdateTime="just now"
+          isLoading={false}
         />
 
         {/* Main Gallery */}

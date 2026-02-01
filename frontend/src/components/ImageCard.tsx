@@ -1,33 +1,21 @@
-import { useState } from 'react';
 import { StatusBadge } from './ui/StatusBadge';
 import { LoadingSpinner } from './ui/LoadingSpinner';
 import { DynamicTimeAgo } from './ui/DynamicTimeAgo';
-import { executionsApi } from '@/services/api';
 import { cn } from '@/utils';
-import { ImageCardProps, ProcessingStage } from '@/types';
+import { ImageCardProps } from '@/types';
+import { useImageCard } from '@/hooks/useImageCard';
 import { AlertTriangle, MessageCircle, Flame, Wind, Camera, MapPin, RefreshCw, X } from 'lucide-react';
 
 export function ImageCard({ execution, onClick, loading = false }: ImageCardProps) {
-  const [imageLoading, setImageLoading] = useState(true);
-  const [imageError, setImageError] = useState(false);
-
-  const processingStage = (execution as any).processingStage as ProcessingStage | undefined;
-  const isStage1Only = processingStage === 'stage1';
-  const hasStage2Error = processingStage === 'failed';
-
-  const thumbnailUrl = execution.hasImage && !isStage1Only
-    ? executionsApi.getImageUrl(execution.id, true)
-    : undefined;
-
-  const handleImageLoad = () => {
-    setImageLoading(false);
-    setImageError(false);
-  };
-
-  const handleImageError = () => {
-    setImageLoading(false);
-    setImageError(true);
-  };
+  const {
+    imageLoading,
+    imageError,
+    isStage1Only,
+    hasStage2Error,
+    thumbnailUrl,
+    handleImageLoad,
+    handleImageError,
+  } = useImageCard(execution);
 
   const handleCardClick = () => {
     if (!loading) {
