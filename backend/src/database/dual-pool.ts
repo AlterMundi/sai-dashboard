@@ -30,8 +30,8 @@ class DualDatabasePool {
       port: parseInt(process.env.SAI_DB_PORT || '5432'),
       database: process.env.SAI_DB_NAME || 'sai_dashboard',
       user: process.env.SAI_DB_USER || 'n8n_user',
-      password: process.env.SAI_DB_PASSWORD || 'REDACTED',
-      max: 10, // Primary database gets more connections
+      password: process.env.SAI_DB_PASSWORD || '',
+      max: 15, // Primary database gets more connections (serves API + ETL)
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 5000,
       ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
@@ -43,8 +43,8 @@ class DualDatabasePool {
       port: parseInt(process.env.N8N_DB_PORT || '5432'),
       database: process.env.N8N_DB_NAME || 'n8n',
       user: process.env.N8N_DB_USER || 'n8n_user',
-      password: process.env.N8N_DB_PASSWORD || 'REDACTED',
-      max: 3, // Limited connections for legacy read-only access
+      password: process.env.N8N_DB_PASSWORD || '',
+      max: 5, // Read-only access for ETL pipeline
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 5000,
       ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
@@ -199,6 +199,20 @@ class DualDatabasePool {
   }
 
   /**
+   * Get raw SAI pool (for ETL services that need direct pool access)
+   */
+  public getSaiPool(): Pool {
+    return this.saiPool;
+  }
+
+  /**
+   * Get raw N8N pool (for ETL services that need direct pool access)
+   */
+  public getN8nPool(): Pool {
+    return this.n8nPool;
+  }
+
+  /**
    * Get pool statistics for both databases
    */
   public getPoolStats(): { 
@@ -220,24 +234,5 @@ class DualDatabasePool {
   }
 }
 
-// Export singleton instance with clear naming
+// Export singleton instance
 export const dualDb = DualDatabasePool.getInstance();
-
-// Export primary database query function (preferred)
-export const query = dualDb.query.bind(dualDb);
-
-// Export legacy database query function (migration only)
-export const legacyQuery = dualDb.legacyQuery.bind(dualDb);
-
-// Backward compatibility - but points to NEW database now!
-export const db = {
-  query: dualDb.query.bind(dualDb),
-  getClient: dualDb.getClient.bind(dualDb),
-  transaction: dualDb.transaction.bind(dualDb),
-  testConnection: async () => {
-    const results = await dualDb.testConnections();
-    return results.sai;
-  },
-  close: dualDb.close.bind(dualDb),
-  getPoolStats: () => dualDb.getPoolStats().sai
-};

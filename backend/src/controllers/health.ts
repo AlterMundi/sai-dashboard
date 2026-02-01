@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { promises as fs } from 'fs';
-import { db } from '@/database/dual-pool';
+import { dualDb } from '@/database/dual-pool';
 import { cacheConfig, appConfig } from '@/config';
 import { HealthStatus } from '@/types';
 import { logger } from '@/utils/logger';
@@ -26,17 +26,17 @@ export const healthCheck = asyncHandler(async (req: Request, res: Response): Pro
     // Database connectivity check
     try {
       const dbTest = await Promise.race([
-        db.testConnection(),
-        new Promise<boolean>((_, reject) => 
+        dualDb.testConnections().then(r => r.sai),
+        new Promise<boolean>((_, reject) =>
           setTimeout(() => reject(new Error('Database timeout')), appConfig.health.timeout)
         )
       ]);
-      
+
       healthStatus.services.database = dbTest ? 'connected' : 'error';
-      
+
       // Additional database stats if enabled
       if (appConfig.health.enableMetrics && dbTest) {
-        const poolStats = db.getPoolStats();
+        const poolStats = dualDb.getPoolStats().sai;
         (healthStatus as any).databaseStats = poolStats;
       }
     } catch (error) {
@@ -141,7 +141,7 @@ export const healthCheck = asyncHandler(async (req: Request, res: Response): Pro
 export const readiness = asyncHandler(async (req: Request, res: Response): Promise<void> => {
   try {
     // Basic readiness checks - faster than full health check
-    const dbConnected = await db.testConnection();
+    const dbConnected = await dualDb.testConnections().then(r => r.sai);
     
     if (!dbConnected) {
       res.status(503).json({

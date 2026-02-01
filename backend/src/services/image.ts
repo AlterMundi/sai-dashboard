@@ -2,7 +2,7 @@ import { promises as fs } from 'fs';
 import { createReadStream, existsSync } from 'fs';
 import { join, dirname } from 'path';
 import sharp from 'sharp';
-import { db } from '@/database/dual-pool';
+import { dualDb } from '@/database/dual-pool';
 import { cacheConfig } from '@/config';
 import { logger } from '@/utils/logger';
 import { validateImageFormat, sanitizeFilename, formatBytes } from '@/utils';
@@ -66,7 +66,7 @@ export class ImageService {
         LIMIT 1
       `;
 
-      const results = await db.query(query, [executionId]);
+      const results = await dualDb.query(query, [executionId]);
 
       if (results.length === 0) {
         logger.warn('No webhook image data found for execution:', executionId);
@@ -260,7 +260,7 @@ export class ImageService {
     // Cache the extracted image
     // Direct table access - views are too slow for single ID lookups
     // See DATABASE_PERFORMANCE.md for detailed analysis
-    const execution = await db.query(
+    const execution = await dualDb.query(
       'SELECT "startedAt" as started_at FROM execution_entity WHERE id = $1',
       [executionId]
     );
