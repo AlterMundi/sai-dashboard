@@ -5,8 +5,8 @@
  * Keeps component files cleaner and types reusable.
  */
 
+import React from 'react';
 import { Execution, ExecutionWithImageUrls } from './execution';
-import { ExecutionFilters } from './api';
 
 // ============================================================================
 // Image Gallery Components
@@ -30,18 +30,6 @@ export interface ImageGalleryProps {
   isLoading?: boolean;
   onLoadMore?: () => void;
   hasMore?: boolean;
-}
-
-// ============================================================================
-// Filter Components
-// ============================================================================
-
-export interface FilterBarProps {
-  filters: ExecutionFilters;
-  onFiltersChange: (filters: ExecutionFilters) => void;
-  onReset: () => void;
-  isLoading?: boolean;
-  className?: string;
 }
 
 // ============================================================================
@@ -70,13 +58,12 @@ export interface DetectionBadgeProps {
 // ============================================================================
 
 export interface LiveStatsCardProps {
-  stats: {
-    totalExecutions: number;
-    fireDetections: number;
-    smokeDetections: number;
-    avgConfidence: number;
-  };
-  isLoading?: boolean;
+  title: string;
+  icon: React.ReactNode;
+  statKey: string;
+  initialValue: number;
+  format?: (value: number) => string;
+  className?: string;
 }
 
 export interface StatsDashboardProps {

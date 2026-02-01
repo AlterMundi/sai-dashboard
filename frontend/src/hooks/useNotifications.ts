@@ -39,37 +39,10 @@ export function useNotifications() {
     switch (action) {
       case 'view':
         if (data?.execution?.id) {
-          // Navigate to execution details or open modal
-          console.log('Navigate to execution:', data.execution.id);
+          navigate(`/dashboard/executions/${data.execution.id}`);
         }
         break;
-        
-      case 'viewBatch':
-        if (data?.batchId) {
-          // Navigate to batch view
-          console.log('Navigate to batch:', data.batchId);
-        }
-        break;
-        
-      case 'flag':
-        if (data?.execution?.id) {
-          // Flag execution for admin review
-          console.log('Flag execution:', data.execution.id);
-        }
-        break;
-        
-      case 'health':
-        // Navigate to system health page
-        console.log('Navigate to system health');
-        break;
-        
-      case 'report':
-        if (data?.batchId) {
-          // Download batch report
-          console.log('Download batch report:', data.batchId);
-        }
-        break;
-        
+
       default:
         console.log('Unknown notification action:', action, data);
     }
@@ -77,19 +50,23 @@ export function useNotifications() {
 
   // Smart notification creators for different event types
   const notifyNewExecution = useCallback((executionData: any) => {
-    const isHighRisk = executionData.execution.analysis?.risk_assessment === 'high';
-    const confidence = executionData.execution.analysis?.confidence;
-    
+    const alertLevel = executionData.execution.analysis?.alertLevel;
+    const isHighRisk = alertLevel === 'critical' || alertLevel === 'high';
+    const confidence = Math.max(
+      executionData.execution.analysis?.confidenceFire ?? 0,
+      executionData.execution.analysis?.confidenceSmoke ?? 0
+    );
+    const executionId = String(executionData.execution.id).slice(-6);
+
     return createNotification({
       type: 'execution:new',
       icon: isHighRisk ? '🚨' : '🔍',
-      title: isHighRisk ? 'High Risk Detection' : `Analysis Complete #${executionData.execution.id.slice(-6)}`,
-      body: isHighRisk 
-        ? `Risk: ${executionData.execution.analysis?.risk_assessment} (${confidence}% confidence)`
-        : `Risk: ${executionData.execution.analysis?.risk_assessment || 'Unknown'}`,
+      title: isHighRisk ? 'High Risk Detection' : `Analysis Complete #${executionId}`,
+      body: isHighRisk
+        ? `Alert: ${alertLevel} (${(confidence * 100).toFixed(0)}% confidence)`
+        : `Alert: ${alertLevel || 'none'}`,
       actions: [
         { label: 'View Details', action: 'view', priority: isHighRisk ? 'high' : 'medium' },
-        ...(isHighRisk ? [{ label: 'Flag for Review', action: 'flag', priority: 'high' as const }] : []),
       ],
       duration: isHighRisk ? 10000 : 6000,
       persistent: isHighRisk,
