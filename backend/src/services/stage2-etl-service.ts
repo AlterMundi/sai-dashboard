@@ -35,9 +35,10 @@ import { EventEmitter } from 'events';
 import sharp from 'sharp';
 import fs from 'fs/promises';
 import path from 'path';
-import { n8nDatabaseConfig, saiDatabaseConfig, cacheConfig } from '@/config';
+import { cacheConfig } from '@/config';
 import { logger } from '@/utils/logger';
 import { randomUUID } from 'crypto';
+import { dualDb } from '@/database/dual-pool';
 
 /**
  * YOLO detection object (from detections array)
@@ -132,29 +133,9 @@ export class Stage2ETLService extends EventEmitter {
     super();
     this.workerId = `stage2-${randomUUID().slice(0, 8)}`;
 
-    // N8N database pool (read execution_data)
-    this.n8nPool = new Pool({
-      host: n8nDatabaseConfig.host,
-      port: n8nDatabaseConfig.port,
-      database: n8nDatabaseConfig.database,
-      user: n8nDatabaseConfig.username,
-      password: n8nDatabaseConfig.password,
-      max: 5,
-      idleTimeoutMillis: 30000,
-      statement_timeout: this.STATEMENT_TIMEOUT_MS
-    });
-
-    // SAI Dashboard database pool (write operations)
-    this.saiPool = new Pool({
-      host: saiDatabaseConfig.host,
-      port: saiDatabaseConfig.port,
-      database: saiDatabaseConfig.database,
-      user: saiDatabaseConfig.username,
-      password: saiDatabaseConfig.password,
-      max: 10,
-      idleTimeoutMillis: 30000,
-      statement_timeout: this.STATEMENT_TIMEOUT_MS
-    });
+    // Use shared pools from dual-pool singleton
+    this.n8nPool = dualDb.getN8nPool();
+    this.saiPool = dualDb.getSaiPool();
   }
 
   /**
@@ -229,8 +210,7 @@ export class Stage2ETLService extends EventEmitter {
       }
     }
 
-    await this.n8nPool.end();
-    await this.saiPool.end();
+    // Note: pools are shared via dualDb, do not end them here
 
     logger.info('✅ Stage 2 ETL Service stopped', {
       totalProcessed: this.metrics.processed,

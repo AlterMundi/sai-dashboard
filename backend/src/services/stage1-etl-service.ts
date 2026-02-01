@@ -23,6 +23,7 @@ import { Client, Pool } from 'pg';
 import { EventEmitter } from 'events';
 import { n8nDatabaseConfig, saiDatabaseConfig, appConfig } from '@/config';
 import { logger } from '@/utils/logger';
+import { dualDb } from '@/database/dual-pool';
 
 /**
  * Stage 1 notification payload from n8n trigger
@@ -60,27 +61,9 @@ export class Stage1ETLService extends EventEmitter {
   constructor() {
     super();
 
-    // N8N database pool (read-only, minimal connections)
-    this.n8nPool = new Pool({
-      host: n8nDatabaseConfig.host,
-      port: n8nDatabaseConfig.port,
-      database: n8nDatabaseConfig.database,
-      user: n8nDatabaseConfig.username,
-      password: n8nDatabaseConfig.password,
-      max: 2, // Minimal - only for LISTEN connection
-      idleTimeoutMillis: 30000
-    });
-
-    // SAI Dashboard database pool (write operations)
-    this.saiPool = new Pool({
-      host: saiDatabaseConfig.host,
-      port: saiDatabaseConfig.port,
-      database: saiDatabaseConfig.database,
-      user: saiDatabaseConfig.username,
-      password: saiDatabaseConfig.password,
-      max: 5,
-      idleTimeoutMillis: 30000
-    });
+    // Use shared pools from dual-pool singleton
+    this.n8nPool = dualDb.getN8nPool();
+    this.saiPool = dualDb.getSaiPool();
   }
 
   /**
@@ -130,8 +113,7 @@ export class Stage1ETLService extends EventEmitter {
       this.notifyClient = null;
     }
 
-    await this.n8nPool.end();
-    await this.saiPool.end();
+    // Note: pools are shared via dualDb, do not end them here
 
     logger.info('✅ Stage 1 ETL Service stopped', {
       totalProcessed: this.metrics.processed,
