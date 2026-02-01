@@ -5,9 +5,8 @@ import compression from 'compression';
 import morgan from 'morgan';
 import { appConfig, isDevelopment } from '@/config';
 import { logger, expressLogger } from '@/utils/logger';
-// ETL Services
-import { simpleETLService } from '@/services/simple-etl-service';
 import { twoStageETLManager } from '@/services/two-stage-etl-manager';
+import type { TwoStageETLManager } from '@/services/two-stage-etl-manager';
 
 const app = express();
 
@@ -92,8 +91,7 @@ app.use('*', (req, res) => {
   });
 });
 
-// Global ETL service instance
-let etlService: any = null;
+let etlService: TwoStageETLManager | null = null;
 
 const startServer = async (): Promise<void> => {
   try {
@@ -103,78 +101,49 @@ const startServer = async (): Promise<void> => {
       logger.info(`CORS origin: ${appConfig.cors.origin}`);
     });
 
-    // Start ETL service
-    const enableETL = process.env.ENABLE_ETL_SERVICE !== 'false';
-    const useTwoStageETL = process.env.USE_TWO_STAGE_ETL === 'true';
+    // Start Two-Stage ETL
+    try {
+      logger.info('Starting Two-Stage ETL Manager...');
+      etlService = twoStageETLManager;
 
-    if (enableETL) {
-      try {
-        if (useTwoStageETL) {
-          // NEW: Two-Stage ETL Architecture (Stage 1: fast trigger + Stage 2: async deep)
-          logger.info('🚀 Starting Two-Stage ETL Manager alongside API...');
-          etlService = twoStageETLManager;
+      etlService.on('started', () => {
+        logger.info('ETL: Two-Stage Manager started successfully');
+        logger.info('  Stage 1: Listening for PostgreSQL notifications (fast path)');
+        logger.info('  Stage 2: Polling processing queue (deep extraction)');
+      });
 
-          etlService.on('started', () => {
-            logger.info('✅ ETL: Two-Stage Manager started successfully');
-            logger.info('   Stage 1: Listening for PostgreSQL notifications (fast path)');
-            logger.info('   Stage 2: Polling processing queue (deep extraction)');
-          });
+      etlService.on('stage1:execution_processed', ({ execution_id, status }: any) => {
+        logger.info(`Stage 1: Inserted execution ${execution_id} (status: ${status})`);
+      });
 
-          etlService.on('stage1:execution_processed', ({ execution_id, status }: any) => {
-            logger.info(`⚡ Stage 1: Inserted execution ${execution_id} (status: ${status})`);
-          });
+      etlService.on('stage2:execution_processed', ({ execution_id, processing_time_ms, extracted }: any) => {
+        logger.info(`Stage 2: Processed execution ${execution_id} (${processing_time_ms}ms, image: ${extracted.image_base64 ? 'yes' : 'no'})`);
+      });
 
-          etlService.on('stage2:execution_processed', ({ execution_id, processing_time_ms, extracted }: any) => {
-            logger.info(`🔍 Stage 2: Processed execution ${execution_id} (${processing_time_ms}ms, image: ${extracted.image_base64 ? 'yes' : 'no'})`);
-          });
+      etlService.on('stopped', () => {
+        logger.info('ETL: Two-Stage Manager stopped');
+      });
 
-          etlService.on('stopped', () => {
-            logger.info('🛑 ETL: Two-Stage Manager stopped');
-          });
-
-          await etlService.start();
-          logger.info('✅ Two-Stage ETL Manager started successfully');
-        } else {
-          // Legacy: Simple ETL Service (combines Stage 1 + 2)
-          logger.info('🚀 Starting Simple ETL Service alongside API...');
-          etlService = simpleETLService;
-
-          etlService.on('started', () => {
-            logger.info('✅ ETL: Service started and listening for notifications');
-          });
-
-          etlService.on('execution_processed', ({ execution_id, status, imageProcessed }: any) => {
-            logger.info(`✅ ETL: Processed execution ${execution_id} (status: ${status}, image: ${imageProcessed ? 'yes' : 'no'})`);
-          });
-
-          etlService.on('stopped', () => {
-            logger.info('🛑 ETL: Service stopped');
-          });
-
-          await etlService.start();
-          logger.info('✅ Simple ETL Service started successfully');
-        }
-      } catch (error) {
-        logger.error('⚠️ Failed to start ETL Service (continuing without it):', error);
-      }
-    } else {
-      logger.info('ℹ️ ETL Service disabled (set ENABLE_ETL_SERVICE=true to enable)');
+      await etlService.start();
+      logger.info('Two-Stage ETL Manager started successfully');
+    } catch (error) {
+      logger.error('Failed to start ETL Service (continuing without it):', error);
     }
 
     // Graceful shutdown handlers
     const gracefulShutdown = async (signal: string) => {
       logger.info(`${signal} received, shutting down gracefully`);
-      
+
       if (etlService) {
         try {
-          logger.info('🛑 Stopping ETL Service...');
+          logger.info('Stopping ETL Service...');
           await etlService.stop();
-          logger.info('✅ ETL Service stopped');
+          logger.info('ETL Service stopped');
         } catch (error) {
-          logger.error('❌ Error stopping ETL Service:', error);
+          logger.error('Error stopping ETL Service:', error);
         }
       }
-      
+
       process.exit(0);
     };
 
