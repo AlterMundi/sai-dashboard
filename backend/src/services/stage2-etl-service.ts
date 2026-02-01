@@ -401,17 +401,30 @@ export class Stage2ETLService extends EventEmitter {
       // 1. Extract all available information with n8n format resolution
       const extracted = this.extractFromExecutionData(executionDataRaw);
 
-      // 2. Perform all database updates in a single transaction
-      await this.performAtomicUpdates(executionId, extracted);
+      // 2. Write image files first (idempotent filesystem ops)
+      let imagePaths: { originalRelPath: string; thumbRelPath: string; webpRelPath: string; sizeBytes: number } | null = null;
+      if (extracted.image_base64) {
+        imagePaths = await this.writeImageFiles(executionId, extracted.image_base64);
+      }
 
-      // 3. Track detection metrics
+      // 3. Perform all database updates in a single transaction (including image metadata)
+      try {
+        await this.performAtomicUpdates(executionId, extracted, imagePaths);
+      } catch (error) {
+        // Rollback: clean up orphaned image files if DB transaction failed
+        if (imagePaths) {
+          await this.cleanupImageFiles(executionId).catch(cleanupErr =>
+            logger.warn(`Failed to cleanup orphaned image files for ${executionId}:`, cleanupErr)
+          );
+        }
+        throw error;
+      }
+
+      // 4. Track detection metrics
       if (extracted.detections && extracted.detections.length > 0) {
         this.metrics.detectionsFound += extracted.detections.length;
       }
-
-      // 4. Process and cache image (if present) - all formats in parallel
-      if (extracted.image_base64) {
-        await this.processImage(executionId, extracted.image_base64);
+      if (imagePaths) {
         this.metrics.imagesExtracted++;
       }
 
@@ -459,7 +472,8 @@ export class Stage2ETLService extends EventEmitter {
    */
   private async performAtomicUpdates(
     executionId: number,
-    extracted: Stage2ExtractionResult
+    extracted: Stage2ExtractionResult,
+    imagePaths: { originalRelPath: string; thumbRelPath: string; webpRelPath: string; sizeBytes: number } | null
   ): Promise<void> {
     const client = await this.saiPool.connect();
 
@@ -476,6 +490,20 @@ export class Stage2ETLService extends EventEmitter {
 
       // 3. Insert notification status
       await this.insertNotification(client, executionId, extracted);
+
+      // 4. Insert image metadata (if files were written)
+      if (imagePaths) {
+        await client.query(`
+          INSERT INTO execution_images (
+            execution_id, original_path, thumbnail_path, cached_path, size_bytes, format, extracted_at
+          ) VALUES ($1, $2, $3, $4, $5, 'jpeg', NOW())
+          ON CONFLICT (execution_id) DO UPDATE SET
+            original_path = EXCLUDED.original_path,
+            thumbnail_path = EXCLUDED.thumbnail_path,
+            cached_path = EXCLUDED.cached_path,
+            size_bytes = EXCLUDED.size_bytes
+        `, [executionId, imagePaths.originalRelPath, imagePaths.thumbRelPath, imagePaths.webpRelPath, imagePaths.sizeBytes]);
+      }
 
       await client.query('COMMIT');
     } catch (error) {
@@ -803,63 +831,58 @@ export class Stage2ETLService extends EventEmitter {
   }
 
   /**
-   * Process and cache image - all formats in parallel
-   *
-   * Stores RELATIVE paths in database (e.g., "original/410/410000.jpg")
-   * The application resolves these at runtime using IMAGE_BASE_PATH config
+   * Write image files to filesystem (idempotent).
+   * Returns relative paths for database storage.
+   * DB insert is handled separately inside the transaction.
    */
-  private async processImage(executionId: number, imageBase64: string): Promise<void> {
-    try {
-      const partition = Math.floor(executionId / 1000);
+  private async writeImageFiles(
+    executionId: number,
+    imageBase64: string
+  ): Promise<{ originalRelPath: string; thumbRelPath: string; webpRelPath: string; sizeBytes: number }> {
+    const partition = Math.floor(executionId / 1000);
 
-      // Define RELATIVE paths (stored in database)
-      const originalRelPath = `original/${partition}/${executionId}.jpg`;
-      const webpRelPath = `webp/${partition}/${executionId}.webp`;
-      const thumbRelPath = `thumb/${partition}/${executionId}.webp`;
+    const originalRelPath = `original/${partition}/${executionId}.jpg`;
+    const webpRelPath = `webp/${partition}/${executionId}.webp`;
+    const thumbRelPath = `thumb/${partition}/${executionId}.webp`;
 
-      // Define ABSOLUTE paths (used for filesystem operations)
-      const originalAbsPath = path.join(this.IMAGE_CACHE_PATH, originalRelPath);
-      const webpAbsPath = path.join(this.IMAGE_CACHE_PATH, webpRelPath);
-      const thumbAbsPath = path.join(this.IMAGE_CACHE_PATH, thumbRelPath);
+    const originalAbsPath = path.join(this.IMAGE_CACHE_PATH, originalRelPath);
+    const webpAbsPath = path.join(this.IMAGE_CACHE_PATH, webpRelPath);
+    const thumbAbsPath = path.join(this.IMAGE_CACHE_PATH, thumbRelPath);
 
-      // Create directories
-      await Promise.all([
-        fs.mkdir(path.dirname(originalAbsPath), { recursive: true }),
-        fs.mkdir(path.dirname(webpAbsPath), { recursive: true }),
-        fs.mkdir(path.dirname(thumbAbsPath), { recursive: true })
-      ]);
+    await Promise.all([
+      fs.mkdir(path.dirname(originalAbsPath), { recursive: true }),
+      fs.mkdir(path.dirname(webpAbsPath), { recursive: true }),
+      fs.mkdir(path.dirname(thumbAbsPath), { recursive: true })
+    ]);
 
-      const imageBuffer = Buffer.from(imageBase64, 'base64');
+    const imageBuffer = Buffer.from(imageBase64, 'base64');
 
-      // Process all image formats in parallel
-      await Promise.all([
-        // Save original JPEG
-        sharp(imageBuffer).jpeg({ quality: 95 }).toFile(originalAbsPath),
-        // Create WebP variant
-        sharp(imageBuffer).webp({ quality: 85 }).toFile(webpAbsPath),
-        // Create thumbnail
-        sharp(imageBuffer)
-          .resize(300, 300, { fit: 'inside', withoutEnlargement: true })
-          .webp({ quality: 75 })
-          .toFile(thumbAbsPath)
-      ]);
+    await Promise.all([
+      sharp(imageBuffer).jpeg({ quality: 95 }).toFile(originalAbsPath),
+      sharp(imageBuffer).webp({ quality: 85 }).toFile(webpAbsPath),
+      sharp(imageBuffer)
+        .resize(300, 300, { fit: 'inside', withoutEnlargement: true })
+        .webp({ quality: 75 })
+        .toFile(thumbAbsPath)
+    ]);
 
-      // Insert image metadata with RELATIVE paths (portable across environments)
-      await this.saiPool.query(`
-        INSERT INTO execution_images (
-          execution_id, original_path, thumbnail_path, cached_path, size_bytes, format, extracted_at
-        ) VALUES ($1, $2, $3, $4, $5, 'jpeg', NOW())
-        ON CONFLICT (execution_id) DO UPDATE SET
-          original_path = EXCLUDED.original_path,
-          thumbnail_path = EXCLUDED.thumbnail_path,
-          cached_path = EXCLUDED.cached_path,
-          size_bytes = EXCLUDED.size_bytes
-      `, [executionId, originalRelPath, thumbRelPath, webpRelPath, imageBuffer.length]);
+    return { originalRelPath, thumbRelPath, webpRelPath, sizeBytes: imageBuffer.length };
+  }
 
-    } catch (error) {
-      logger.error(`Failed to process image for execution ${executionId}:`, error);
-      throw error;
-    }
+  /**
+   * Clean up orphaned image files after a failed DB transaction.
+   */
+  private async cleanupImageFiles(executionId: number): Promise<void> {
+    const partition = Math.floor(executionId / 1000);
+    const filesToDelete = [
+      path.join(this.IMAGE_CACHE_PATH, `original/${partition}/${executionId}.jpg`),
+      path.join(this.IMAGE_CACHE_PATH, `webp/${partition}/${executionId}.webp`),
+      path.join(this.IMAGE_CACHE_PATH, `thumb/${partition}/${executionId}.webp`),
+    ];
+
+    await Promise.allSettled(
+      filesToDelete.map(f => fs.unlink(f))
+    );
   }
 
   /**

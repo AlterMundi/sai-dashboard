@@ -47,6 +47,8 @@ export class Stage1ETLService extends EventEmitter {
   private saiPool: Pool;
   private notifyClient: Client | null = null;
   private isRunning = false;
+  private reconnectAttempts = 0;
+  private readonly maxReconnectAttempts = 10;
 
   // Performance metrics
   private metrics = {
@@ -216,19 +218,37 @@ export class Stage1ETLService extends EventEmitter {
       }
     });
 
+    // Reset reconnect counter on successful connection
+    this.reconnectAttempts = 0;
+
     this.notifyClient.on('error', (error) => {
-      logger.error('❌ PostgreSQL notification client error:', error);
-      // Attempt reconnection after 5 seconds
+      logger.error('PostgreSQL notification client error:', error);
+
+      if (!this.isRunning) return;
+
+      this.reconnectAttempts++;
+      if (this.reconnectAttempts > this.maxReconnectAttempts) {
+        logger.error('CRITICAL: NOTIFY reconnect attempts exhausted, falling back to polling-only mode', {
+          attempts: this.reconnectAttempts,
+          maxAttempts: this.maxReconnectAttempts
+        });
+        this.emit('notify:circuit_open');
+        return;
+      }
+
+      const delay = Math.min(5000 * Math.pow(2, this.reconnectAttempts - 1), 60000);
+      logger.warn(`Reconnecting NOTIFY listener in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
+
       setTimeout(() => {
         if (this.isRunning) {
           this.setupNotificationListener().catch(err =>
             logger.error('Failed to reconnect notification listener:', err)
           );
         }
-      }, 5000);
+      }, delay);
     });
 
-    logger.info('✅ Listening for sai_execution_stage1 notifications');
+    logger.info('Listening for sai_execution_stage1 notifications');
   }
 
   /**
@@ -332,7 +352,9 @@ export class Stage1ETLService extends EventEmitter {
     return {
       ...this.metrics,
       uptime_seconds: Math.floor((Date.now() - this.metrics.startedAt.getTime()) / 1000),
-      is_running: this.isRunning
+      is_running: this.isRunning,
+      notify_reconnect_attempts: this.reconnectAttempts,
+      notify_circuit_open: this.reconnectAttempts > this.maxReconnectAttempts
     };
   }
 
