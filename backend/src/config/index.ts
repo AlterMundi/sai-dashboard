@@ -123,8 +123,6 @@ export const appConfig = {
   rateLimit: {
     windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '60000', 10),
     maxRequests: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '60', 10),
-    burstMax: parseInt(process.env.RATE_LIMIT_BURST_MAX || '10', 10),
-    burstWindow: parseInt(process.env.RATE_LIMIT_BURST_WINDOW || '10000', 10),
     loginWindowMs: parseInt(process.env.LOGIN_RATE_LIMIT_WINDOW || '900000', 10),
     loginMaxAttempts: parseInt(process.env.LOGIN_RATE_LIMIT_MAX || '5', 10),
   },
@@ -157,9 +155,7 @@ export const appConfig = {
   },
 
   features: {
-    imageProcessing: process.env.FEATURE_IMAGE_PROCESSING !== 'false',
     realTimeUpdates: process.env.FEATURE_REAL_TIME_UPDATES !== 'false',
-    exportFunctionality: process.env.FEATURE_EXPORT_FUNCTIONALITY === 'true',
     devTools: process.env.ENABLE_DEV_TOOLS === 'true',
   }
 };

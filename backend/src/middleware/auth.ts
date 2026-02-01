@@ -74,24 +74,6 @@ export const apiRateLimit = rateLimit({
   }
 });
 
-export const burstRateLimit = rateLimit({
-  windowMs: appConfig.rateLimit.burstWindow,
-  max: appConfig.rateLimit.burstMax,
-  message: {
-    error: {
-      message: 'Request burst limit exceeded',
-      code: 'BURST_LIMIT_EXCEEDED'
-    }
-  },
-  standardHeaders: false,
-  legacyHeaders: false,
-  skip: (req) => {
-    // Skip burst limiting in development for localhost
-    return appConfig.nodeEnv === 'development' &&
-           (req.ip === '127.0.0.1' || req.ip === '::1' || req.ip === '::ffff:127.0.0.1');
-  }
-});
-
 export const generateToken = (sessionData: Omit<SessionData, 'createdAt' | 'expiresAt'>): string => {
   const payload = {
     ...sessionData,
