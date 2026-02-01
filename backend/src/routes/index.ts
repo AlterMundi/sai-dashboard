@@ -1,11 +1,10 @@
-import { Router } from 'express';
-import { 
-  apiRateLimit, 
-  burstRateLimit, 
+import { Router, Request, Response } from 'express';
+import {
+  apiRateLimit,
   loginRateLimit,
-  authenticateToken, 
+  authenticateToken,
   requireAuth,
-  optionalAuth 
+  optionalAuth
 } from '@/middleware/auth';
 import { 
   login, 
@@ -36,6 +35,9 @@ import {
   liveness
 } from '@/controllers/health';
 import { NodeController } from '@/controllers/node';
+import { dualDb } from '@/database/dual-pool';
+import { logger } from '@/utils/logger';
+import { asyncHandler } from '@/utils';
 
 const router = Router();
 
@@ -67,7 +69,6 @@ router.use('/auth', authRouter);
 
 // Apply general rate limiting to all API routes
 router.use(apiRateLimit);
-router.use(burstRateLimit);
 
 // =================================================================
 // Server-Sent Events (SSE) Routes - Special Auth Handling
@@ -182,88 +183,72 @@ router.use('/executions', executionRouter);
 const incidentRouter = Router();
 
 // Multi-camera incident detection
-incidentRouter.get('/', async (req, res) => {
-  try {
-    const {
-      status = 'active',
-      timeRange = '24h',
-      minCameras = 1,
-      alertLevel
-    } = req.query;
+incidentRouter.get('/', asyncHandler(async (req: Request, res: Response) => {
+  const {
+    timeRange = '24h',
+    minCameras = 1,
+    alertLevel
+  } = req.query;
 
-    // Get active incidents across multiple cameras
-    let whereConditions = ['incident_id IS NOT NULL'];
-    const queryParams: any[] = [];
-    let paramCount = 0;
+  const whereConditions = ['incident_id IS NOT NULL'];
+  const queryParams: any[] = [];
+  let paramCount = 0;
 
-    // Time range filter
-    if (timeRange === '1h') {
-      whereConditions.push(`detection_timestamp > NOW() - INTERVAL '1 hour'`);
-    } else if (timeRange === '24h') {
-      whereConditions.push(`detection_timestamp > NOW() - INTERVAL '24 hours'`);
-    } else if (timeRange === '7d') {
-      whereConditions.push(`detection_timestamp > NOW() - INTERVAL '7 days'`);
-    }
-
-    // Alert level filter
-    if (alertLevel) {
-      paramCount++;
-      whereConditions.push(`alert_level = $${paramCount}`);
-      queryParams.push(alertLevel);
-    }
-
-    const whereClause = whereConditions.join(' AND ');
-
-    // Get incident summaries
-    const incidentsQuery = `
-      SELECT
-        incident_id,
-        COUNT(*) as total_detections,
-        COUNT(DISTINCT camera_id) as cameras_involved,
-        MAX(alert_level) as max_alert_level,
-        MIN(detection_timestamp) as incident_start,
-        MAX(detection_timestamp) as incident_end,
-        ARRAY_AGG(DISTINCT camera_id) as camera_list
-      FROM execution_analysis
-      WHERE ${whereClause}
-      GROUP BY incident_id
-      HAVING COUNT(DISTINCT camera_id) >= $${paramCount + 1}
-      ORDER BY incident_start DESC
-      LIMIT 50
-    `;
-
-    queryParams.push(parseInt(minCameras as string) || 1);
-    const { dualDb } = await import('@/database/dual-pool');
-    const incidents = await dualDb.query(incidentsQuery, queryParams);
-
-    res.json({
-      data: incidents.map((incident: any) => ({
-        incidentId: incident.incident_id,
-        totalDetections: parseInt(incident.total_detections),
-        camerasInvolved: parseInt(incident.cameras_involved),
-        maxAlertLevel: incident.max_alert_level,
-        incidentStart: incident.incident_start,
-        incidentEnd: incident.incident_end,
-        cameraList: incident.camera_list
-      })),
-      meta: {
-        totalIncidents: incidents.length,
-        timeRange,
-        minCameras: parseInt(minCameras as string) || 1
-      }
-    });
-
-  } catch (error) {
-    const { logger } = await import('@/utils/logger');
-    logger.error('Failed to fetch incidents:', { query: req.query, error });
-    res.status(500).json({
-      error: {
-        message: 'Failed to fetch incidents',
-        code: 'FETCH_INCIDENTS_ERROR'
-      }
-    });
+  // Time range filter
+  if (timeRange === '1h') {
+    whereConditions.push(`detection_timestamp > NOW() - INTERVAL '1 hour'`);
+  } else if (timeRange === '24h') {
+    whereConditions.push(`detection_timestamp > NOW() - INTERVAL '24 hours'`);
+  } else if (timeRange === '7d') {
+    whereConditions.push(`detection_timestamp > NOW() - INTERVAL '7 days'`);
   }
-});
+
+  // Alert level filter
+  if (alertLevel) {
+    paramCount++;
+    whereConditions.push(`alert_level = $${paramCount}`);
+    queryParams.push(alertLevel);
+  }
+
+  const whereClause = whereConditions.join(' AND ');
+
+  const incidentsQuery = `
+    SELECT
+      incident_id,
+      COUNT(*) as total_detections,
+      COUNT(DISTINCT camera_id) as cameras_involved,
+      MAX(alert_level) as max_alert_level,
+      MIN(detection_timestamp) as incident_start,
+      MAX(detection_timestamp) as incident_end,
+      ARRAY_AGG(DISTINCT camera_id) as camera_list
+    FROM execution_analysis
+    WHERE ${whereClause}
+    GROUP BY incident_id
+    HAVING COUNT(DISTINCT camera_id) >= $${paramCount + 1}
+    ORDER BY incident_start DESC
+    LIMIT 50
+  `;
+
+  queryParams.push(parseInt(minCameras as string) || 1);
+  const incidents = await dualDb.query(incidentsQuery, queryParams);
+
+  res.json({
+    data: incidents.map((incident: any) => ({
+      incidentId: incident.incident_id,
+      totalDetections: parseInt(incident.total_detections),
+      camerasInvolved: parseInt(incident.cameras_involved),
+      maxAlertLevel: incident.max_alert_level,
+      incidentStart: incident.incident_start,
+      incidentEnd: incident.incident_end,
+      cameraList: incident.camera_list
+    })),
+    meta: {
+      totalIncidents: incidents.length,
+      timeRange,
+      minCameras: parseInt(minCameras as string) || 1
+    }
+  });
+}));
 
 router.use('/incidents', incidentRouter);
 
@@ -389,7 +374,6 @@ if (process.env.NODE_ENV === 'development' || process.env.ENABLE_API_DOCS === 't
         },
         rateLimit: {
           general: '60 requests per minute',
-          burst: '10 requests per 10 seconds',
           login: '5 attempts per 15 minutes'
         }
       }
