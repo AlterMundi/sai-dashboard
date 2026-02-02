@@ -101,33 +101,37 @@ const startServer = async (): Promise<void> => {
       logger.info(`CORS origin: ${appConfig.cors.origin}`);
     });
 
-    // Start Two-Stage ETL
-    try {
-      logger.info('Starting Two-Stage ETL Manager...');
-      etlService = twoStageETLManager;
+    // Start Two-Stage ETL (skip if explicitly disabled)
+    if (process.env.ENABLE_ETL_SERVICE === 'false') {
+      logger.info('ETL Service disabled via ENABLE_ETL_SERVICE=false');
+    } else {
+      try {
+        logger.info('Starting Two-Stage ETL Manager...');
+        etlService = twoStageETLManager;
 
-      etlService.on('started', () => {
-        logger.info('ETL: Two-Stage Manager started successfully');
-        logger.info('  Stage 1: Listening for PostgreSQL notifications (fast path)');
-        logger.info('  Stage 2: Polling processing queue (deep extraction)');
-      });
+        etlService.on('started', () => {
+          logger.info('ETL: Two-Stage Manager started successfully');
+          logger.info('  Stage 1: Listening for PostgreSQL notifications (fast path)');
+          logger.info('  Stage 2: Polling processing queue (deep extraction)');
+        });
 
-      etlService.on('stage1:execution_processed', ({ execution_id, status }: any) => {
-        logger.info(`Stage 1: Inserted execution ${execution_id} (status: ${status})`);
-      });
+        etlService.on('stage1:execution_processed', ({ execution_id, status }: any) => {
+          logger.info(`Stage 1: Inserted execution ${execution_id} (status: ${status})`);
+        });
 
-      etlService.on('stage2:execution_processed', ({ execution_id, processing_time_ms, extracted }: any) => {
-        logger.info(`Stage 2: Processed execution ${execution_id} (${processing_time_ms}ms, image: ${extracted.image_base64 ? 'yes' : 'no'})`);
-      });
+        etlService.on('stage2:execution_processed', ({ execution_id, processing_time_ms, extracted }: any) => {
+          logger.info(`Stage 2: Processed execution ${execution_id} (${processing_time_ms}ms, image: ${extracted.image_base64 ? 'yes' : 'no'})`);
+        });
 
-      etlService.on('stopped', () => {
-        logger.info('ETL: Two-Stage Manager stopped');
-      });
+        etlService.on('stopped', () => {
+          logger.info('ETL: Two-Stage Manager stopped');
+        });
 
-      await etlService.start();
-      logger.info('Two-Stage ETL Manager started successfully');
-    } catch (error) {
-      logger.error('Failed to start ETL Service (continuing without it):', error);
+        await etlService.start();
+        logger.info('Two-Stage ETL Manager started successfully');
+      } catch (error) {
+        logger.error('Failed to start ETL Service (continuing without it):', error);
+      }
     }
 
     // Graceful shutdown handlers
