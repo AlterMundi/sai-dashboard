@@ -23,12 +23,12 @@ interface SSEProviderProps {
 export function SSEProvider({ children }: SSEProviderProps) {
   const [isConnected, setIsConnected] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected' | 'error'>('disconnected');
-  const [lastEvent, setLastEvent] = useState<any>(null);
+  const [lastEvent, setLastEvent] = useState<{ type: string; data: unknown; timestamp: Date } | null>(null);
   const [clientCount, setClientCount] = useState(0);
   const [liveStats, setLiveStats] = useState<any>(null);
   const [systemHealth, setSystemHealth] = useState<any>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
-  const reconnectTimeoutRef = useRef<number | null>(null);
+  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reconnectAttempts = useRef(0);
   const connectionIdRef = useRef(0);
   const isConnectingRef = useRef(false);
@@ -47,6 +47,21 @@ export function SSEProvider({ children }: SSEProviderProps) {
     notifySystemStats
   } = useNotifications();
 
+  // Stable refs for notification functions used inside connect()
+  const notifyNewExecutionRef = useRef(notifyNewExecution);
+  const notifyExecutionErrorRef = useRef(notifyExecutionError);
+  const notifyBatchCompleteRef = useRef(notifyBatchComplete);
+  const notifySystemHealthRef = useRef(notifySystemHealth);
+  const notifySystemStatsRef = useRef(notifySystemStats);
+  const fallbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Keep refs current
+  notifyNewExecutionRef.current = notifyNewExecution;
+  notifyExecutionErrorRef.current = notifyExecutionError;
+  notifyBatchCompleteRef.current = notifyBatchComplete;
+  notifySystemHealthRef.current = notifySystemHealth;
+  notifySystemStatsRef.current = notifySystemStats;
+
   const cleanup = useCallback(() => {
     if (eventSourceRef.current) {
       eventSourceRef.current.close();
@@ -55,6 +70,10 @@ export function SSEProvider({ children }: SSEProviderProps) {
     if (reconnectTimeoutRef.current) {
       clearTimeout(reconnectTimeoutRef.current);
       reconnectTimeoutRef.current = null;
+    }
+    if (fallbackTimeoutRef.current) {
+      clearTimeout(fallbackTimeoutRef.current);
+      fallbackTimeoutRef.current = null;
     }
     isConnectingRef.current = false;
   }, []);
@@ -93,7 +112,7 @@ export function SSEProvider({ children }: SSEProviderProps) {
       };
 
       // Fallback: Check connection after 10 seconds if onopen hasn't fired
-      setTimeout(() => {
+      fallbackTimeoutRef.current = setTimeout(() => {
         if (eventSource.readyState === EventSource.OPEN) {
           setIsConnected(true);
           setConnectionStatus('connected');
@@ -122,7 +141,7 @@ export function SSEProvider({ children }: SSEProviderProps) {
             
             reconnectTimeoutRef.current = setTimeout(() => {
               connect();
-            }, delay) as unknown as number;
+            }, delay);
           } else {
             setConnectionStatus('error');
             toast.error('Real-time connection failed. Please refresh the page.');
@@ -160,7 +179,7 @@ export function SSEProvider({ children }: SSEProviderProps) {
           // Events are handled through useSSEHandler hook
           
           // Use smart notification system instead of basic toast
-          notifyNewExecution(data);
+          notifyNewExecutionRef.current(data);
         } catch (error) {
           console.warn('SSE Context: Failed to parse execution:new event:', error);
         }
@@ -173,7 +192,7 @@ export function SSEProvider({ children }: SSEProviderProps) {
           setLastEvent({ type: 'execution:error', data, timestamp: new Date() });
           
           // Use smart notification system
-          notifyExecutionError(data);
+          notifyExecutionErrorRef.current(data);
         } catch (error) {
           console.warn('SSE Context: Failed to parse execution:error event:', error);
         }
@@ -200,7 +219,7 @@ export function SSEProvider({ children }: SSEProviderProps) {
           // Events are captured directly via lastEvent state
           
           // Smart notification for significant stats changes
-          notifySystemStats(data);
+          notifySystemStatsRef.current(data);
         } catch (error) {
           console.warn('SSE Context: Failed to parse system:stats event:', error);
         }
@@ -216,7 +235,7 @@ export function SSEProvider({ children }: SSEProviderProps) {
           // Events are captured directly via lastEvent state
           
           // Smart notification for health issues
-          notifySystemHealth(data);
+          notifySystemHealthRef.current(data);
         } catch (error) {
           console.warn('SSE Context: Failed to parse system:health event:', error);
         }
@@ -232,7 +251,7 @@ export function SSEProvider({ children }: SSEProviderProps) {
           // Events are handled through useSSEHandler hook
           
           // Smart notification for batch completion
-          notifyBatchComplete(data);
+          notifyBatchCompleteRef.current(data);
         } catch (error) {
           console.warn('❌ SSE Context: Failed to parse execution:batch event:', error);
         }
@@ -357,11 +376,13 @@ export function SSEProvider({ children }: SSEProviderProps) {
   return (
     <SSEContext.Provider value={contextValue}>
       {children}
-      <NotificationOverlay
-        notifications={notifications}
-        onDismiss={dismissNotification}
-        onAction={handleNotificationAction}
-      />
+      <div aria-live="polite" aria-atomic="false">
+        <NotificationOverlay
+          notifications={notifications}
+          onDismiss={dismissNotification}
+          onAction={handleNotificationAction}
+        />
+      </div>
     </SSEContext.Provider>
   );
 }
@@ -393,7 +414,7 @@ export function useSSEHandler(handlers: {
 
     switch (lastEvent.type) {
       case 'execution:new':
-        handlers.onNewExecution?.(lastEvent.data);
+        handlers.onNewExecution?.(lastEvent.data as SSEExecutionEvent);
         break;
       case 'execution:error':
         handlers.onExecutionError?.(lastEvent.data);
@@ -402,19 +423,19 @@ export function useSSEHandler(handlers: {
         handlers.onExecutionBatch?.(lastEvent.data);
         break;
       case 'connection':
-        handlers.onConnection?.(lastEvent.data);
+        handlers.onConnection?.(lastEvent.data as SSEConnectionEvent);
         break;
       case 'heartbeat':
-        handlers.onHeartbeat?.(lastEvent.data);
+        handlers.onHeartbeat?.(lastEvent.data as SSEHeartbeatEvent);
         break;
       case 'etl:stage2:complete':
-        handlers.onStage2Complete?.(lastEvent.data);
+        handlers.onStage2Complete?.(lastEvent.data as SSEStage2CompletionEvent);
         break;
       case 'etl:stage2:failed':
-        handlers.onStage2Failure?.(lastEvent.data);
+        handlers.onStage2Failure?.(lastEvent.data as SSEStage2FailureEvent);
         break;
       case 'etl:status':
-        handlers.onEtlStatus?.(lastEvent.data);
+        handlers.onEtlStatus?.(lastEvent.data as SSEEtlStatusEvent);
         break;
     }
   }, [lastEvent, handlers]);

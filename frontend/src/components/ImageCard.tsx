@@ -23,15 +23,26 @@ export function ImageCard({ execution, onClick, loading = false }: ImageCardProp
     }
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      handleCardClick();
+    }
+  };
+
   return (
     <div
       className={cn(
-        'group relative bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-xl transition-all duration-300 cursor-pointer overflow-hidden',
+        'group relative bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-xl transition-[box-shadow,border-color] duration-300 cursor-pointer overflow-hidden focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 outline-none',
         loading && 'opacity-50 cursor-not-allowed',
         execution.alertLevel === 'critical' && 'ring-2 ring-red-500 ring-offset-2',
         execution.alertLevel === 'high' && 'ring-2 ring-orange-400 ring-offset-1'
       )}
       onClick={handleCardClick}
+      onKeyDown={handleKeyDown}
+      role="button"
+      tabIndex={0}
+      aria-label={`Execution ${execution.id}, status ${execution.status}${execution.alertLevel && execution.alertLevel !== 'none' ? `, alert level ${execution.alertLevel}` : ''}`}
     >
       {/* Image Section */}
       <div className="aspect-[4/3] relative bg-gradient-to-br from-gray-100 to-gray-200">
@@ -44,7 +55,7 @@ export function ImageCard({ execution, onClick, loading = false }: ImageCardProp
             )}
             {imageError ? (
               <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-400">
-                <AlertTriangle className="h-8 w-8 mb-2" />
+                <AlertTriangle className="h-8 w-8 mb-2" aria-hidden="true" />
                 <span className="text-xs">Failed to load</span>
               </div>
             ) : (
@@ -52,10 +63,12 @@ export function ImageCard({ execution, onClick, loading = false }: ImageCardProp
                 src={thumbnailUrl}
                 alt={`Execution ${execution.id}`}
                 className={cn(
-                  'absolute inset-0 w-full h-full object-cover transition-all duration-300',
+                  'absolute inset-0 w-full h-full object-cover transition-[opacity,transform] duration-300',
                   imageLoading ? 'opacity-0' : 'opacity-100',
                   'group-hover:scale-105'
                 )}
+                width={400}
+                height={300}
                 onLoad={handleImageLoad}
                 onError={handleImageError}
                 loading="lazy"
@@ -66,8 +79,8 @@ export function ImageCard({ execution, onClick, loading = false }: ImageCardProp
           <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-400">
             {isStage1Only ? (
               <>
-                <RefreshCw className="h-8 w-8 mb-2 animate-spin text-blue-500" />
-                <span className="text-xs text-blue-600">Processing...</span>
+                <RefreshCw className="h-8 w-8 mb-2 animate-spin text-blue-500" aria-hidden="true" />
+                <span className="text-xs text-blue-600">Processing{'\u2026'}</span>
               </>
             ) : hasStage2Error ? (
               <>
@@ -76,7 +89,7 @@ export function ImageCard({ execution, onClick, loading = false }: ImageCardProp
               </>
             ) : (
               <>
-                <Camera className="h-8 w-8 mb-2 opacity-50" />
+                <Camera className="h-8 w-8 mb-2 opacity-50" aria-hidden="true" />
                 <span className="text-xs">No image</span>
               </>
             )}
@@ -119,9 +132,9 @@ export function ImageCard({ execution, onClick, loading = false }: ImageCardProp
               )}
               title={isStage1Only ? "Fire detection pending" : `Fire: ${execution.confidenceFire ? Math.round(execution.confidenceFire * 100) + '%' : 'detected'}`}
             >
-              <Flame className="h-3 w-3" />
+              <Flame className="h-3 w-3" aria-hidden="true" />
               {!isStage1Only && execution.confidenceFire !== null && (
-                <span>{Math.round(execution.confidenceFire * 100)}%</span>
+                <span className="tabular-nums">{Math.round(execution.confidenceFire * 100)}%</span>
               )}
             </div>
           )}
@@ -133,9 +146,9 @@ export function ImageCard({ execution, onClick, loading = false }: ImageCardProp
               )}
               title={isStage1Only ? "Smoke detection pending" : `Smoke: ${execution.confidenceSmoke ? Math.round(execution.confidenceSmoke * 100) + '%' : 'detected'}`}
             >
-              <Wind className="h-3 w-3" />
+              <Wind className="h-3 w-3" aria-hidden="true" />
               {!isStage1Only && execution.confidenceSmoke !== null && (
-                <span>{Math.round(execution.confidenceSmoke * 100)}%</span>
+                <span className="tabular-nums">{Math.round(execution.confidenceSmoke * 100)}%</span>
               )}
             </div>
           )}
@@ -147,13 +160,17 @@ export function ImageCard({ execution, onClick, loading = false }: ImageCardProp
             <div
               className="bg-emerald-500/90 text-white rounded-full p-1.5 shadow-lg backdrop-blur-sm"
               title="Telegram sent"
+              aria-label="Telegram notification sent"
             >
-              <MessageCircle className="h-3 w-3" />
+              <MessageCircle className="h-3 w-3" aria-hidden="true" />
             </div>
           )}
           {isStage1Only && (
-            <div className="bg-blue-500/90 text-white rounded-full p-1.5 shadow-lg backdrop-blur-sm animate-pulse">
-              <RefreshCw className="h-3 w-3 animate-spin" />
+            <div
+              className="bg-blue-500/90 text-white rounded-full p-1.5 shadow-lg backdrop-blur-sm animate-pulse"
+              aria-label="Processing in progress"
+            >
+              <RefreshCw className="h-3 w-3 animate-spin" aria-hidden="true" />
             </div>
           )}
         </div>
@@ -175,13 +192,13 @@ export function ImageCard({ execution, onClick, loading = false }: ImageCardProp
         <div className="flex items-center gap-3 text-xs text-gray-500">
           {execution.cameraId && (
             <div className="flex items-center truncate" title={`Camera: ${execution.cameraId}`}>
-              <Camera className="h-3 w-3 mr-1 flex-shrink-0 text-gray-400" />
+              <Camera className="h-3 w-3 mr-1 flex-shrink-0 text-gray-400" aria-hidden="true" />
               <span className="truncate">{execution.cameraId}</span>
             </div>
           )}
           {execution.location && (
             <div className="flex items-center truncate" title={`Location: ${execution.location}`}>
-              <MapPin className="h-3 w-3 mr-1 flex-shrink-0 text-gray-400" />
+              <MapPin className="h-3 w-3 mr-1 flex-shrink-0 text-gray-400" aria-hidden="true" />
               <span className="truncate">{execution.location}</span>
             </div>
           )}

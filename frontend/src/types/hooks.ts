@@ -34,6 +34,7 @@ export interface UseExecutionsReturn {
   filters: ExecutionFilters;
   prependExecutions: (executions: ExecutionWithImageUrls[]) => void;
   updateExecutionStage: (executionId: number, stage: ProcessingStage, additionalData?: any) => void;
+  totalResults: number;
 }
 
 /**
@@ -41,7 +42,11 @@ export interface UseExecutionsReturn {
  */
 export interface UseSSEReturn {
   isConnected: boolean;
-  lastEvent: any;
+  lastEvent: {
+    type: string;
+    data: unknown;
+    timestamp: Date;
+  } | null;
   connectionStatus: 'connecting' | 'connected' | 'disconnected' | 'error';
   clientCount: number;
   connect: () => void;

@@ -11,6 +11,7 @@ export function useExecutions(
   const [error, setError] = useState<string | null>(null);
   const [hasNext, setHasNext] = useState(false);
   const [currentPage, setCurrentPage] = useState(0);
+  const [totalResults, setTotalResults] = useState(0);
   const [filters, setFilters] = useState<ExecutionFilters>(initialFilters);
 
   const fetchExecutions = useCallback(async (
@@ -38,6 +39,7 @@ export function useExecutions(
       }
 
       setHasNext(response.meta?.hasNext || false);
+      setTotalResults(response.meta?.total || 0);
       setError(null);
 
     } catch (error) {
@@ -47,6 +49,7 @@ export function useExecutions(
       if (reset) {
         setExecutions([]);
         setHasNext(false);
+        setTotalResults(0);
       }
     } finally {
       if (reset) {
@@ -119,10 +122,10 @@ export function useExecutions(
     }));
   }, []);
 
-  // Initial fetch
+  // Initial fetch and refetch when filters change
   useEffect(() => {
     fetchExecutions(filters, true);
-  }, []); // Only run on mount
+  }, [filters]); // Refetch when filters change
 
   // Handle external refresh triggers (from SSE updates)
   useEffect(() => {
@@ -143,6 +146,7 @@ export function useExecutions(
     filters,
     prependExecutions,
     updateExecutionStage,
+    totalResults,
   };
 }
 

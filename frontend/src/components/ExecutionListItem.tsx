@@ -39,15 +39,26 @@ export function ExecutionListItem({ execution, onClick, loading = false }: Execu
     }
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      handleClick();
+    }
+  };
+
   return (
     <div
       className={cn(
-        'group flex items-center gap-4 p-3 bg-white rounded-lg border border-gray-200 hover:border-primary-300 hover:shadow-md transition-all cursor-pointer',
+        'group flex items-center gap-4 p-3 bg-white rounded-lg border border-gray-200 hover:border-primary-300 hover:shadow-md transition-[box-shadow,border-color] cursor-pointer focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 outline-none',
         loading && 'opacity-50 cursor-not-allowed',
         execution.alertLevel === 'critical' && 'border-l-4 border-l-red-500',
         execution.alertLevel === 'high' && 'border-l-4 border-l-orange-500'
       )}
       onClick={handleClick}
+      onKeyDown={handleKeyDown}
+      role="button"
+      tabIndex={0}
+      aria-label={`Execution ${execution.id}, status ${execution.status}${execution.alertLevel && execution.alertLevel !== 'none' ? `, alert level ${execution.alertLevel}` : ''}`}
     >
       {/* Thumbnail */}
       <div className="flex-shrink-0 w-16 h-16 rounded-md overflow-hidden bg-gray-100 relative">
@@ -60,7 +71,7 @@ export function ExecutionListItem({ execution, onClick, loading = false }: Execu
             )}
             {imageError ? (
               <div className="absolute inset-0 flex items-center justify-center text-gray-400">
-                <AlertTriangle className="h-5 w-5" />
+                <AlertTriangle className="h-5 w-5" aria-hidden="true" />
               </div>
             ) : (
               <img
@@ -70,6 +81,8 @@ export function ExecutionListItem({ execution, onClick, loading = false }: Execu
                   'w-full h-full object-cover',
                   imageLoading ? 'opacity-0' : 'opacity-100'
                 )}
+                width={64}
+                height={64}
                 onLoad={handleImageLoad}
                 onError={handleImageError}
                 loading="lazy"
@@ -79,11 +92,11 @@ export function ExecutionListItem({ execution, onClick, loading = false }: Execu
         ) : (
           <div className="absolute inset-0 flex items-center justify-center text-gray-400">
             {isStage1Only ? (
-              <RefreshCw className="h-5 w-5 animate-spin text-blue-500" />
+              <RefreshCw className="h-5 w-5 animate-spin text-blue-500" aria-hidden="true" />
             ) : hasStage2Error ? (
-              <X className="h-5 w-5 text-red-500" />
+              <X className="h-5 w-5 text-red-500" aria-hidden="true" />
             ) : (
-              <Camera className="h-5 w-5" />
+              <Camera className="h-5 w-5" aria-hidden="true" />
             )}
           </div>
         )}
@@ -104,26 +117,26 @@ export function ExecutionListItem({ execution, onClick, loading = false }: Execu
         <div className="flex items-center gap-3 text-sm">
           {execution.cameraId && (
             <div className="flex items-center text-gray-700" title={`Camera: ${execution.cameraId}`}>
-              <Camera className="h-4 w-4 mr-1 text-gray-400" />
+              <Camera className="h-4 w-4 mr-1 text-gray-400" aria-hidden="true" />
               <span className="truncate max-w-[120px]">{execution.cameraId}</span>
             </div>
           )}
           {execution.location && (
             <div className="flex items-center text-gray-600" title={`Location: ${execution.location}`}>
-              <MapPin className="h-4 w-4 mr-1 text-gray-400" />
+              <MapPin className="h-4 w-4 mr-1 text-gray-400" aria-hidden="true" />
               <span className="truncate max-w-[120px]">{execution.location}</span>
             </div>
           )}
         </div>
         {isStage1Only && (
           <div className="text-xs text-blue-600 flex items-center mt-1">
-            <RefreshCw className="h-3 w-3 mr-1 animate-spin" />
-            Processing...
+            <RefreshCw className="h-3 w-3 mr-1 animate-spin" aria-hidden="true" />
+            Processing{'\u2026'}
           </div>
         )}
         {hasStage2Error && (
           <div className="text-xs text-red-600 flex items-center mt-1">
-            <X className="h-3 w-3 mr-1" />
+            <X className="h-3 w-3 mr-1" aria-hidden="true" />
             Analysis failed
           </div>
         )}
@@ -153,9 +166,9 @@ export function ExecutionListItem({ execution, onClick, loading = false }: Execu
             )}
             title={isStage1Only ? "Fire detection pending" : "Fire detected"}
           >
-            <Flame className="h-3 w-3" />
+            <Flame className="h-3 w-3" aria-hidden="true" />
             {!isStage1Only && execution.confidenceFire !== null && (
-              <span>{Math.round(execution.confidenceFire * 100)}%</span>
+              <span className="tabular-nums">{Math.round(execution.confidenceFire * 100)}%</span>
             )}
           </div>
         )}
@@ -167,9 +180,9 @@ export function ExecutionListItem({ execution, onClick, loading = false }: Execu
             )}
             title={isStage1Only ? "Smoke detection pending" : "Smoke detected"}
           >
-            <Wind className="h-3 w-3" />
+            <Wind className="h-3 w-3" aria-hidden="true" />
             {!isStage1Only && execution.confidenceSmoke !== null && (
-              <span>{Math.round(execution.confidenceSmoke * 100)}%</span>
+              <span className="tabular-nums">{Math.round(execution.confidenceSmoke * 100)}%</span>
             )}
           </div>
         )}
@@ -196,19 +209,20 @@ export function ExecutionListItem({ execution, onClick, loading = false }: Execu
             className="text-success-600"
             title="Telegram notification sent"
           >
-            <MessageCircle className="h-4 w-4" />
+            <MessageCircle className="h-4 w-4" aria-hidden="true" />
           </div>
         )}
         <StatusBadge status={execution.status} size="sm" />
       </div>
 
       {/* View Button */}
-      <div className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+      <div className="flex-shrink-0 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
         <button
           className="p-2 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
           title="View details"
+          aria-label="View execution details"
         >
-          <Eye className="h-4 w-4" />
+          <Eye className="h-4 w-4" aria-hidden="true" />
         </button>
       </div>
 

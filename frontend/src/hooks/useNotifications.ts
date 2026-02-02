@@ -10,7 +10,7 @@ interface CreateNotificationOptions {
   actions?: NotificationAction[];
   duration?: number;
   persistent?: boolean;
-  data?: any;
+  data?: unknown;
 }
 
 export function useNotifications() {
@@ -49,7 +49,7 @@ export function useNotifications() {
   }, [navigate]);
 
   // Smart notification creators for different event types
-  const notifyNewExecution = useCallback((executionData: any) => {
+  const notifyNewExecution = useCallback((executionData: { execution: { id: number; analysis?: { alertLevel?: string; confidenceFire?: number; confidenceSmoke?: number } } }) => {
     const alertLevel = executionData.execution.analysis?.alertLevel;
     const isHighRisk = alertLevel === 'critical' || alertLevel === 'high';
     const confidence = Math.max(
@@ -74,7 +74,7 @@ export function useNotifications() {
     });
   }, [createNotification]);
 
-  const notifyExecutionError = useCallback((errorData: any) => {
+  const notifyExecutionError = useCallback((errorData: { executionId: string; error?: string }) => {
     return createNotification({
       type: 'execution:error',
       icon: '⚠️',
@@ -88,19 +88,19 @@ export function useNotifications() {
     });
   }, [createNotification]);
 
-  const notifyBatchComplete = useCallback((batchData: any) => {
+  const notifyBatchComplete = useCallback((batchData: { count: number; highRisk?: number; successful?: number }) => {
     return createNotification({
       type: 'execution:batch',
       icon: '📊',
       title: `${batchData.count} New Executions`,
-      body: `${batchData.highRisk > 0 ? `⚠️ ${batchData.highRisk} high risk, ` : ''}${batchData.successful} successful`,
+      body: `${(batchData.highRisk ?? 0) > 0 ? `⚠️ ${batchData.highRisk} high risk, ` : ''}${batchData.successful} successful`,
       actions: [], // No buttons - strict notification only
       duration: 8000, // Show for 8 seconds
       data: batchData
     });
   }, [createNotification]);
 
-  const notifySystemHealth = useCallback((healthData: any) => {
+  const notifySystemHealth = useCallback((healthData: { status: string; cpu?: number; memory?: number; queueSize?: number }) => {
     const isCritical = healthData.status === 'critical';
     
     if (healthData.status === 'healthy') return; // Don't notify for healthy status
@@ -119,7 +119,7 @@ export function useNotifications() {
     });
   }, [createNotification]);
 
-  const notifySystemStats = useCallback((statsData: any) => {
+  const notifySystemStats = useCallback((statsData: { successRate: number; queueSize?: number; avgProcessingTime?: number }) => {
     // Only notify for significant changes in stats
     const successRate = (statsData.successRate * 100).toFixed(1);
     
