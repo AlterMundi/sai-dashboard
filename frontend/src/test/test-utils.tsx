@@ -3,7 +3,7 @@ import { render, RenderOptions } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import { HelmetProvider } from 'react-helmet-async';
 import { vi } from 'vitest';
-import { ExecutionWithImage, ImageAnalysis } from '@/types';
+import { ExecutionWithImageUrls } from '@/types';
 
 // Custom render with providers
 interface CustomRenderOptions extends Omit<RenderOptions, 'wrapper'> {
@@ -29,65 +29,75 @@ export function renderWithProviders(
   return render(ui, { wrapper: Wrapper, ...options });
 }
 
-// Mock data factories
-export const createMockExecution = (overrides?: Partial<ExecutionWithImage>): ExecutionWithImage => ({
-  id: 'exec-123',
-  workflowId: 'workflow-456',
+// ---------------------------------------------------------------------------
+// Mock data factories (YOLO schema - matches ExecutionWithImageUrls)
+// ---------------------------------------------------------------------------
+
+export const createMockExecution = (overrides?: Partial<ExecutionWithImageUrls>): ExecutionWithImageUrls => ({
+  id: 180001,
+  workflowId: 'wf-sai-001',
   status: 'success',
-  executionTimestamp: '2025-08-29T10:00:00Z',
-  completionTimestamp: '2025-08-29T10:00:30Z',
+  executionTimestamp: '2025-10-15T10:00:00Z',
+  completionTimestamp: '2025-10-15T10:00:30Z',
   durationMs: 30000,
   mode: 'webhook',
+  deviceId: null,
   nodeId: 'NODE_001',
   cameraId: 'CAM_001',
-  
-  // Analysis fields from new ETL structure
-  riskLevel: 'low',
-  confidenceScore: 0.85,
-  overallAssessment: 'Low risk detected - Image analysis completed successfully',
-  smokeDetected: false,
-  flameDetected: false,
-  heatSignatureDetected: false,
-  alertPriority: 'normal',
-  responseRequired: false,
-  
-  // Image fields
+  location: 'Zone A',
+  cameraType: null,
+  captureTimestamp: null,
+
+  // YOLO analysis
+  requestId: 'req-001',
+  yoloModelVersion: 'yolov8n',
+  detectionCount: 1,
+  hasFire: false,
+  hasSmoke: false,
+  alertLevel: 'none',
+  detectionMode: null,
+  activeClasses: null,
+  detections: null,
+  confidenceFire: null,
+  confidenceSmoke: null,
+  confidenceScore: null,
+
+  // Image
   hasImage: true,
-  imagePath: '/mnt/raid1/n8n-backup/images/by-execution/exec-123/original.jpg',
-  imageSizeBytes: 1024000,
+  imagePath: '/images/180001/original.jpg',
+  thumbnailPath: '/images/180001/thumb.webp',
+  cachedPath: '/images/180001/high.webp',
+  imageSizeBytes: 512000,
   imageFormat: 'jpeg',
-  imageUrl: '/api/executions/exec-123/image',
-  thumbnailUrl: '/api/executions/exec-123/image?thumbnail=true',
-  
-  // Notification fields
-  telegramSent: true,
-  telegramMessageId: 'msg-789',
-  telegramSentAt: '2025-08-29T10:00:35Z',
-  
+  imageWidth: 1920,
+  imageHeight: 1080,
+  imageUrl: '/api/executions/180001/image',
+  thumbnailUrl: '/api/executions/180001/image?thumbnail=true',
+
+  // Notifications
+  telegramSent: false,
+  telegramMessageId: null,
+  telegramSentAt: null,
+
   // Metadata
-  modelVersion: 'v1.2.3',
+  yoloProcessingTimeMs: 150,
   processingTimeMs: 5000,
-  extractedAt: '2025-08-29T10:00:15Z',
-  
+  extractedAt: '2025-10-15T10:00:15Z',
+
   ...overrides,
 });
 
-export const createMockAnalysis = (overrides?: Partial<ImageAnalysis>): ImageAnalysis => ({
-  riskAssessment: 'Medium risk detected',
-  confidence: 0.75,
-  description: 'Analysis shows potential issues',
-  recommendations: ['Monitor closely', 'Review in 24 hours'],
-  ...overrides,
-});
-
+// ---------------------------------------------------------------------------
 // Mock API responses
+// ---------------------------------------------------------------------------
+
 export const mockApiResponses = {
   executions: {
     success: {
-      data: [
-        createMockExecution({ id: 'exec-1' }),
-        createMockExecution({ id: 'exec-2', status: 'error' }),
-        createMockExecution({ id: 'exec-3', status: 'running' }),
+      executions: [
+        createMockExecution({ id: 180001 }),
+        createMockExecution({ id: 180002, status: 'error' }),
+        createMockExecution({ id: 180003 }),
       ],
       meta: {
         total: 100,
@@ -97,7 +107,7 @@ export const mockApiResponses = {
       },
     },
     empty: {
-      data: [],
+      executions: [],
       meta: {
         total: 0,
         page: 0,
@@ -140,13 +150,16 @@ export const mockApiResponses = {
         totalExecutions: 4893,
         successRate: 99.96,
         avgDailyExecutions: 163.1,
-        lastExecution: '2025-08-29T10:00:00Z',
+        lastExecution: '2025-10-15T10:00:00Z',
       },
     },
   },
 };
 
-// Mock hooks
+// ---------------------------------------------------------------------------
+// Mock hooks (matching current return types)
+// ---------------------------------------------------------------------------
+
 export const mockUseAuth = (authenticated = false, loading = false) => ({
   isAuthenticated: authenticated,
   isLoading: loading,
@@ -157,7 +170,7 @@ export const mockUseAuth = (authenticated = false, loading = false) => ({
 });
 
 export const mockUseExecutions = (
-  executions = mockApiResponses.executions.success.data,
+  executions = mockApiResponses.executions.success.executions,
   loading = false
 ) => ({
   executions,
@@ -168,28 +181,35 @@ export const mockUseExecutions = (
   refresh: vi.fn(),
   updateFilters: vi.fn(),
   filters: {},
+  prependExecutions: vi.fn(),
+  updateExecutionStage: vi.fn(),
+  totalResults: executions.length,
 });
 
 export const mockUseSSE = (connected = true) => ({
   isConnected: connected,
   lastEvent: null,
-  connectionStatus: connected ? 'connected' : 'disconnected',
+  connectionStatus: connected ? 'connected' as const : 'disconnected' as const,
   clientCount: 1,
   connect: vi.fn(),
   disconnect: vi.fn(),
+  liveStats: null,
+  systemHealth: null,
 });
 
-// Wait utilities
-export const waitForLoadingToFinish = () => 
+// ---------------------------------------------------------------------------
+// Test utilities
+// ---------------------------------------------------------------------------
+
+export const waitForLoadingToFinish = () =>
   new Promise(resolve => setTimeout(resolve, 0));
 
-// Mock image loading
 export const mockImageLoad = (img: HTMLImageElement) => {
   Object.defineProperty(img, 'complete', {
     writable: true,
     value: true,
   });
-  
+
   setTimeout(() => {
     img.onload?.(new Event('load'));
   }, 0);
@@ -201,7 +221,6 @@ export const mockImageError = (img: HTMLImageElement) => {
   }, 0);
 };
 
-// Mock IntersectionObserver for infinite scroll
 export const mockIntersectionObserver = (
   isIntersecting = false,
   disconnect = vi.fn()
@@ -213,7 +232,6 @@ export const mockIntersectionObserver = (
   };
 
   (globalThis as any).IntersectionObserver = vi.fn().mockImplementation((callback) => {
-    // Trigger callback immediately with mock entry
     callback([{ isIntersecting, target: document.createElement('div') }], mockObserver as any);
     return mockObserver;
   }) as any;
@@ -221,7 +239,6 @@ export const mockIntersectionObserver = (
   return mockObserver;
 };
 
-// Mock EventSource for SSE
 export const mockEventSource = () => {
   const listeners: Record<string, Function[]> = {};
   const eventSource = {
