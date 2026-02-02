@@ -4,6 +4,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Badge } from './ui/badge';
+import { DateTimeRangeSelector } from './DateTimeRangeSelector';
 import {
   Filter,
   Wind,
@@ -216,7 +217,7 @@ export function AlertFilterComponent({
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
             <Calendar className="h-3.5 w-3.5 mr-1" />
-            Date Range
+            Date Preset
           </label>
           <Select
             value={filters.datePreset || ''}
@@ -257,6 +258,26 @@ export function AlertFilterComponent({
           </Select>
         </div>
       </div>
+
+      {/* Precise Date-Time Range Selector */}
+      <DateTimeRangeSelector
+        value={filters.startDate && filters.endDate ? {
+          startDate: filters.startDate,
+          endDate: filters.endDate
+        } : undefined}
+        onChange={(range) => {
+          console.log('DateTimeRangeSelector onChange:', range);
+          const newFilters = {
+            ...filters,
+            startDate: range?.startDate,
+            endDate: range?.endDate,
+            datePreset: range ? undefined : filters.datePreset, // Clear date preset when using custom range
+            page: 0
+          };
+          onFiltersChange(newFilters);
+        }}
+        disabled={isLoading}
+      />
 
       {/* Advanced Filters */}
       {showAdvanced && (

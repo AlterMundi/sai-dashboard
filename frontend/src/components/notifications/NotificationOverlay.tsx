@@ -87,18 +87,18 @@ function NotificationCard({
 
   const getActionIcon = (action: string) => {
     switch (action) {
-      case 'view': return <Eye className="w-4 h-4" />;
-      case 'flag': return <Flag className="w-4 h-4" />;
-      case 'report': return <FileText className="w-4 h-4" />;
-      case 'health': return <Activity className="w-4 h-4" />;
-      default: return <ExternalLink className="w-4 h-4" />;
+      case 'view': return <Eye className="w-4 h-4" aria-hidden="true" />;
+      case 'flag': return <Flag className="w-4 h-4" aria-hidden="true" />;
+      case 'report': return <FileText className="w-4 h-4" aria-hidden="true" />;
+      case 'health': return <Activity className="w-4 h-4" aria-hidden="true" />;
+      default: return <ExternalLink className="w-4 h-4" aria-hidden="true" />;
     }
   };
 
   return (
     <div
       className={cn(
-        'transform transition-all duration-300 ease-in-out',
+        'transform transition-[transform,opacity] duration-300 ease-in-out',
         isVisible && !isExiting ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'
       )}
     >
@@ -127,9 +127,10 @@ function NotificationCard({
             {/* Dismiss button */}
             <button
               onClick={handleDismiss}
-              className="ml-4 inline-flex text-gray-400 hover:text-gray-600 focus:outline-none"
+              className="ml-4 inline-flex text-gray-400 hover:text-gray-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 rounded"
+              aria-label="Dismiss notification"
             >
-              <X className="w-4 h-4" />
+              <X className="w-4 h-4" aria-hidden="true" />
             </button>
           </div>
 
@@ -165,7 +166,7 @@ export function NotificationOverlay({ notifications, onDismiss, onAction }: Noti
   if (notifications.length === 0) return null;
 
   const notificationContainer = (
-    <div className="fixed top-4 right-4 z-50 space-y-2 pointer-events-none">
+    <div className="fixed top-4 right-4 z-50 space-y-2 pointer-events-none" role="status" aria-live="polite" aria-atomic="false">
       <div className="pointer-events-auto">
         {notifications.slice(0, 5).map((notification) => (
           <NotificationCard

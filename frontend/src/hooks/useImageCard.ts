@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { executionsApi } from '@/services/api';
-import { ExecutionWithImageUrls, ProcessingStage } from '@/types';
+import { ExecutionWithImageUrls, ExecutionWithProcessingStage, ProcessingStage } from '@/types';
 
 /**
  * Shared image loading state and URL construction for ImageCard and ExecutionListItem.
@@ -9,7 +9,9 @@ export function useImageCard(execution: ExecutionWithImageUrls) {
   const [imageLoading, setImageLoading] = useState(true);
   const [imageError, setImageError] = useState(false);
 
-  const processingStage = (execution as any).processingStage as ProcessingStage | undefined;
+  const processingStage = 'processingStage' in execution
+    ? (execution as ExecutionWithProcessingStage).processingStage
+    : undefined;
   const isStage1Only = processingStage === 'stage1';
   const hasStage2Error = processingStage === 'failed';
 
@@ -51,7 +53,7 @@ export const alertLevelColors: Record<string, string> = {
 /** Human-readable label for processing stages */
 export function getProcessingStageLabel(stage: ProcessingStage | undefined): string {
   switch (stage) {
-    case 'stage1': return 'Processing...';
+    case 'stage1': return 'Processing\u2026';
     case 'stage2': return 'Complete';
     case 'failed': return 'Failed';
     default: return 'Unknown';

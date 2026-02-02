@@ -18,7 +18,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <LoadingSpinner size="xl" />
-          <p className="mt-4 text-gray-600">Loading...</p>
+          <p className="mt-4 text-gray-600">Loading\u2026</p>
         </div>
       </div>
     );

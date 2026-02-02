@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
 import { ImageGallery } from '@/components/ImageGallery';
 import { AlertFilterComponent } from '@/components/AlertFilterComponent';
@@ -16,14 +17,55 @@ import {
   Timer,
 } from 'lucide-react';
 
+function parseFiltersFromURL(searchParams: URLSearchParams): ExecutionFilters {
+  const filters: ExecutionFilters = {};
+  const status = searchParams.get('status');
+  if (status === 'success' || status === 'error') filters.status = status;
+  const alertLevels = searchParams.get('alertLevels');
+  if (alertLevels) filters.alertLevels = alertLevels.split(',') as ExecutionFilters['alertLevels'];
+  const hasFire = searchParams.get('hasFire');
+  if (hasFire !== null) filters.hasFire = hasFire === 'true';
+  const hasSmoke = searchParams.get('hasSmoke');
+  if (hasSmoke !== null) filters.hasSmoke = hasSmoke === 'true';
+  const search = searchParams.get('search');
+  if (search) filters.search = search;
+  const datePreset = searchParams.get('datePreset');
+  if (datePreset) filters.datePreset = datePreset as ExecutionFilters['datePreset'];
+  const sortBy = searchParams.get('sortBy');
+  if (sortBy) filters.sortBy = sortBy as ExecutionFilters['sortBy'];
+  const sortOrder = searchParams.get('sortOrder');
+  if (sortOrder === 'asc' || sortOrder === 'desc') filters.sortOrder = sortOrder;
+  return filters;
+}
+
+function filtersToSearchParams(filters: ExecutionFilters): URLSearchParams {
+  const params = new URLSearchParams();
+  if (filters.status) params.set('status', filters.status);
+  if (filters.alertLevels?.length) params.set('alertLevels', filters.alertLevels.join(','));
+  if (filters.hasFire !== undefined) params.set('hasFire', String(filters.hasFire));
+  if (filters.hasSmoke !== undefined) params.set('hasSmoke', String(filters.hasSmoke));
+  if (filters.search) params.set('search', filters.search);
+  if (filters.datePreset) params.set('datePreset', filters.datePreset);
+  if (filters.sortBy) params.set('sortBy', filters.sortBy);
+  if (filters.sortOrder) params.set('sortOrder', filters.sortOrder);
+  return params;
+}
+
 export function Dashboard() {
-  const [filters, setFilters] = useState<ExecutionFilters>({});
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [filters, setFiltersState] = useState<ExecutionFilters>(() => parseFiltersFromURL(searchParams));
+
+  const setFilters = useCallback((newFilters: ExecutionFilters) => {
+    setFiltersState(newFilters);
+    setSearchParams(filtersToSearchParams(newFilters), { replace: true });
+  }, [setSearchParams]);
+
   const [batchUpdateTrigger, setBatchUpdateTrigger] = useState(0);
   const galleryPrependRef = useRef<((executions: any[]) => void) | null>(null);
 
   const { stats, isLoading: statsLoading, error: statsError } = useExecutionStats();
   useDailySummary(7);
-  const { isConnected, systemHealth } = useSSE();
+  const { isConnected, systemHealth, lastEvent } = useSSE();
 
   const {
     updateExecutionStage,
@@ -90,8 +132,9 @@ export function Dashboard() {
   });
 
   const clearAllFilters = useCallback(() => {
-    setFilters({});
-  }, []);
+    setFiltersState({});
+    setSearchParams(new URLSearchParams(), { replace: true });
+  }, [setSearchParams]);
 
   return (
     <Layout>
@@ -166,7 +209,7 @@ export function Dashboard() {
           currentPage={1}
           totalPages={Math.ceil(totalResults / 50)}
           pageSize={50}
-          lastUpdateTime="just now"
+          lastUpdateTime={lastEvent?.timestamp ? new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: 'numeric', second: 'numeric' }).format(lastEvent.timestamp) : 'waiting\u2026'}
           isLoading={false}
         />
 
