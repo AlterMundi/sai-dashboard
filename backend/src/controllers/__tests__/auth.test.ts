@@ -1,8 +1,13 @@
 import request from 'supertest';
 import express from 'express';
+import jwt from 'jsonwebtoken';
 import { login, logout, validateToken, refreshToken } from '../auth';
 import { loginRateLimit, authenticateToken } from '../../middleware/auth';
-import { createTestToken } from '../../__tests__/setup';
+
+// Inline token helper — no dependency on deleted legacy setup
+const createTestToken = (payload: any = { userId: 'test-user', isAuthenticated: true }) => {
+  return jwt.sign(payload, process.env.SESSION_SECRET!, { expiresIn: '1h' });
+};
 
 // Create test app
 const createTestApp = () => {
@@ -29,7 +34,7 @@ describe('Auth Controller', () => {
     it('should login with correct password', async () => {
       const response = await request(app)
         .post('/auth/login')
-        .send({ password: 'test-password' })
+        .send({ password: 'test_password' })
         .expect(200);
 
       expect(response.body).toHaveProperty('data');
@@ -156,14 +161,13 @@ describe('Auth Controller', () => {
     });
 
     it('should reject expired token', async () => {
-      const jwt = require('jsonwebtoken');
       // Create a token that expires very quickly, then wait for it to expire
       const expiredToken = jwt.sign(
         { 
           userId: 'test-user', 
           isAuthenticated: true
         },
-        process.env.SESSION_SECRET,
+        process.env.SESSION_SECRET!,
         { expiresIn: '1ms' } // Expires in 1 millisecond
       );
       
@@ -182,11 +186,10 @@ describe('Auth Controller', () => {
 
   describe('POST /auth/refresh', () => {
     it('should refresh token when close to expiry', async () => {
-      const jwt = require('jsonwebtoken');
       // Create token that expires in 30 minutes (less than 1 hour)
       const nearExpiryToken = jwt.sign(
         { userId: 'test-user', isAuthenticated: true },
-        process.env.SESSION_SECRET,
+        process.env.SESSION_SECRET!,
         { expiresIn: 1800 } // 30 minutes
       );
 
@@ -204,10 +207,9 @@ describe('Auth Controller', () => {
 
     it('should reject refresh for token with lots of time remaining', async () => {
       // Create a token with 2 hours expiry (more than the 1 hour threshold)
-      const jwt = require('jsonwebtoken');
       const token = jwt.sign(
         { userId: 'test-user', isAuthenticated: true },
-        process.env.SESSION_SECRET,
+        process.env.SESSION_SECRET!,
         { expiresIn: '2h' }
       );
 
