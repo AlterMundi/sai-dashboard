@@ -273,12 +273,17 @@ export class NewExecutionService {
         ea.alert_level,
         ea.detection_mode,
         ea.active_classes,
+        ea.detections,
         ea.confidence_fire,
         ea.confidence_smoke,
         ea.yolo_processing_time_ms,
 
         -- General confidence score
         ea.confidence_score,
+
+        -- Image dimensions (from YOLO analysis)
+        ea.image_width,
+        ea.image_height,
 
         -- Image data
         ei.original_path,
@@ -291,7 +296,12 @@ export class NewExecutionService {
         -- Notification data
         en.telegram_sent,
         en.telegram_message_id,
-        en.telegram_sent_at
+        en.telegram_sent_at,
+
+        -- False positive tracking
+        COALESCE(ea.is_false_positive, false) as is_false_positive,
+        ea.false_positive_reason,
+        ea.marked_false_positive_at
 
       FROM executions e
       LEFT JOIN execution_analysis ea ON e.id = ea.execution_id
@@ -347,12 +357,17 @@ export class NewExecutionService {
         ea.alert_level,
         ea.detection_mode,
         ea.active_classes,
+        ea.detections,
         ea.confidence_fire,
         ea.confidence_smoke,
         ea.yolo_processing_time_ms,
 
         -- General confidence score
         ea.confidence_score,
+
+        -- Image dimensions (from YOLO analysis)
+        ea.image_width,
+        ea.image_height,
 
         -- Image data
         ei.original_path,
@@ -365,7 +380,12 @@ export class NewExecutionService {
         -- Notification data
         en.telegram_sent,
         en.telegram_message_id,
-        en.telegram_sent_at
+        en.telegram_sent_at,
+
+        -- False positive tracking
+        COALESCE(ea.is_false_positive, false) as is_false_positive,
+        ea.false_positive_reason,
+        ea.marked_false_positive_at
 
       FROM executions e
       LEFT JOIN execution_analysis ea ON e.id = ea.execution_id
@@ -395,6 +415,8 @@ export class NewExecutionService {
         COUNT(CASE WHEN e.status = 'success' THEN 1 END) as successful_executions,
         COUNT(CASE WHEN ea.alert_level = 'high' THEN 1 END) as high_alert_detections,
         COUNT(CASE WHEN ea.alert_level = 'critical' THEN 1 END) as critical_detections,
+        COUNT(CASE WHEN ea.has_fire = true THEN 1 END) as fire_detections,
+        COUNT(CASE WHEN ea.has_smoke = true THEN 1 END) as smoke_detections,
         COUNT(CASE WHEN ei.execution_id IS NOT NULL THEN 1 END) as executions_with_images,
         COUNT(CASE WHEN en.telegram_sent = true THEN 1 END) as telegram_notifications_sent,
         AVG(e.duration_ms) as avg_processing_time_ms,
@@ -415,7 +437,7 @@ export class NewExecutionService {
       const totalExecutions = parseInt(row.total_executions);
       const successfulExecutions = parseInt(row.successful_executions);
       const failedExecutions = totalExecutions - successfulExecutions;
-      
+
       return {
         date: row.date,
         totalExecutions,
@@ -425,6 +447,8 @@ export class NewExecutionService {
         avgExecutionTime: parseFloat(row.avg_processing_time_ms) / 1000 || null, // Convert to seconds
         highRiskDetections: parseInt(row.high_alert_detections),
         criticalDetections: parseInt(row.critical_detections),
+        fireDetections: parseInt(row.fire_detections) || 0,
+        smokeDetections: parseInt(row.smoke_detections) || 0,
         executionsWithImages: parseInt(row.executions_with_images),
         telegramNotificationsSent: parseInt(row.telegram_notifications_sent),
         avgProcessingTimeMs: parseFloat(row.avg_processing_time_ms) || 0,
@@ -544,12 +568,17 @@ export class NewExecutionService {
         ea.alert_level,
         ea.detection_mode,
         ea.active_classes,
+        ea.detections,
         ea.confidence_fire,
         ea.confidence_smoke,
         ea.yolo_processing_time_ms,
 
         -- General confidence score
         ea.confidence_score,
+
+        -- Image dimensions (from YOLO analysis)
+        ea.image_width,
+        ea.image_height,
 
         -- Image data
         ei.original_path,
@@ -562,7 +591,12 @@ export class NewExecutionService {
         -- Notification data
         en.telegram_sent,
         en.telegram_message_id,
-        en.telegram_sent_at
+        en.telegram_sent_at,
+
+        -- False positive tracking
+        COALESCE(ea.is_false_positive, false) as is_false_positive,
+        ea.false_positive_reason,
+        ea.marked_false_positive_at
 
       FROM executions e
       LEFT JOIN execution_analysis ea ON e.id = ea.execution_id
@@ -611,7 +645,9 @@ export class NewExecutionService {
       alertLevel: row.alert_level || null,
       detectionMode: row.detection_mode || null,
       activeClasses: row.active_classes || null,
-      detections: row.detections ? JSON.parse(row.detections) : null,
+      detections: row.detections
+        ? (typeof row.detections === 'string' ? JSON.parse(row.detections) : row.detections)
+        : null,
 
       // Confidence scores
       confidenceFire: parseFloat(row.confidence_fire) || null,
@@ -641,9 +677,70 @@ export class NewExecutionService {
 
       // Processing metadata
       yoloProcessingTimeMs: parseFloat(row.yolo_processing_time_ms) || null,
-      processingTimeMs: row.processing_time_ms || null,
-      extractedAt: row.extracted_at || null
+      processingTimeMs: parseFloat(row.yolo_processing_time_ms) || null,
+      extractedAt: row.extracted_at || null,
+
+      // False positive tracking
+      isFalsePositive: row.is_false_positive || false,
+      falsePositiveReason: row.false_positive_reason || null,
+      markedFalsePositiveAt: row.marked_false_positive_at || null
     };
+  }
+
+  /**
+   * Mark an execution as a false positive
+   */
+  async markFalsePositive(
+    executionId: number,
+    isFalsePositive: boolean,
+    reason?: string
+  ): Promise<{ success: boolean; execution?: ExecutionWithImage; error?: string }> {
+    try {
+      // First check if execution exists
+      const exists = await dualDb.query(
+        'SELECT 1 FROM executions WHERE id = $1',
+        [executionId]
+      );
+
+      if (exists.length === 0) {
+        return { success: false, error: 'Execution not found' };
+      }
+
+      // Check if execution_analysis row exists
+      const analysisExists = await dualDb.query(
+        'SELECT 1 FROM execution_analysis WHERE execution_id = $1',
+        [executionId]
+      );
+
+      if (analysisExists.length === 0) {
+        // Create execution_analysis row if it doesn't exist
+        await dualDb.query(
+          `INSERT INTO execution_analysis (execution_id, is_false_positive, false_positive_reason, marked_false_positive_at)
+           VALUES ($1, $2, $3, $4)`,
+          [executionId, isFalsePositive, reason || null, isFalsePositive ? new Date() : null]
+        );
+      } else {
+        // Update existing row
+        await dualDb.query(
+          `UPDATE execution_analysis
+           SET is_false_positive = $2,
+               false_positive_reason = $3,
+               marked_false_positive_at = $4
+           WHERE execution_id = $1`,
+          [executionId, isFalsePositive, reason || null, isFalsePositive ? new Date() : null]
+        );
+      }
+
+      logger.info(`Marked execution ${executionId} as ${isFalsePositive ? 'false positive' : 'valid detection'}${reason ? `: ${reason}` : ''}`);
+
+      // Return updated execution
+      const execution = await this.getExecutionById(executionId);
+      return { success: true, execution: execution || undefined };
+
+    } catch (error) {
+      logger.error(`Failed to mark execution ${executionId} as false positive:`, error);
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    }
   }
 
   /**
@@ -706,86 +803,156 @@ export class NewExecutionService {
 
   /**
    * Get enhanced statistics with detailed breakdowns
+   * Returns data in the format expected by the StatsDashboard component
    * SINGLE SOURCE: sai_dashboard database only
-   * OPTIMIZED: Uses efficient aggregation queries with proper indexing
    */
   async getEnhancedStatistics(): Promise<{
-    basicStats: any;
-    alertAnalysis: any;
-    timeAnalysis: any;
-    nodeAnalysis: any;
-    imageAnalysis: any;
+    overview: {
+      totalExecutions: number;
+      successRate: number;
+      errorRate: number;
+      averageExecutionTime: number;
+      activeToday: number;
+    };
+    statusBreakdown: {
+      success: number;
+      error: number;
+      running: number;
+      waiting: number;
+      canceled: number;
+    };
+    recentActivity: {
+      lastHour: number;
+      last24Hours: number;
+      last7Days: number;
+      last30Days: number;
+    };
+    performanceMetrics: {
+      avgResponseTime: number;
+      minResponseTime: number;
+      maxResponseTime: number;
+      medianResponseTime: number;
+      p95ResponseTime: number;
+      p99ResponseTime: number;
+    };
+    hourlyDistribution: Array<{ hour: number; count: number }>;
+    errorTrend: Array<{ date: string; errors: number; total: number; errorRate: number }>;
   }> {
-    // Basic statistics
-    const basicStats = await this.getExecutionStats();
-
-    // Alert level analysis over time
-    const alertQuery = `
+    // Overview stats
+    const overviewQuery = `
       SELECT
-        DATE_TRUNC('day', e.execution_timestamp) as date,
-        ea.alert_level,
-        COUNT(*) as count,
-        AVG(ea.confidence_score) as avg_confidence
-      FROM executions e
-      JOIN execution_analysis ea ON e.id = ea.execution_id
-      WHERE e.execution_timestamp >= NOW() - INTERVAL '30 days'
-        AND ea.alert_level IS NOT NULL
-      GROUP BY DATE_TRUNC('day', e.execution_timestamp), ea.alert_level
-      ORDER BY date DESC, ea.alert_level
+        COUNT(*) as total_executions,
+        COUNT(CASE WHEN status = 'success' THEN 1 END) as successful,
+        COUNT(CASE WHEN status = 'error' THEN 1 END) as failed,
+        AVG(duration_ms) as avg_duration,
+        COUNT(CASE WHEN execution_timestamp >= CURRENT_DATE THEN 1 END) as active_today
+      FROM executions
     `;
+    const overviewResult = await dualDb.query(overviewQuery);
+    const overview = overviewResult[0];
+    const totalExecutions = parseInt(overview.total_executions) || 0;
+    const successful = parseInt(overview.successful) || 0;
+    const failed = parseInt(overview.failed) || 0;
 
-    const alertResults = await dualDb.query(alertQuery);
-
-    // Time analysis (hourly patterns)
-    const timeQuery = `
+    // Recent activity counts
+    const activityQuery = `
       SELECT
-        EXTRACT(HOUR FROM execution_timestamp) as hour,
-        COUNT(*) as total,
-        COUNT(CASE WHEN ea.alert_level IN ('high', 'critical') THEN 1 END) as high_alert
-      FROM executions e
-      LEFT JOIN execution_analysis ea ON e.id = ea.execution_id
-      WHERE e.execution_timestamp >= NOW() - INTERVAL '7 days'
+        COUNT(CASE WHEN execution_timestamp >= NOW() - INTERVAL '1 hour' THEN 1 END) as last_hour,
+        COUNT(CASE WHEN execution_timestamp >= NOW() - INTERVAL '24 hours' THEN 1 END) as last_24h,
+        COUNT(CASE WHEN execution_timestamp >= NOW() - INTERVAL '7 days' THEN 1 END) as last_7d,
+        COUNT(CASE WHEN execution_timestamp >= NOW() - INTERVAL '30 days' THEN 1 END) as last_30d
+      FROM executions
+    `;
+    const activityResult = await dualDb.query(activityQuery);
+    const activity = activityResult[0];
+
+    // Performance metrics (using duration_ms)
+    const perfQuery = `
+      SELECT
+        AVG(duration_ms) as avg_time,
+        MIN(duration_ms) as min_time,
+        MAX(duration_ms) as max_time,
+        PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY duration_ms) as median_time,
+        PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY duration_ms) as p95_time,
+        PERCENTILE_CONT(0.99) WITHIN GROUP (ORDER BY duration_ms) as p99_time
+      FROM executions
+      WHERE duration_ms IS NOT NULL
+        AND execution_timestamp >= NOW() - INTERVAL '7 days'
+    `;
+    const perfResult = await dualDb.query(perfQuery);
+    const perf = perfResult[0];
+
+    // Hourly distribution (last 24 hours)
+    const hourlyQuery = `
+      SELECT
+        EXTRACT(HOUR FROM execution_timestamp)::int as hour,
+        COUNT(*) as count
+      FROM executions
+      WHERE execution_timestamp >= NOW() - INTERVAL '24 hours'
       GROUP BY EXTRACT(HOUR FROM execution_timestamp)
       ORDER BY hour
     `;
+    const hourlyResult = await dualDb.query(hourlyQuery);
 
-    const timeResults = await dualDb.query(timeQuery);
-
-    // Node analysis (if available)
-    const nodeQuery = `
+    // Error trend (last 7 days)
+    const errorTrendQuery = `
       SELECT
-        e.node_id,
-        COUNT(*) as total_executions,
-        COUNT(CASE WHEN ea.alert_level IN ('high', 'critical') THEN 1 END) as high_alert,
-        AVG(ea.confidence_score) as avg_confidence
-      FROM executions e
-      LEFT JOIN execution_analysis ea ON e.id = ea.execution_id
-      WHERE e.node_id IS NOT NULL
-      GROUP BY e.node_id
-      ORDER BY high_alert DESC, total_executions DESC
+        DATE(execution_timestamp) as date,
+        COUNT(CASE WHEN status = 'error' THEN 1 END) as errors,
+        COUNT(*) as total
+      FROM executions
+      WHERE execution_timestamp >= NOW() - INTERVAL '7 days'
+      GROUP BY DATE(execution_timestamp)
+      ORDER BY date DESC
     `;
+    const errorTrendResult = await dualDb.query(errorTrendQuery);
 
-    const nodeResults = await dualDb.query(nodeQuery);
-
-    // Image analysis
-    const imageQuery = `
-      SELECT 
-        COUNT(e.id) as total_executions,
-        COUNT(ei.execution_id) as with_images,
-        AVG(ei.size_bytes) as avg_image_size,
-        COUNT(CASE WHEN ei.format = 'jpeg' THEN 1 END) as jpeg_count
-      FROM executions e
-      LEFT JOIN execution_images ei ON e.id = ei.execution_id
-    `;
-
-    const imageResults = await dualDb.query(imageQuery);
+    // Convert ms to seconds for display
+    const msToSeconds = (ms: number | null) => ms ? ms / 1000 : 0;
 
     return {
-      basicStats,
-      alertAnalysis: alertResults,
-      timeAnalysis: timeResults,
-      nodeAnalysis: nodeResults,
-      imageAnalysis: imageResults[0]
+      overview: {
+        totalExecutions,
+        successRate: totalExecutions > 0 ? (successful / totalExecutions) * 100 : 0,
+        errorRate: totalExecutions > 0 ? (failed / totalExecutions) * 100 : 0,
+        averageExecutionTime: msToSeconds(parseFloat(overview.avg_duration)),
+        activeToday: parseInt(overview.active_today) || 0
+      },
+      statusBreakdown: {
+        success: successful,
+        error: failed,
+        running: 0,  // YOLO workflow doesn't have running state
+        waiting: 0,  // YOLO workflow doesn't have waiting state
+        canceled: 0  // YOLO workflow doesn't have canceled state
+      },
+      recentActivity: {
+        lastHour: parseInt(activity.last_hour) || 0,
+        last24Hours: parseInt(activity.last_24h) || 0,
+        last7Days: parseInt(activity.last_7d) || 0,
+        last30Days: parseInt(activity.last_30d) || 0
+      },
+      performanceMetrics: {
+        avgResponseTime: msToSeconds(parseFloat(perf.avg_time)),
+        minResponseTime: msToSeconds(parseFloat(perf.min_time)),
+        maxResponseTime: msToSeconds(parseFloat(perf.max_time)),
+        medianResponseTime: msToSeconds(parseFloat(perf.median_time)),
+        p95ResponseTime: msToSeconds(parseFloat(perf.p95_time)),
+        p99ResponseTime: msToSeconds(parseFloat(perf.p99_time))
+      },
+      hourlyDistribution: hourlyResult.map((row: any) => ({
+        hour: parseInt(row.hour),
+        count: parseInt(row.count)
+      })),
+      errorTrend: errorTrendResult.map((row: any) => {
+        const errors = parseInt(row.errors) || 0;
+        const total = parseInt(row.total) || 0;
+        return {
+          date: row.date.toISOString().split('T')[0],
+          errors,
+          total,
+          errorRate: total > 0 ? (errors / total) * 100 : 0
+        };
+      })
     };
   }
 

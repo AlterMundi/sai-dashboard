@@ -1,29 +1,3 @@
-export interface SaiExecution {
-  id: string;
-  workflowId: string;
-  status: 'success' | 'error' | 'waiting' | 'running' | 'canceled';
-  startedAt: Date;
-  stoppedAt: Date | null;
-  mode: 'webhook' | 'manual' | 'retry';
-  finished: boolean;
-  retryOf: string | null;
-  retrySuccessId: string | null;
-}
-
-export interface SaiExecutionData {
-  executionId: string;
-  nodeId: string;
-  data: Record<string, unknown>;
-  createdAt: Date;
-}
-
-export interface ImageAnalysis {
-  riskAssessment: string;
-  confidence: number;
-  description: string;
-  recommendations?: string[];
-}
-
 // YOLO Detection object (matches Stage2 ETL)
 export interface YoloDetection {
   class: string;
@@ -34,56 +8,6 @@ export interface YoloDetection {
     width: number;
     height: number;
   };
-}
-
-// Enhanced Analysis Types for SAI System (YOLO-based)
-// NOTE: This interface matches the actual database schema (execution_analysis + related tables)
-export interface SaiEnhancedAnalysis {
-  // Primary Key
-  executionId: string;
-
-  // YOLO Inference Results (execution_analysis table)
-  requestId?: string;
-  yoloModelVersion?: string;
-  detectionCount?: number;
-  hasFire?: boolean;
-  hasSmoke?: boolean;
-  alertLevel?: 'none' | 'low' | 'high' | 'critical';
-  detectionMode?: string;
-  activeClasses?: string[];
-  detections?: YoloDetection[];
-
-  // Confidence Scores (execution_analysis table)
-  confidenceFire?: number;
-  confidenceSmoke?: number;
-  confidenceScore?: number;  // Max confidence
-
-  // Node & Device Context (executions table)
-  nodeId?: string;
-  deviceId?: string;
-  cameraId?: string;
-  cameraType?: string;
-  location?: string;
-
-  // Image Data (execution_images table)
-  hasImage: boolean;
-  imageWidth?: number;
-  imageHeight?: number;
-  imageSizeBytes?: number;
-  imageFormat?: string;
-
-  // Processing Metrics (execution_analysis table)
-  yoloProcessingTimeMs?: number;
-
-  // Notification Status (execution_notifications table)
-  telegramDelivered: boolean;
-  telegramMessageId?: string;
-
-  // Temporal Context (executions table)
-  captureTimestamp?: Date;
-
-  // Processing Metadata (execution_analysis table)
-  processedAt: Date;
 }
 
 export interface ExecutionWithImage {
@@ -139,6 +63,11 @@ export interface ExecutionWithImage {
   yoloProcessingTimeMs: number | null;
   processingTimeMs: number | null;
   extractedAt: Date | null;
+
+  // False positive tracking
+  isFalsePositive: boolean;
+  falsePositiveReason: string | null;
+  markedFalsePositiveAt: Date | null;
 }
 
 export interface ApiResponse<T> {
@@ -171,8 +100,8 @@ export interface ExecutionFilters extends PaginationQuery {
   hasImage?: boolean;
 
   // YOLO-specific filters (execution_analysis table)
-  alertLevel?: 'none' | 'low' | 'high' | 'critical';  // Single selection (legacy)
-  alertLevels?: ('none' | 'low' | 'high' | 'critical')[];  // Multi-select array
+  alertLevel?: 'none' | 'low' | 'medium' | 'high' | 'critical';  // Single selection (legacy)
+  alertLevels?: ('none' | 'low' | 'medium' | 'high' | 'critical')[];  // Multi-select array
   hasFire?: boolean;
   hasSmoke?: boolean;
   detectionCount?: number;  // Filter by minimum number of detections
@@ -270,6 +199,9 @@ export interface DailySummary {
   failedExecutions: number;
   successRate: number;
   avgExecutionTime: number | null;
+  // Detection counts
+  fireDetections: number;
+  smokeDetections: number;
   // New fields for enhanced daily summary
   highRiskDetections: number;
   criticalDetections: number;
