@@ -239,7 +239,7 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate }: ImageModalP
         {/* Content */}
         <div className="flex flex-col lg:flex-row max-h-[calc(100vh-8rem)] overflow-hidden">
           {/* Image Section */}
-          <div className="flex-1 bg-gray-900 flex flex-col">
+          <div className="flex-1 bg-gray-900 flex flex-col overflow-hidden">
             {/* Bounding Box Toggle */}
             {execution.detections && execution.detections.length > 0 && !imageLoading && !imageError && imageUrl && (
               <div className="flex justify-center p-2 bg-gray-800">
