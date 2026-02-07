@@ -252,7 +252,10 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate }: ImageModalP
             )}
 
             {/* Image with Bounding Boxes */}
-            <div className="flex-1 flex items-center justify-center p-4 relative">
+            <div className={cn(
+              "flex-1 p-4 relative min-h-0",
+              fullSize ? "overflow-auto" : "flex items-center justify-center"
+            )}>
               {secureImageUrl ? (
                 <>
                   {imageLoading && (
@@ -266,13 +269,18 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate }: ImageModalP
                       <p className="text-lg">Failed to load image</p>
                     </div>
                   ) : imageUrl ? (
-                    <div className="relative inline-block max-w-full max-h-full">
+                    <div className={cn(
+                      "relative",
+                      fullSize ? "w-fit" : "inline-block max-w-full max-h-full"
+                    )}>
                       <img
                         src={imageUrl}
                         alt={`Execution ${execution.id}`}
                         className={cn(
-                          'max-w-full max-h-full object-contain transition-opacity duration-200 cursor-zoom-in',
-                          fullSize && 'cursor-zoom-out'
+                          'transition-opacity duration-200',
+                          fullSize
+                            ? 'max-w-none cursor-zoom-out'
+                            : 'max-w-full max-h-full object-contain cursor-zoom-in'
                         )}
                         onClick={() => setFullSize(!fullSize)}
                       />
