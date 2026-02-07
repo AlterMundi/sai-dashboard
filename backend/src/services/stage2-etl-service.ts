@@ -37,9 +37,13 @@
 
 import { Pool, PoolClient } from 'pg';
 import { EventEmitter } from 'events';
+import { promises as fs } from 'fs';
+import path from 'path';
+import sharp from 'sharp';
 import { logger } from '@/utils/logger';
 import { randomUUID } from 'crypto';
 import { dualDb } from '@/database/dual-pool';
+import { cacheConfig } from '@/config';
 
 /**
  * YOLO detection object (from detections array)
@@ -401,15 +405,17 @@ export class Stage2ETLService extends EventEmitter {
       // 1. Extract all available information with n8n format resolution
       const extracted = this.extractFromExecutionData(executionDataRaw);
 
-      // 2. Perform all database updates in a single transaction
-      // Image reference (hash/path) is stored directly - ETL never handles image bytes
-      await this.performAtomicUpdates(executionId, extracted);
+      // 2. Extract and save original camera image from Webhook node
+      const imageResult = await this.extractAndSaveOriginalImage(executionId, executionDataRaw);
 
-      // 3. Track metrics
+      // 3. Perform all database updates in a single transaction
+      await this.performAtomicUpdates(executionId, extracted, imageResult);
+
+      // 4. Track metrics
       if (extracted.detections && extracted.detections.length > 0) {
         this.metrics.detectionsFound += extracted.detections.length;
       }
-      if (extracted.image_hash) {
+      if (imageResult) {
         this.metrics.imagesExtracted++;
       }
 
@@ -424,6 +430,7 @@ export class Stage2ETLService extends EventEmitter {
       logger.info(`✅ Stage 2: Completed execution ${executionId}`, {
         executionId,
         processingTimeMs: processingTime,
+        hasOriginalImage: !!imageResult,
         hasImageRef: !!extracted.image_hash,
         hasFire: extracted.has_fire,
         hasSmoke: extracted.has_smoke,
@@ -457,7 +464,15 @@ export class Stage2ETLService extends EventEmitter {
    */
   private async performAtomicUpdates(
     executionId: number,
-    extracted: Stage2ExtractionResult
+    extracted: Stage2ExtractionResult,
+    imageResult: {
+      originalPath: string;
+      thumbnailPath: string;
+      cachedPath: string;
+      sizeBytes: number;
+      width: number;
+      height: number;
+    } | null
   ): Promise<void> {
     const client = await this.saiPool.connect();
 
@@ -475,15 +490,31 @@ export class Stage2ETLService extends EventEmitter {
       // 3. Insert notification status
       await this.insertNotification(client, executionId, extracted);
 
-      // 4. Insert image reference (hash/path from YOLO storage)
-      if (extracted.image_hash) {
+      // 4. Insert image paths (only when we have real local files)
+      // YOLO image_hash/image_path are remote references stored in execution_analysis,
+      // not local files — don't insert them into execution_images.
+      if (imageResult) {
         await client.query(`
           INSERT INTO execution_images (
-            execution_id, original_path, format, extracted_at
-          ) VALUES ($1, $2, 'jpeg', NOW())
+            execution_id, original_path, thumbnail_path, cached_path,
+            size_bytes, width, height, format, extracted_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'jpeg', NOW())
           ON CONFLICT (execution_id) DO UPDATE SET
-            original_path = EXCLUDED.original_path
-        `, [executionId, extracted.image_path]);
+            original_path = EXCLUDED.original_path,
+            thumbnail_path = EXCLUDED.thumbnail_path,
+            cached_path = EXCLUDED.cached_path,
+            size_bytes = EXCLUDED.size_bytes,
+            width = EXCLUDED.width,
+            height = EXCLUDED.height
+        `, [
+          executionId,
+          imageResult.originalPath,
+          imageResult.thumbnailPath,
+          imageResult.cachedPath,
+          imageResult.sizeBytes,
+          imageResult.width,
+          imageResult.height
+        ]);
       }
 
       await client.query('COMMIT');
@@ -677,6 +708,116 @@ export class Stage2ETLService extends EventEmitter {
       image_hash: null,
       image_path: null
     };
+  }
+
+  /**
+   * Extract original camera image from Webhook node and save to disk
+   *
+   * The Webhook node contains the full-resolution camera frame as a
+   * data:image/jpeg;base64,... string. This is higher resolution than
+   * the YOLO-processed image (which is resized to 768x432).
+   *
+   * Saves three variants:
+   * - original/{partition}/{executionId}.jpg  (full-res JPEG)
+   * - webp/{partition}/{executionId}.webp     (high-quality WebP 80%)
+   * - thumb/{partition}/{executionId}.webp    (thumbnail 200px WebP 70%)
+   */
+  private async extractAndSaveOriginalImage(
+    executionId: number,
+    data: any[]
+  ): Promise<{
+    originalPath: string;
+    thumbnailPath: string;
+    cachedPath: string;
+    sizeBytes: number;
+    width: number;
+    height: number;
+  } | null> {
+    try {
+      // 1. Extract Webhook node output
+      const webhookData = this.extractNodeOutput(data, 'Webhook');
+      if (!webhookData) {
+        logger.debug(`Stage 2: No Webhook node output for execution ${executionId}`);
+        return null;
+      }
+
+      // 2. Find base64 image data URL in the resolved JSON
+      const jsonStr = JSON.stringify(webhookData);
+      const match = jsonStr.match(/data:image\/[^;]+;base64,[A-Za-z0-9+/=]+/);
+      if (!match) {
+        logger.debug(`Stage 2: No base64 image in Webhook data for execution ${executionId}`);
+        return null;
+      }
+
+      const imageDataUrl = match[0];
+      const dataUrlMatch = imageDataUrl.match(/^data:([^;]+);base64,(.+)$/);
+      if (!dataUrlMatch) {
+        logger.debug(`Stage 2: Invalid data URL format for execution ${executionId}`);
+        return null;
+      }
+
+      // 3. Decode base64 to Buffer
+      const base64Data = dataUrlMatch[2];
+      const imageBuffer = Buffer.from(base64Data, 'base64');
+
+      // 4. Get image metadata with Sharp
+      const metadata = await sharp(imageBuffer).metadata();
+      const width = metadata.width || 0;
+      const height = metadata.height || 0;
+
+      // 5. Build paths using partition scheme
+      const partition = Math.floor(executionId / 1000);
+      const originalRelative = `original/${partition}/${executionId}.jpg`;
+      const webpRelative = `webp/${partition}/${executionId}.webp`;
+      const thumbRelative = `thumb/${partition}/${executionId}.webp`;
+
+      const basePath = cacheConfig.basePath;
+      const originalAbsolute = path.join(basePath, originalRelative);
+      const webpAbsolute = path.join(basePath, webpRelative);
+      const thumbAbsolute = path.join(basePath, thumbRelative);
+
+      // 6. Create directories
+      await fs.mkdir(path.dirname(originalAbsolute), { recursive: true });
+      await fs.mkdir(path.dirname(webpAbsolute), { recursive: true });
+      await fs.mkdir(path.dirname(thumbAbsolute), { recursive: true });
+
+      // 7. Save original JPEG
+      await fs.writeFile(originalAbsolute, imageBuffer);
+
+      // 8. Generate high-quality WebP variant
+      await sharp(imageBuffer)
+        .webp({ quality: 80 })
+        .toFile(webpAbsolute);
+
+      // 9. Generate thumbnail WebP
+      await sharp(imageBuffer)
+        .resize(cacheConfig.thumbnailSize, cacheConfig.thumbnailSize, {
+          fit: 'inside',
+          withoutEnlargement: true
+        })
+        .webp({ quality: cacheConfig.thumbnailQuality })
+        .toFile(thumbAbsolute);
+
+      logger.info(`📸 Stage 2: Saved original camera image for execution ${executionId}`, {
+        executionId,
+        dimensions: `${width}x${height}`,
+        sizeBytes: imageBuffer.length,
+        paths: { original: originalRelative, webp: webpRelative, thumb: thumbRelative }
+      });
+
+      return {
+        originalPath: originalRelative,
+        thumbnailPath: thumbRelative,
+        cachedPath: webpRelative,
+        sizeBytes: imageBuffer.length,
+        width,
+        height
+      };
+
+    } catch (error) {
+      logger.warn(`Stage 2: Failed to extract/save original image for execution ${executionId}:`, error);
+      return null;
+    }
   }
 
   /**
