@@ -20,9 +20,11 @@ interface ExecutionListItemProps {
   execution: ExecutionWithImageUrls;
   onClick: (execution: ExecutionWithImageUrls) => void;
   loading?: boolean;
+  isSelected?: boolean;
+  onToggleSelect?: (id: number) => void;
 }
 
-export function ExecutionListItem({ execution, onClick, loading = false }: ExecutionListItemProps) {
+export function ExecutionListItem({ execution, onClick, loading = false, isSelected, onToggleSelect }: ExecutionListItemProps) {
   const {
     imageLoading,
     imageError,
@@ -51,8 +53,9 @@ export function ExecutionListItem({ execution, onClick, loading = false }: Execu
       className={cn(
         'group flex items-center gap-4 p-3 bg-white rounded-lg border border-gray-200 hover:border-primary-300 hover:shadow-md transition-[box-shadow,border-color] cursor-pointer focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 outline-none',
         loading && 'opacity-50 cursor-not-allowed',
-        execution.alertLevel === 'critical' && 'border-l-4 border-l-red-500',
-        execution.alertLevel === 'high' && 'border-l-4 border-l-orange-500'
+        isSelected && 'bg-primary-50 border-primary-200',
+        execution.alertLevel === 'critical' && !isSelected && 'border-l-4 border-l-red-500',
+        execution.alertLevel === 'high' && !isSelected && 'border-l-4 border-l-orange-500'
       )}
       onClick={handleClick}
       onKeyDown={handleKeyDown}
@@ -60,6 +63,22 @@ export function ExecutionListItem({ execution, onClick, loading = false }: Execu
       tabIndex={0}
       aria-label={`Execution ${execution.id}, status ${execution.status}${execution.alertLevel && execution.alertLevel !== 'none' ? `, alert level ${execution.alertLevel}` : ''}`}
     >
+      {/* Checkbox */}
+      {onToggleSelect && (
+        <div
+          className="flex-shrink-0 w-8 flex items-center justify-center"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <input
+            type="checkbox"
+            checked={isSelected || false}
+            onChange={() => onToggleSelect(execution.id)}
+            className="h-4 w-4 rounded border-gray-300 text-primary-600 accent-primary-600 cursor-pointer"
+            aria-label={`Select execution ${execution.id}`}
+          />
+        </div>
+      )}
+
       {/* Thumbnail */}
       <div className="flex-shrink-0 w-16 h-16 rounded-md overflow-hidden bg-gray-100 relative">
         {thumbnailUrl ? (
