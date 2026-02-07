@@ -9,24 +9,20 @@ COPY backend/package.json backend/
 COPY frontend/package.json frontend/
 RUN npm ci
 
-# Stage 2: Build backend + frontend
-FROM base AS builder
-WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/backend/node_modules ./backend/node_modules
-COPY --from=deps /app/frontend/node_modules ./frontend/node_modules
+# Stage 2: Build backend + frontend, then prune dev deps
+FROM deps AS builder
 COPY . .
 RUN npm run build:backend
 RUN VITE_BASE_PATH=/dashboard/ VITE_API_URL=/dashboard/api npm run build:frontend
+RUN npm prune --omit=dev
 
 # Stage 3: Production runner
 FROM base AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 RUN apk add --no-cache curl
+COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/backend/dist ./backend/dist
-COPY --from=builder /app/backend/package.json ./backend/
-COPY --from=builder /app/backend/node_modules ./backend/node_modules
 COPY --from=builder /app/frontend/dist ./frontend/dist
 COPY --from=builder /app/package.json ./
 
