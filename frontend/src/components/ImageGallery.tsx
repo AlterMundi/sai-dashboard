@@ -1,10 +1,13 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { useInView } from 'react-intersection-observer';
+import toast from 'react-hot-toast';
 import { ImageCard } from './ImageCard';
 import { ExecutionListItem } from './ExecutionListItem';
+import { BatchActionBar } from './BatchActionBar';
 import { ImageModal } from './ImageModal';
 import { LoadingSpinner, LoadingState } from './ui/LoadingSpinner';
 import { useExecutions } from '@/hooks/useExecutions';
+import { executionsApi, tokenManager } from '@/services/api';
 import { ExecutionWithImageUrls, ExecutionFilters } from '@/types';
 import { cn } from '@/utils';
 import { Grid, List, RefreshCw, ArrowUp } from 'lucide-react';
@@ -21,6 +24,7 @@ export function ImageGallery({ initialFilters = {}, className, refreshTrigger, o
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [showScrollTop, setShowScrollTop] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const galleryRef = useRef<HTMLDivElement>(null);
   
   const {
@@ -78,6 +82,117 @@ export function ImageGallery({ initialFilters = {}, className, refreshTrigger, o
     }
   }, [initialFiltersJson, initialFilters, updateFilters]);
 
+  // Clear selection when view mode changes
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [viewMode]);
+
+  // Clear selection when filters change
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [initialFiltersJson]);
+
+  // Selection handlers
+  const toggleSelect = useCallback((id: number) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }, []);
+
+  const toggleSelectAll = useCallback(() => {
+    setSelectedIds(prev => {
+      if (prev.size === executions.length) {
+        return new Set();
+      }
+      return new Set(executions.map(e => e.id));
+    });
+  }, [executions]);
+
+  const clearSelection = useCallback(() => {
+    setSelectedIds(new Set());
+  }, []);
+
+  const handleBulkFalsePositive = useCallback(async () => {
+    const ids = Array.from(selectedIds);
+    const result = await executionsApi.bulkMarkFalsePositive(ids, true, 'Batch marked');
+    toast.success(`Marked ${result.updatedCount} executions as false positive`);
+    clearSelection();
+    refresh();
+  }, [selectedIds, clearSelection, refresh]);
+
+  const handleExportCsv = useCallback(() => {
+    const selected = executions.filter(e => selectedIds.has(e.id));
+    const headers = ['id', 'timestamp', 'camera', 'location', 'alertLevel', 'hasFire', 'hasSmoke', 'detectionCount', 'confidenceFire', 'confidenceSmoke', 'isFalsePositive'];
+    const rows = selected.map(e => [
+      e.id,
+      e.executionTimestamp,
+      e.cameraId ?? '',
+      e.location ?? '',
+      e.alertLevel ?? '',
+      e.hasFire ?? false,
+      e.hasSmoke ?? false,
+      e.detectionCount ?? 0,
+      e.confidenceFire ?? '',
+      e.confidenceSmoke ?? '',
+      e.isFalsePositive ?? false,
+    ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(','));
+
+    const csv = [headers.join(','), ...rows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `sai-executions-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success(`Exported ${selected.length} executions to CSV`);
+  }, [executions, selectedIds]);
+
+  const handleDownloadImages = useCallback(async () => {
+    const selected = executions.filter(e => selectedIds.has(e.id) && e.hasImage);
+    if (selected.length === 0) {
+      toast.error('No images available for selected executions');
+      return;
+    }
+
+    const token = tokenManager.get();
+    let downloaded = 0;
+
+    for (const exec of selected) {
+      try {
+        const url = executionsApi.getImageUrl(exec.id, false);
+        const response = await fetch(url, {
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+        if (!response.ok) continue;
+
+        const blob = await response.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = `sai-execution-${exec.id}.webp`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(blobUrl);
+        downloaded++;
+      } catch {
+        // skip failed downloads
+      }
+    }
+
+    if (downloaded > 0) {
+      toast.success(`Downloaded ${downloaded} image${downloaded > 1 ? 's' : ''}`);
+    } else {
+      toast.error('Failed to download images');
+    }
+  }, [executions, selectedIds]);
 
   const handleCardClick = useCallback((execution: ExecutionWithImageUrls) => {
     setSelectedExecution(execution);
@@ -223,6 +338,16 @@ export function ImageGallery({ initialFilters = {}, className, refreshTrigger, o
             <div className="space-y-2">
               {/* List Header */}
               <div className="hidden sm:flex items-center gap-4 px-3 py-2 bg-gray-50 rounded-lg text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <div className="w-8 flex items-center justify-center">
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.size > 0 && selectedIds.size === executions.length}
+                    ref={(el) => { if (el) el.indeterminate = selectedIds.size > 0 && selectedIds.size < executions.length; }}
+                    onChange={toggleSelectAll}
+                    className="h-4 w-4 rounded border-gray-300 text-primary-600 accent-primary-600 cursor-pointer"
+                    aria-label="Select all executions"
+                  />
+                </div>
                 <div className="w-16">Image</div>
                 <div className="w-32">ID / Time</div>
                 <div className="flex-1">Camera / Location</div>
@@ -238,6 +363,8 @@ export function ImageGallery({ initialFilters = {}, className, refreshTrigger, o
                   key={execution.id}
                   execution={execution}
                   onClick={handleCardClick}
+                  isSelected={selectedIds.has(execution.id)}
+                  onToggleSelect={toggleSelect}
                 />
               ))}
             </div>
@@ -264,6 +391,17 @@ export function ImageGallery({ initialFilters = {}, className, refreshTrigger, o
           )}
         </>
       </LoadingState>
+
+      {/* Batch Action Bar */}
+      {selectedIds.size > 0 && viewMode === 'list' && (
+        <BatchActionBar
+          selectedCount={selectedIds.size}
+          onMarkFalsePositive={handleBulkFalsePositive}
+          onExportCsv={handleExportCsv}
+          onDownloadImages={handleDownloadImages}
+          onClearSelection={clearSelection}
+        />
+      )}
 
       {/* Image Modal */}
       <ImageModal

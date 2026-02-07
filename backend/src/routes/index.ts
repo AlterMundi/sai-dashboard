@@ -174,6 +174,58 @@ executionRouter.get('/:executionId/data', getExecutionData);
 // Manual analysis trigger
 executionRouter.post('/trigger-analysis', triggerAnalysisProcessing);
 
+// Bulk mark executions as false positive
+executionRouter.post('/bulk/false-positive', asyncHandler(async (req: Request, res: Response) => {
+  const { executionIds, isFalsePositive, reason } = req.body;
+
+  // Validate executionIds is an array of numbers, max 500
+  if (!Array.isArray(executionIds) || executionIds.length === 0) {
+    res.status(400).json({
+      error: { message: 'executionIds must be a non-empty array', code: 'INVALID_REQUEST' }
+    });
+    return;
+  }
+
+  if (executionIds.length > 500) {
+    res.status(400).json({
+      error: { message: 'Maximum 500 executions per request', code: 'INVALID_REQUEST' }
+    });
+    return;
+  }
+
+  if (!executionIds.every((id: any) => Number.isInteger(id) && id > 0)) {
+    res.status(400).json({
+      error: { message: 'All executionIds must be positive integers', code: 'INVALID_REQUEST' }
+    });
+    return;
+  }
+
+  if (typeof isFalsePositive !== 'boolean') {
+    res.status(400).json({
+      error: { message: 'isFalsePositive must be a boolean', code: 'INVALID_REQUEST' }
+    });
+    return;
+  }
+
+  const { newExecutionService } = require('@/services/new-execution-service');
+  const result = await newExecutionService.bulkMarkFalsePositive(executionIds, isFalsePositive, reason);
+
+  if (!result.success) {
+    res.status(500).json({
+      error: { message: result.error || 'Failed to bulk update', code: 'BULK_UPDATE_FAILED' }
+    });
+    return;
+  }
+
+  res.json({
+    data: { updatedCount: result.updatedCount },
+    meta: {
+      action: isFalsePositive ? 'bulk_marked_false_positive' : 'bulk_unmarked_false_positive',
+      timestamp: new Date().toISOString()
+    }
+  });
+}));
+
 // Mark execution as false positive
 executionRouter.post('/:executionId/false-positive', asyncHandler(async (req: Request, res: Response) => {
   const executionId = parseInt(req.params.executionId);

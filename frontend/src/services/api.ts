@@ -229,6 +229,25 @@ export const executionsApi = {
   },
 
   /**
+   * Bulk mark executions as false positives (or undo)
+   */
+  async bulkMarkFalsePositive(
+    executionIds: number[],
+    isFalsePositive: boolean,
+    reason?: string
+  ): Promise<{ updatedCount: number }> {
+    try {
+      const response: AxiosResponse<ApiResponse<{ updatedCount: number }>> = await api.post(
+        '/executions/bulk/false-positive',
+        { executionIds, isFalsePositive, reason }
+      );
+      return response.data.data;
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  },
+
+  /**
    * Mark an execution as a false positive or valid detection
    */
   async markFalsePositive(
