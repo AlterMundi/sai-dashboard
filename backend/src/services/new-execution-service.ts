@@ -744,6 +744,46 @@ export class NewExecutionService {
   }
 
   /**
+   * Bulk mark executions as false positives (or undo)
+   */
+  async bulkMarkFalsePositive(
+    executionIds: number[],
+    isFalsePositive: boolean,
+    reason?: string
+  ): Promise<{ success: boolean; updatedCount: number; error?: string }> {
+    try {
+      if (executionIds.length === 0) {
+        return { success: true, updatedCount: 0 };
+      }
+
+      // Upsert: insert if no analysis row exists, update if it does
+      const query = `
+        INSERT INTO execution_analysis (execution_id, is_false_positive, false_positive_reason, marked_false_positive_at)
+        SELECT unnest($1::int[]), $2, $3, $4
+        ON CONFLICT (execution_id) DO UPDATE SET
+          is_false_positive = EXCLUDED.is_false_positive,
+          false_positive_reason = EXCLUDED.false_positive_reason,
+          marked_false_positive_at = EXCLUDED.marked_false_positive_at
+      `;
+
+      const result = await dualDb.query(query, [
+        executionIds,
+        isFalsePositive,
+        reason || null,
+        isFalsePositive ? new Date() : null
+      ]);
+
+      const updatedCount = executionIds.length;
+      logger.info(`Bulk marked ${updatedCount} executions as ${isFalsePositive ? 'false positive' : 'valid detection'}${reason ? `: ${reason}` : ''}`);
+
+      return { success: true, updatedCount };
+    } catch (error) {
+      logger.error('Failed to bulk mark false positives:', error);
+      return { success: false, updatedCount: 0, error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  }
+
+  /**
    * Get image paths for an execution
    * Returns relative paths from execution_images table
    */

@@ -29,11 +29,14 @@ import {
   Box,
   Flag,
   FlagOff,
+  ZoomIn,
+  ZoomOut,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export function ImageModal({ execution, isOpen, onClose, onUpdate }: ImageModalProps) {
-  const [fullSize, setFullSize] = useState(false);
+  const [zoomLevel, setZoomLevel] = useState(1);
+  const [naturalSize, setNaturalSize] = useState<{ w: number; h: number } | null>(null);
   const [downloading, setDownloading] = useState(false);
   const [showBoundingBoxes, setShowBoundingBoxes] = useState(true);
   const [updatingFalsePositive, setUpdatingFalsePositive] = useState(false);
@@ -56,10 +59,11 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate }: ImageModalP
     isOpen ? secureImageUrl : undefined // Only fetch when modal is open
   );
 
-  // Reset fullSize when execution changes
+  // Reset zoom when execution changes
   useEffect(() => {
     if (execution) {
-      setFullSize(false);
+      setZoomLevel(1);
+      setNaturalSize(null);
     }
   }, [execution?.id]);
 
@@ -239,10 +243,10 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate }: ImageModalP
         {/* Content */}
         <div className="flex flex-col lg:flex-row max-h-[calc(100vh-8rem)] overflow-hidden">
           {/* Image Section */}
-          <div className="flex-1 bg-gray-900 flex flex-col overflow-hidden">
+          <div className="flex-1 bg-gray-900 flex flex-col min-h-0 min-w-0 relative overflow-hidden">
             {/* Bounding Box Toggle */}
             {execution.detections && execution.detections.length > 0 && !imageLoading && !imageError && imageUrl && (
-              <div className="flex justify-center p-2 bg-gray-800">
+              <div className="flex justify-center p-2 bg-gray-800 shrink-0">
                 <BoundingBoxToggle
                   visible={showBoundingBoxes}
                   onToggle={setShowBoundingBoxes}
@@ -251,15 +255,15 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate }: ImageModalP
               </div>
             )}
 
-            {/* Image with Bounding Boxes */}
+            {/* Scrollable image container */}
             <div className={cn(
-              "flex-1 p-4 relative min-h-0",
-              fullSize ? "overflow-auto" : "flex items-center justify-center"
+              "flex-1 min-h-0 p-4 overflow-auto",
+              zoomLevel <= 1 && "flex items-center justify-center"
             )}>
               {secureImageUrl ? (
                 <>
                   {imageLoading && (
-                    <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="flex items-center justify-center h-full">
                       <LoadingSpinner size="lg" color="white" />
                     </div>
                   )}
@@ -269,20 +273,22 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate }: ImageModalP
                       <p className="text-lg">Failed to load image</p>
                     </div>
                   ) : imageUrl ? (
-                    <div className={cn(
-                      "relative",
-                      fullSize ? "w-fit" : "inline-block max-w-full max-h-full"
-                    )}>
+                    <div className="relative inline-block">
                       <img
                         src={imageUrl}
                         alt={`Execution ${execution.id}`}
+                        onLoad={(e) => {
+                          const img = e.currentTarget;
+                          setNaturalSize({ w: img.naturalWidth, h: img.naturalHeight });
+                        }}
                         className={cn(
-                          'transition-opacity duration-200',
-                          fullSize
-                            ? 'max-w-none cursor-zoom-out'
-                            : 'max-w-full max-h-full object-contain cursor-zoom-in'
+                          zoomLevel <= 1 && 'max-w-full max-h-[calc(100vh-14rem)] object-contain'
                         )}
-                        onClick={() => setFullSize(!fullSize)}
+                        style={zoomLevel > 1 && naturalSize ? {
+                          width: naturalSize.w * zoomLevel,
+                          maxWidth: 'none',
+                          maxHeight: 'none',
+                        } : undefined}
                       />
                       <BoundingBoxOverlay
                         detections={execution.detections}
@@ -300,6 +306,29 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate }: ImageModalP
                 </div>
               )}
             </div>
+
+            {/* Zoom controls - fixed over scrollable area */}
+            {imageUrl && !imageError && (
+              <div className="absolute bottom-4 right-4 flex items-center gap-1 bg-black/70 rounded-lg p-1 z-10">
+                <button
+                  onClick={() => setZoomLevel(z => Math.max(z - 0.5, 1))}
+                  disabled={zoomLevel <= 1}
+                  className="p-1.5 text-white hover:bg-white/20 rounded disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  <ZoomOut className="h-4 w-4" />
+                </button>
+                <span className="text-white text-xs font-mono px-1.5 min-w-[3ch] text-center">
+                  {zoomLevel === 1 ? 'Fit' : `${zoomLevel}x`}
+                </span>
+                <button
+                  onClick={() => setZoomLevel(z => Math.min(z + 0.5, 4))}
+                  disabled={zoomLevel >= 4}
+                  className="p-1.5 text-white hover:bg-white/20 rounded disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  <ZoomIn className="h-4 w-4" />
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Details Sidebar */}
