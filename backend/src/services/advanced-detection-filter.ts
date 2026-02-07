@@ -212,56 +212,102 @@ export class AdvancedDetectionFilterService {
     sizeDistribution: { small: number; medium: number; large: number };
     temporalPatterns: Array<{ period: string; count: number; avgConfidence: number }>;
   }> {
+    const timeInterval = {
+      hour: '1 hour',
+      day: '1 day',
+      week: '7 days'
+    }[timeRange];
+
     const timeGroup = {
       hour: "date_trunc('hour', e.execution_timestamp)",
       day: "date_trunc('day', e.execution_timestamp)",
       week: "date_trunc('week', e.execution_timestamp)"
     }[timeRange];
 
-    const query = `
-      SELECT
-        COUNT(*) as total_detections,
-        AVG(ea.confidence_score) as average_confidence,
-        -- Class distribution
-        jsonb_object_agg(
-          class,
-          count
-        ) as class_distribution,
-        -- Size distribution based on bounding box area
-        jsonb_build_object(
-          'small', COUNT(*) FILTER (WHERE (det->'bounding_box'->>'width')::numeric * (det->'bounding_box'->>'height')::numeric < 0.1),
-          'medium', COUNT(*) FILTER (WHERE (det->'bounding_box'->>'width')::numeric * (det->'bounding_box'->>'height')::numeric BETWEEN 0.1 AND 0.5),
-          'large', COUNT(*) FILTER (WHERE (det->'bounding_box'->>'width')::numeric * (det->'bounding_box'->>'height')::numeric > 0.5)
-        ) as size_distribution,
-        -- Temporal patterns
-        jsonb_agg(
-          jsonb_build_object(
-            'period', ${timeGroup},
-            'count', COUNT(*),
-            'avg_confidence', AVG(ea.confidence_score)
-          )
-        ) as temporal_patterns
-      FROM executions e
-      JOIN execution_analysis ea ON e.id = ea.execution_id
-      CROSS JOIN LATERAL jsonb_array_elements(ea.detections) AS det
-      CROSS JOIN LATERAL jsonb_build_object(
-        det->>'class',
-        1
-      ) AS class_count(class, count)
-      WHERE e.execution_timestamp >= NOW() - INTERVAL '30 days'
-      GROUP BY class
-    `;
-
     try {
-      const result = await dualDb.query(query);
-      const row = result[0];
+      // Get total detections and average confidence
+      const summaryQuery = `
+        SELECT
+          COALESCE(SUM(ea.detection_count), 0) as total_detections,
+          AVG(ea.confidence_score) as average_confidence
+        FROM executions e
+        JOIN execution_analysis ea ON e.id = ea.execution_id
+        WHERE e.execution_timestamp >= NOW() - INTERVAL '${timeInterval}'
+          AND ea.detections IS NOT NULL
+      `;
+      const summaryResult = await dualDb.query(summaryQuery);
+
+      // Get class distribution
+      const classQuery = `
+        SELECT
+          det->>'class' as class,
+          COUNT(*) as count
+        FROM executions e
+        JOIN execution_analysis ea ON e.id = ea.execution_id
+        CROSS JOIN LATERAL jsonb_array_elements(ea.detections) AS det
+        WHERE e.execution_timestamp >= NOW() - INTERVAL '${timeInterval}'
+          AND ea.detections IS NOT NULL
+        GROUP BY det->>'class'
+      `;
+      const classResult = await dualDb.query(classQuery);
+      const classDistribution: Record<string, number> = {};
+      classResult.forEach((row: any) => {
+        classDistribution[row.class] = parseInt(row.count);
+      });
+
+      // Get size distribution
+      const sizeQuery = `
+        SELECT
+          COUNT(*) FILTER (WHERE
+            COALESCE((det->'bounding_box'->>'width')::numeric, 0) *
+            COALESCE((det->'bounding_box'->>'height')::numeric, 0) < 0.1
+          ) as small,
+          COUNT(*) FILTER (WHERE
+            COALESCE((det->'bounding_box'->>'width')::numeric, 0) *
+            COALESCE((det->'bounding_box'->>'height')::numeric, 0) BETWEEN 0.1 AND 0.5
+          ) as medium,
+          COUNT(*) FILTER (WHERE
+            COALESCE((det->'bounding_box'->>'width')::numeric, 0) *
+            COALESCE((det->'bounding_box'->>'height')::numeric, 0) > 0.5
+          ) as large
+        FROM executions e
+        JOIN execution_analysis ea ON e.id = ea.execution_id
+        CROSS JOIN LATERAL jsonb_array_elements(ea.detections) AS det
+        WHERE e.execution_timestamp >= NOW() - INTERVAL '${timeInterval}'
+          AND ea.detections IS NOT NULL
+      `;
+      const sizeResult = await dualDb.query(sizeQuery);
+
+      // Get temporal patterns
+      const temporalQuery = `
+        SELECT
+          ${timeGroup} as period,
+          COUNT(*) as count,
+          AVG(ea.confidence_score) as avg_confidence
+        FROM executions e
+        JOIN execution_analysis ea ON e.id = ea.execution_id
+        WHERE e.execution_timestamp >= NOW() - INTERVAL '30 days'
+          AND ea.detections IS NOT NULL
+        GROUP BY ${timeGroup}
+        ORDER BY period DESC
+        LIMIT 30
+      `;
+      const temporalResult = await dualDb.query(temporalQuery);
 
       return {
-        totalDetections: parseInt(row.total_detections) || 0,
-        averageConfidence: parseFloat(row.average_confidence) || 0,
-        classDistribution: row.class_distribution || {},
-        sizeDistribution: row.size_distribution || { small: 0, medium: 0, large: 0 },
-        temporalPatterns: row.temporal_patterns || []
+        totalDetections: parseInt(summaryResult[0]?.total_detections) || 0,
+        averageConfidence: parseFloat(summaryResult[0]?.average_confidence) || 0,
+        classDistribution,
+        sizeDistribution: {
+          small: parseInt(sizeResult[0]?.small) || 0,
+          medium: parseInt(sizeResult[0]?.medium) || 0,
+          large: parseInt(sizeResult[0]?.large) || 0
+        },
+        temporalPatterns: temporalResult.map((row: any) => ({
+          period: row.period?.toISOString() || '',
+          count: parseInt(row.count) || 0,
+          avgConfidence: parseFloat(row.avg_confidence) || 0
+        }))
       };
     } catch (error) {
       logger.error('Detection statistics query failed:', error);

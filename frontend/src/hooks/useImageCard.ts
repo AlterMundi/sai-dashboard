@@ -1,32 +1,33 @@
-import { useState } from 'react';
 import { executionsApi } from '@/services/api';
+import { useSecureImage } from '@/components/ui/SecureImage';
 import { ExecutionWithImageUrls, ExecutionWithProcessingStage, ProcessingStage } from '@/types';
 
 /**
  * Shared image loading state and URL construction for ImageCard and ExecutionListItem.
+ * Uses secure image loading (Authorization header) to prevent token leakage in URLs.
  */
 export function useImageCard(execution: ExecutionWithImageUrls) {
-  const [imageLoading, setImageLoading] = useState(true);
-  const [imageError, setImageError] = useState(false);
-
   const processingStage = 'processingStage' in execution
     ? (execution as ExecutionWithProcessingStage).processingStage
     : undefined;
   const isStage1Only = processingStage === 'stage1';
   const hasStage2Error = processingStage === 'failed';
 
-  const thumbnailUrl = execution.hasImage && !isStage1Only
+  // Get the secure URL (without token in query params)
+  const secureUrl = execution.hasImage && !isStage1Only
     ? executionsApi.getImageUrl(execution.id, true)
     : undefined;
 
+  // Use secure image loading - fetches with Authorization header, returns blob URL
+  const { blobUrl, loading: imageLoading, error: imageError } = useSecureImage(secureUrl);
+
+  // For compatibility with existing component interface
   const handleImageLoad = () => {
-    setImageLoading(false);
-    setImageError(false);
+    // No-op: loading state managed by useSecureImage
   };
 
   const handleImageError = () => {
-    setImageLoading(false);
-    setImageError(true);
+    // No-op: error state managed by useSecureImage
   };
 
   return {
@@ -35,7 +36,7 @@ export function useImageCard(execution: ExecutionWithImageUrls) {
     processingStage,
     isStage1Only,
     hasStage2Error,
-    thumbnailUrl,
+    thumbnailUrl: blobUrl, // Return blob URL instead of token-in-URL
     handleImageLoad,
     handleImageError,
   };

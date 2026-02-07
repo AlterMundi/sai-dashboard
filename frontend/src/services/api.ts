@@ -198,24 +198,18 @@ export const executionsApi = {
     }
   },
 
+  /**
+   * Get secure image URL (use with SecureImage component or useSecureImage hook).
+   * Does NOT include token in URL - authentication handled via Authorization header.
+   */
   getImageUrl(executionId: number, thumbnail = false): string {
     const baseUrl = import.meta.env.VITE_API_URL || '/api';
-    const token = tokenManager.get();
-
-    if (!token) {
-      console.warn('No authentication token available for image request');
-      return '';
-    }
 
     // Use proper endpoint based on image type
-    let endpoint = '';
     if (thumbnail) {
-      endpoint = `/executions/${executionId}/thumbnail`;
-    } else {
-      endpoint = `/executions/${executionId}/image/webp`; // Prefer WebP for better performance
+      return `${baseUrl}/executions/${executionId}/thumbnail`;
     }
-
-    return `${baseUrl}${endpoint}?token=${encodeURIComponent(token)}`;
+    return `${baseUrl}/executions/${executionId}/image/webp`;
   },
 
   async triggerAnalysis(batchSize = 50): Promise<{
@@ -227,6 +221,83 @@ export const executionsApi = {
     try {
       const response: AxiosResponse<ApiResponse<any>> = await api.post('/executions/trigger-analysis', {
         batchSize
+      });
+      return response.data.data;
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  },
+
+  /**
+   * Mark an execution as a false positive or valid detection
+   */
+  async markFalsePositive(
+    executionId: number,
+    isFalsePositive: boolean,
+    reason?: string
+  ): Promise<Execution> {
+    try {
+      const response: AxiosResponse<ApiResponse<Execution>> = await api.post(
+        `/executions/${executionId}/false-positive`,
+        { isFalsePositive, reason }
+      );
+      return response.data.data;
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  },
+};
+
+// Detection Filter API
+export interface DetectionFilterCriteria {
+  hasClass?: string[];
+  minConfidence?: number;
+  maxConfidence?: number;
+  minBoundingBoxSize?: number;
+  maxBoundingBoxSize?: number;
+  minDetections?: number;
+  maxDetections?: number;
+  position?: 'top' | 'bottom' | 'left' | 'right' | 'center';
+}
+
+export interface DetectionQueryResult {
+  executionId: number;
+  detectionCount: number;
+  matchingDetections: any[];
+  totalConfidence: number;
+  primaryClass: string;
+}
+
+export const detectionsApi = {
+  /**
+   * Search executions with advanced detection criteria
+   */
+  async search(criteria: DetectionFilterCriteria, limit = 100): Promise<DetectionQueryResult[]> {
+    try {
+      const response: AxiosResponse<ApiResponse<DetectionQueryResult[]>> = await api.post(
+        '/detections/search',
+        criteria,
+        { params: { limit } }
+      );
+      return response.data.data;
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  },
+
+  /**
+   * Get detection statistics for a time range
+   */
+  async getStatistics(timeRange: 'hour' | 'day' | 'week' = 'day'): Promise<{
+    totalDetections: number;
+    averageConfidence: number;
+    classDistribution: Record<string, number>;
+    sizeDistribution: { small: number; medium: number; large: number };
+    temporalPatterns: Array<{ period: string; count: number; avgConfidence: number }>;
+  }> {
+    try {
+      const response = await api.get('/detections/statistics', {
+        params: { timeRange },
       });
       return response.data.data;
     } catch (error) {

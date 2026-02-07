@@ -60,7 +60,7 @@ export interface ExecutionFilters {
   hasImage?: boolean;
 
   // YOLO-specific filters (require Stage 2 completion)
-  alertLevels?: ('none' | 'low' | 'high' | 'critical')[];  // Multi-select array (consolidated)
+  alertLevels?: ('none' | 'low' | 'medium' | 'high' | 'critical')[];  // Multi-select array (consolidated)
   hasFire?: boolean;
   hasSmoke?: boolean;
   detectionCount?: number;  // Filter by number of detections

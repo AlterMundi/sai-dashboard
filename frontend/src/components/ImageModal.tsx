@@ -1,8 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { StatusBadge } from './ui/StatusBadge';
 import { LoadingSpinner } from './ui/LoadingSpinner';
-import { executionsApi } from '@/services/api';
+import { useSecureImage } from './ui/SecureImage';
+import { BoundingBoxOverlay, BoundingBoxToggle } from './BoundingBoxOverlay';
+import { executionsApi, tokenManager } from '@/services/api';
 import {
   formatDate,
   formatDuration,
@@ -25,19 +27,38 @@ import {
   Camera,
   Zap,
   Box,
+  Flag,
+  FlagOff,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-export function ImageModal({ execution, isOpen, onClose }: ImageModalProps) {
-  const [imageLoading, setImageLoading] = useState(true);
-  const [imageError, setImageError] = useState(false);
+export function ImageModal({ execution, isOpen, onClose, onUpdate }: ImageModalProps) {
   const [fullSize, setFullSize] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+  const [showBoundingBoxes, setShowBoundingBoxes] = useState(true);
+  const [updatingFalsePositive, setUpdatingFalsePositive] = useState(false);
+  const [localIsFalsePositive, setLocalIsFalsePositive] = useState(execution?.isFalsePositive ?? false);
 
-  // Reset image state when execution changes
+  // Sync local state when execution changes
   useEffect(() => {
     if (execution) {
-      setImageLoading(true);
-      setImageError(false);
+      setLocalIsFalsePositive(execution.isFalsePositive ?? false);
+    }
+  }, [execution?.id, execution?.isFalsePositive]);
+
+  // Get secure image URL (without token in query params)
+  const secureImageUrl = execution?.hasImage
+    ? executionsApi.getImageUrl(execution.id, false)
+    : undefined;
+
+  // Use secure image loading - fetches with Authorization header
+  const { blobUrl: imageUrl, loading: imageLoading, error: imageError } = useSecureImage(
+    isOpen ? secureImageUrl : undefined // Only fetch when modal is open
+  );
+
+  // Reset fullSize when execution changes
+  useEffect(() => {
+    if (execution) {
       setFullSize(false);
     }
   }, [execution?.id]);
@@ -61,25 +82,70 @@ export function ImageModal({ execution, isOpen, onClose }: ImageModalProps) {
     };
   }, [isOpen, onClose]);
 
-  if (!isOpen || !execution) return null;
+  // Handle false positive toggle
+  const handleToggleFalsePositive = useCallback(async () => {
+    if (!execution) return;
 
-  const imageUrl = execution.hasImage
-    ? executionsApi.getImageUrl(execution.id, false)
-    : undefined;
+    setUpdatingFalsePositive(true);
+    try {
+      const newValue = !localIsFalsePositive;
+      const updatedExecution = await executionsApi.markFalsePositive(
+        execution.id,
+        newValue,
+        newValue ? 'Manually marked by operator' : undefined
+      );
+
+      setLocalIsFalsePositive(newValue);
+      toast.success(newValue ? 'Marked as false positive' : 'Marked as valid detection');
+
+      // Notify parent component if callback provided
+      if (onUpdate) {
+        onUpdate(updatedExecution);
+      }
+    } catch (error) {
+      toast.error('Failed to update false positive status');
+      console.error('False positive toggle error:', error);
+    } finally {
+      setUpdatingFalsePositive(false);
+    }
+  }, [execution, localIsFalsePositive, onUpdate]);
+
+  // Secure download - fetches with Authorization header
+  // NOTE: Must be defined before early return to avoid hooks order issue
+  const handleDownload = useCallback(async () => {
+    if (!secureImageUrl || !execution) return;
+
+    setDownloading(true);
+    try {
+      const token = tokenManager.get();
+      const response = await fetch(secureImageUrl, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+
+      if (!response.ok) throw new Error('Download failed');
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `sai-execution-${execution.id}.webp`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      toast.success('Image downloaded');
+    } catch (error) {
+      toast.error('Failed to download image');
+    } finally {
+      setDownloading(false);
+    }
+  }, [secureImageUrl, execution]);
+
+  if (!isOpen || !execution) return null;
 
   const duration = execution.durationMs
     ? Math.round(execution.durationMs / 1000)
     : null;
-
-  const handleImageLoad = () => {
-    setImageLoading(false);
-    setImageError(false);
-  };
-
-  const handleImageError = () => {
-    setImageLoading(false);
-    setImageError(true);
-  };
 
   const handleCopyId = async () => {
     const success = await copyToClipboard(String(execution.id));
@@ -88,17 +154,6 @@ export function ImageModal({ execution, isOpen, onClose }: ImageModalProps) {
     } else {
       toast.error('Failed to copy to clipboard');
     }
-  };
-
-  const handleDownload = () => {
-    if (!imageUrl) return;
-
-    const link = document.createElement('a');
-    link.href = imageUrl;
-    link.download = `sai-execution-${execution.id}.jpg`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
   };
 
   const handleShare = async () => {
@@ -151,13 +206,17 @@ export function ImageModal({ execution, isOpen, onClose }: ImageModalProps) {
             >
               <Copy className="h-5 w-5" />
             </button>
-            {imageUrl && (
+            {secureImageUrl && (
               <button
                 onClick={handleDownload}
-                className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                disabled={downloading}
+                className={cn(
+                  "p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors",
+                  downloading && "opacity-50 cursor-not-allowed"
+                )}
                 title="Download Image"
               >
-                <Download className="h-5 w-5" />
+                <Download className={cn("h-5 w-5", downloading && "animate-pulse")} />
               </button>
             )}
             <button
@@ -180,40 +239,59 @@ export function ImageModal({ execution, isOpen, onClose }: ImageModalProps) {
         {/* Content */}
         <div className="flex flex-col lg:flex-row max-h-[calc(100vh-8rem)] overflow-hidden">
           {/* Image Section */}
-          <div className="flex-1 bg-gray-900 flex items-center justify-center p-4 relative">
-            {imageUrl ? (
-              <>
-                {imageLoading && (
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <LoadingSpinner size="lg" color="white" />
-                  </div>
-                )}
-                {imageError ? (
-                  <div className="flex flex-col items-center text-gray-400">
-                    <AlertTriangle className="h-16 w-16 mb-4" />
-                    <p className="text-lg">Failed to load image</p>
-                  </div>
-                ) : (
-                  <img
-                    src={imageUrl}
-                    alt={`Execution ${execution.id}`}
-                    className={cn(
-                      'max-w-full max-h-full object-contain transition-opacity duration-200 cursor-zoom-in',
-                      imageLoading ? 'opacity-0' : 'opacity-100',
-                      fullSize && 'cursor-zoom-out'
-                    )}
-                    onLoad={handleImageLoad}
-                    onError={handleImageError}
-                    onClick={() => setFullSize(!fullSize)}
-                  />
-                )}
-              </>
-            ) : (
-              <div className="flex flex-col items-center text-gray-400">
-                <AlertTriangle className="h-16 w-16 mb-4" />
-                <p className="text-lg">No image available</p>
+          <div className="flex-1 bg-gray-900 flex flex-col">
+            {/* Bounding Box Toggle */}
+            {execution.detections && execution.detections.length > 0 && !imageLoading && !imageError && imageUrl && (
+              <div className="flex justify-center p-2 bg-gray-800">
+                <BoundingBoxToggle
+                  visible={showBoundingBoxes}
+                  onToggle={setShowBoundingBoxes}
+                  detectionCount={execution.detections.length}
+                />
               </div>
             )}
+
+            {/* Image with Bounding Boxes */}
+            <div className="flex-1 flex items-center justify-center p-4 relative">
+              {secureImageUrl ? (
+                <>
+                  {imageLoading && (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <LoadingSpinner size="lg" color="white" />
+                    </div>
+                  )}
+                  {imageError ? (
+                    <div className="flex flex-col items-center text-gray-400">
+                      <AlertTriangle className="h-16 w-16 mb-4" />
+                      <p className="text-lg">Failed to load image</p>
+                    </div>
+                  ) : imageUrl ? (
+                    <div className="relative inline-block max-w-full max-h-full">
+                      <img
+                        src={imageUrl}
+                        alt={`Execution ${execution.id}`}
+                        className={cn(
+                          'max-w-full max-h-full object-contain transition-opacity duration-200 cursor-zoom-in',
+                          fullSize && 'cursor-zoom-out'
+                        )}
+                        onClick={() => setFullSize(!fullSize)}
+                      />
+                      <BoundingBoxOverlay
+                        detections={execution.detections}
+                        imageWidth={execution.imageWidth}
+                        imageHeight={execution.imageHeight}
+                        visible={showBoundingBoxes}
+                      />
+                    </div>
+                  ) : null}
+                </>
+              ) : (
+                <div className="flex flex-col items-center text-gray-400">
+                  <AlertTriangle className="h-16 w-16 mb-4" />
+                  <p className="text-lg">No image available</p>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Details Sidebar */}
@@ -348,6 +426,56 @@ export function ImageModal({ execution, isOpen, onClose }: ImageModalProps) {
                     <span className="text-lg font-bold text-blue-700">
                       {execution.detectionCount}
                     </span>
+                  </div>
+                </div>
+
+                {/* False Positive Status & Toggle */}
+                <div className={cn(
+                  "p-3 rounded-lg border transition-colors",
+                  localIsFalsePositive
+                    ? "bg-yellow-50 border-yellow-300"
+                    : "bg-gray-50 border-gray-200"
+                )}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      {localIsFalsePositive ? (
+                        <Flag className="h-4 w-4 text-yellow-600 mr-2" />
+                      ) : (
+                        <FlagOff className="h-4 w-4 text-gray-400 mr-2" />
+                      )}
+                      <div>
+                        <span className={cn(
+                          "text-sm font-medium",
+                          localIsFalsePositive ? "text-yellow-800" : "text-gray-700"
+                        )}>
+                          {localIsFalsePositive ? 'False Positive' : 'Valid Detection'}
+                        </span>
+                        {localIsFalsePositive && execution.falsePositiveReason && (
+                          <p className="text-xs text-yellow-700 mt-0.5">
+                            {execution.falsePositiveReason}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <button
+                      onClick={handleToggleFalsePositive}
+                      disabled={updatingFalsePositive}
+                      className={cn(
+                        "px-3 py-1.5 text-xs font-medium rounded transition-colors",
+                        localIsFalsePositive
+                          ? "bg-green-100 text-green-700 hover:bg-green-200"
+                          : "bg-yellow-100 text-yellow-700 hover:bg-yellow-200",
+                        updatingFalsePositive && "opacity-50 cursor-not-allowed"
+                      )}
+                    >
+                      {updatingFalsePositive ? (
+                        <span className="animate-pulse">...</span>
+                      ) : localIsFalsePositive ? (
+                        'Mark Valid'
+                      ) : (
+                        'Mark False'
+                      )}
+                    </button>
                   </div>
                 </div>
 

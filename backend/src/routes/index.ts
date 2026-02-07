@@ -34,10 +34,10 @@ import {
   readiness,
   liveness
 } from '@/controllers/health';
-import { NodeController } from '@/controllers/node';
 import { dualDb } from '@/database/dual-pool';
 import { logger } from '@/utils/logger';
 import { asyncHandler } from '@/utils';
+import { advancedDetectionFilter, DetectionFilterCriteria } from '@/services/advanced-detection-filter';
 
 const router = Router();
 
@@ -174,98 +174,115 @@ executionRouter.get('/:executionId/data', getExecutionData);
 // Manual analysis trigger
 executionRouter.post('/trigger-analysis', triggerAnalysisProcessing);
 
-router.use('/executions', executionRouter);
+// Mark execution as false positive
+executionRouter.post('/:executionId/false-positive', asyncHandler(async (req: Request, res: Response) => {
+  const executionId = parseInt(req.params.executionId);
+  const { isFalsePositive, reason } = req.body;
 
-
-// =================================================================
-// Incident Analysis Routes (Protected)
-// =================================================================
-const incidentRouter = Router();
-
-// Multi-camera incident detection
-incidentRouter.get('/', asyncHandler(async (req: Request, res: Response) => {
-  const {
-    timeRange = '24h',
-    minCameras = 1,
-    alertLevel
-  } = req.query;
-
-  const whereConditions = ['incident_id IS NOT NULL'];
-  const queryParams: any[] = [];
-  let paramCount = 0;
-
-  // Time range filter
-  if (timeRange === '1h') {
-    whereConditions.push(`detection_timestamp > NOW() - INTERVAL '1 hour'`);
-  } else if (timeRange === '24h') {
-    whereConditions.push(`detection_timestamp > NOW() - INTERVAL '24 hours'`);
-  } else if (timeRange === '7d') {
-    whereConditions.push(`detection_timestamp > NOW() - INTERVAL '7 days'`);
+  if (isNaN(executionId)) {
+    res.status(400).json({
+      error: {
+        message: 'Invalid execution ID',
+        code: 'INVALID_EXECUTION_ID'
+      }
+    });
+    return;
   }
 
-  // Alert level filter
-  if (alertLevel) {
-    paramCount++;
-    whereConditions.push(`alert_level = $${paramCount}`);
-    queryParams.push(alertLevel);
+  if (typeof isFalsePositive !== 'boolean') {
+    res.status(400).json({
+      error: {
+        message: 'isFalsePositive must be a boolean',
+        code: 'INVALID_REQUEST'
+      }
+    });
+    return;
   }
 
-  const whereClause = whereConditions.join(' AND ');
+  const { newExecutionService } = require('@/services/new-execution-service');
+  const result = await newExecutionService.markFalsePositive(executionId, isFalsePositive, reason);
 
-  const incidentsQuery = `
-    SELECT
-      incident_id,
-      COUNT(*) as total_detections,
-      COUNT(DISTINCT camera_id) as cameras_involved,
-      MAX(alert_level) as max_alert_level,
-      MIN(detection_timestamp) as incident_start,
-      MAX(detection_timestamp) as incident_end,
-      ARRAY_AGG(DISTINCT camera_id) as camera_list
-    FROM execution_analysis
-    WHERE ${whereClause}
-    GROUP BY incident_id
-    HAVING COUNT(DISTINCT camera_id) >= $${paramCount + 1}
-    ORDER BY incident_start DESC
-    LIMIT 50
-  `;
-
-  queryParams.push(parseInt(minCameras as string) || 1);
-  const incidents = await dualDb.query(incidentsQuery, queryParams);
+  if (!result.success) {
+    res.status(404).json({
+      error: {
+        message: result.error || 'Failed to update false positive status',
+        code: 'UPDATE_FAILED'
+      }
+    });
+    return;
+  }
 
   res.json({
-    data: incidents.map((incident: any) => ({
-      incidentId: incident.incident_id,
-      totalDetections: parseInt(incident.total_detections),
-      camerasInvolved: parseInt(incident.cameras_involved),
-      maxAlertLevel: incident.max_alert_level,
-      incidentStart: incident.incident_start,
-      incidentEnd: incident.incident_end,
-      cameraList: incident.camera_list
-    })),
+    data: result.execution,
     meta: {
-      totalIncidents: incidents.length,
-      timeRange,
-      minCameras: parseInt(minCameras as string) || 1
+      action: isFalsePositive ? 'marked_as_false_positive' : 'unmarked_false_positive',
+      timestamp: new Date().toISOString()
     }
   });
 }));
 
-router.use('/incidents', incidentRouter);
+router.use('/executions', executionRouter);
 
 // =================================================================
-// NODE-BASED REGIONAL MONITORING ROUTES (NEW)
+// Advanced Detection Filtering Routes (Protected)
 // =================================================================
+const detectionRouter = Router();
 
-// Regional node management
-router.get('/nodes', NodeController.getAllNodes);
-router.get('/nodes/performance', NodeController.getNodePerformance);
-router.get('/nodes/:nodeId', NodeController.getNodeDetails);
-router.get('/nodes/:nodeId/executions', NodeController.getNodeExecutions);
-router.get('/nodes/:nodeId/cameras', NodeController.getNodeCameras);
+// Search executions with advanced JSONB detection criteria
+detectionRouter.post('/search', asyncHandler(async (req: Request, res: Response) => {
+  const criteria: DetectionFilterCriteria = req.body;
+  const limit = parseInt(req.query.limit as string) || 100;
 
-// Coverage and geographic data
-router.get('/coverage/regional', NodeController.getRegionalCoverage);
-router.get('/coverage/map', NodeController.getCoverageMap);
+  // Validate criteria
+  const validation = advancedDetectionFilter.validateCriteria(criteria);
+  if (!validation.valid) {
+    res.status(400).json({
+      error: {
+        message: 'Invalid filter criteria',
+        code: 'INVALID_CRITERIA',
+        details: validation.errors
+      }
+    });
+    return;
+  }
+
+  const results = await advancedDetectionFilter.findExecutionsWithAdvancedDetection(criteria, limit);
+
+  res.json({
+    data: results,
+    meta: {
+      total: results.length,
+      criteria
+    }
+  });
+}));
+
+// Get detection statistics
+detectionRouter.get('/statistics', asyncHandler(async (req: Request, res: Response) => {
+  const timeRange = (req.query.timeRange as 'hour' | 'day' | 'week') || 'day';
+
+  if (!['hour', 'day', 'week'].includes(timeRange)) {
+    res.status(400).json({
+      error: {
+        message: 'Invalid time range. Must be hour, day, or week.',
+        code: 'INVALID_TIME_RANGE'
+      }
+    });
+    return;
+  }
+
+  const statistics = await advancedDetectionFilter.getDetectionStatistics(timeRange);
+
+  res.json({
+    data: statistics,
+    meta: {
+      timeRange,
+      timestamp: new Date().toISOString()
+    }
+  });
+}));
+
+router.use('/detections', detectionRouter);
 
 // =================================================================
 // Optional Routes (With Optional Auth)
@@ -274,22 +291,22 @@ router.get('/coverage/map', NodeController.getCoverageMap);
 // Public stats endpoint (optional auth for enhanced data)
 router.get('/public/stats', optionalAuth, async (req, res) => {
   try {
+    const { newExecutionService } = require('@/services/new-execution-service');
+    const stats = await newExecutionService.getExecutionStats();
+
     // Basic stats available to everyone
     const basicStats = {
-      totalExecutions: 4893,
-      successRate: 99.96,
+      totalExecutions: stats.totalExecutions,
+      successRate: stats.successRate,
       lastUpdate: new Date().toISOString()
     };
 
     // Enhanced stats for authenticated users
     if (req.user?.isAuthenticated) {
-      const { newExecutionService } = require('@/services/new-execution-service');
-      const detailedStats = await newExecutionService.getExecutionStats();
-      
       res.json({
         data: {
           ...basicStats,
-          ...detailedStats,
+          ...stats,
           authenticated: true
         }
       });
@@ -302,6 +319,7 @@ router.get('/public/stats', optionalAuth, async (req, res) => {
       });
     }
   } catch (error) {
+    logger.error('Failed to fetch public stats:', error);
     res.status(500).json({
       error: {
         message: 'Failed to fetch public stats',
@@ -353,9 +371,9 @@ if (process.env.NODE_ENV === 'development' || process.env.ENABLE_API_DOCS === 't
             'GET /events': 'Server-Sent Events stream for real-time updates',
             'GET /events/status': 'SSE connection status and statistics'
           },
-          incidents: {
-            'GET /incidents': 'List multi-camera incidents',
-            'GET /incidents/:id': 'Get incident analysis'
+          detections: {
+            'POST /detections/search': 'Search executions with advanced JSONB detection filters',
+            'GET /detections/statistics': 'Get detection statistics with class distribution'
           },
           health: {
             'GET /health': 'Complete health check with service status',

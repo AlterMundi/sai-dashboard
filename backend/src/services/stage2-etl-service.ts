@@ -15,9 +15,14 @@
  * - Resolves n8n's compact reference format
  * - Extracts YOLO inference results (detections, confidences, alert levels)
  * - Extracts camera metadata (device_id, location, camera_id)
- * - Extracts annotated images (processed in parallel)
+ * - Stores image hash/path references (YOLO handles image storage)
  * - Updates executions, execution_analysis tables in atomic transactions
  * - Cleans up stale workers periodically
+ *
+ * Image Storage:
+ * - YOLO service stores raw images and returns hash/path reference
+ * - ETL only stores the reference, never handles image bytes
+ * - Enables future IPFS migration (hash-based addressing)
  *
  * Data Integrity:
  * - ALL extracted fields are nullable (honest about missing data)
@@ -27,15 +32,11 @@
  *
  * See: docs/TWO_STAGE_ETL_ARCHITECTURE.md
  * See: docs/DATA_INTEGRITY_PRINCIPLES.md
- * See: docs/N8N_DATA_FORMAT.md
+ * See: docs/IMAGE_STORAGE_IMPLEMENTATION.md
  */
 
 import { Pool, PoolClient } from 'pg';
 import { EventEmitter } from 'events';
-import sharp from 'sharp';
-import fs from 'fs/promises';
-import path from 'path';
-import { cacheConfig } from '@/config';
 import { logger } from '@/utils/logger';
 import { randomUUID } from 'crypto';
 import { dualDb } from '@/database/dual-pool';
@@ -75,8 +76,9 @@ interface Stage2ExtractionResult {
   confidence_smoke: number | null;
   confidence_score: number | null;  // Max confidence
 
-  // Image data
-  image_base64: string | null;
+  // Image reference (YOLO stores image, returns hash/path)
+  image_hash: string | null;   // SHA256 hash (64 chars)
+  image_path: string | null;   // Storage path on inference server
   image_width: number | null;
   image_height: number | null;
 
@@ -114,7 +116,6 @@ export class Stage2ETLService extends EventEmitter {
   private readonly CLEANUP_INTERVAL_MS = 60000;  // Cleanup stale workers every 60s
   private readonly STALE_THRESHOLD_MINUTES = 5;
   private readonly STATEMENT_TIMEOUT_MS = 30000;  // 30 second query timeout
-  private readonly IMAGE_CACHE_PATH = cacheConfig.basePath;
 
   // Performance metrics
   private metrics = {
@@ -169,8 +170,7 @@ export class Stage2ETLService extends EventEmitter {
         batchSize: this.BATCH_SIZE,
         pollInterval: this.POLL_INTERVAL_MS,
         cleanupInterval: this.CLEANUP_INTERVAL_MS,
-        imageCachePath: this.IMAGE_CACHE_PATH,
-        mode: 'YOLO Fire Detection (LISTEN/NOTIFY + SKIP LOCKED)'
+        mode: 'YOLO Fire Detection (hash-based image refs)'
       });
 
       this.emit('started');
@@ -401,30 +401,15 @@ export class Stage2ETLService extends EventEmitter {
       // 1. Extract all available information with n8n format resolution
       const extracted = this.extractFromExecutionData(executionDataRaw);
 
-      // 2. Write image files first (idempotent filesystem ops)
-      let imagePaths: { originalRelPath: string; thumbRelPath: string; webpRelPath: string; sizeBytes: number } | null = null;
-      if (extracted.image_base64) {
-        imagePaths = await this.writeImageFiles(executionId, extracted.image_base64);
-      }
+      // 2. Perform all database updates in a single transaction
+      // Image reference (hash/path) is stored directly - ETL never handles image bytes
+      await this.performAtomicUpdates(executionId, extracted);
 
-      // 3. Perform all database updates in a single transaction (including image metadata)
-      try {
-        await this.performAtomicUpdates(executionId, extracted, imagePaths);
-      } catch (error) {
-        // Rollback: clean up orphaned image files if DB transaction failed
-        if (imagePaths) {
-          await this.cleanupImageFiles(executionId).catch(cleanupErr =>
-            logger.warn(`Failed to cleanup orphaned image files for ${executionId}:`, cleanupErr)
-          );
-        }
-        throw error;
-      }
-
-      // 4. Track detection metrics
+      // 3. Track metrics
       if (extracted.detections && extracted.detections.length > 0) {
         this.metrics.detectionsFound += extracted.detections.length;
       }
-      if (imagePaths) {
+      if (extracted.image_hash) {
         this.metrics.imagesExtracted++;
       }
 
@@ -439,7 +424,7 @@ export class Stage2ETLService extends EventEmitter {
       logger.info(`✅ Stage 2: Completed execution ${executionId}`, {
         executionId,
         processingTimeMs: processingTime,
-        hasImage: !!extracted.image_base64,
+        hasImageRef: !!extracted.image_hash,
         hasFire: extracted.has_fire,
         hasSmoke: extracted.has_smoke,
         detectionCount: extracted.detection_count,
@@ -472,8 +457,7 @@ export class Stage2ETLService extends EventEmitter {
    */
   private async performAtomicUpdates(
     executionId: number,
-    extracted: Stage2ExtractionResult,
-    imagePaths: { originalRelPath: string; thumbRelPath: string; webpRelPath: string; sizeBytes: number } | null
+    extracted: Stage2ExtractionResult
   ): Promise<void> {
     const client = await this.saiPool.connect();
 
@@ -491,18 +475,15 @@ export class Stage2ETLService extends EventEmitter {
       // 3. Insert notification status
       await this.insertNotification(client, executionId, extracted);
 
-      // 4. Insert image metadata (if files were written)
-      if (imagePaths) {
+      // 4. Insert image reference (hash/path from YOLO storage)
+      if (extracted.image_hash) {
         await client.query(`
           INSERT INTO execution_images (
-            execution_id, original_path, thumbnail_path, cached_path, size_bytes, format, extracted_at
-          ) VALUES ($1, $2, $3, $4, $5, 'jpeg', NOW())
+            execution_id, original_path, format, extracted_at
+          ) VALUES ($1, $2, 'jpeg', NOW())
           ON CONFLICT (execution_id) DO UPDATE SET
-            original_path = EXCLUDED.original_path,
-            thumbnail_path = EXCLUDED.thumbnail_path,
-            cached_path = EXCLUDED.cached_path,
-            size_bytes = EXCLUDED.size_bytes
-        `, [executionId, imagePaths.originalRelPath, imagePaths.thumbRelPath, imagePaths.webpRelPath, imagePaths.sizeBytes]);
+            original_path = EXCLUDED.original_path
+        `, [executionId, extracted.image_path]);
       }
 
       await client.query('COMMIT');
@@ -650,8 +631,8 @@ export class Stage2ETLService extends EventEmitter {
       confidence_smoke: yoloData?.confidence_scores?.smoke ?? null,
       confidence_score: maxConfidence,
 
-      // Image data
-      image_base64: this.extractImage(yoloData),
+      // Image reference (YOLO stores image, returns hash/path)
+      ...this.extractImageRef(yoloData),
       image_width: yoloData?.image_size?.width ?? null,
       image_height: yoloData?.image_size?.height ?? null,
 
@@ -672,22 +653,30 @@ export class Stage2ETLService extends EventEmitter {
   }
 
   /**
-   * Extract image from YOLO output (annotated_image field)
+   * Extract image reference from YOLO output
+   *
+   * YOLO stores images and returns hash/path reference.
+   * ETL only stores the reference, never handles image bytes.
    */
-  private extractImage(yoloData: any): string | null {
-    try {
-      const annotatedImage = yoloData?.annotated_image;
+  private extractImageRef(yoloData: any): {
+    image_hash: string | null;
+    image_path: string | null;
+  } {
+    const imageHash = yoloData?.image_hash;
+    const imagePath = yoloData?.image_path;
 
-      if (annotatedImage && typeof annotatedImage === 'string' && annotatedImage.length > 1000) {
-        // Remove data URL prefix if present
-        return annotatedImage.replace(/^data:image\/[a-z]+;base64,/, '');
-      }
-
-      return null;
-    } catch (error) {
-      logger.debug('Image extraction failed:', error);
-      return null;
+    if (imageHash && typeof imageHash === 'string' && imageHash.length === 64) {
+      logger.debug(`Image reference: hash=${imageHash.substring(0, 16)}...`);
+      return {
+        image_hash: imageHash,
+        image_path: imagePath || null
+      };
     }
+
+    return {
+      image_hash: null,
+      image_path: null
+    };
   }
 
   /**
@@ -828,61 +817,6 @@ export class Stage2ETLService extends EventEmitter {
       extracted.image_height,
       extracted.yolo_processing_time_ms
     ]);
-  }
-
-  /**
-   * Write image files to filesystem (idempotent).
-   * Returns relative paths for database storage.
-   * DB insert is handled separately inside the transaction.
-   */
-  private async writeImageFiles(
-    executionId: number,
-    imageBase64: string
-  ): Promise<{ originalRelPath: string; thumbRelPath: string; webpRelPath: string; sizeBytes: number }> {
-    const partition = Math.floor(executionId / 1000);
-
-    const originalRelPath = `original/${partition}/${executionId}.jpg`;
-    const webpRelPath = `webp/${partition}/${executionId}.webp`;
-    const thumbRelPath = `thumb/${partition}/${executionId}.webp`;
-
-    const originalAbsPath = path.join(this.IMAGE_CACHE_PATH, originalRelPath);
-    const webpAbsPath = path.join(this.IMAGE_CACHE_PATH, webpRelPath);
-    const thumbAbsPath = path.join(this.IMAGE_CACHE_PATH, thumbRelPath);
-
-    await Promise.all([
-      fs.mkdir(path.dirname(originalAbsPath), { recursive: true }),
-      fs.mkdir(path.dirname(webpAbsPath), { recursive: true }),
-      fs.mkdir(path.dirname(thumbAbsPath), { recursive: true })
-    ]);
-
-    const imageBuffer = Buffer.from(imageBase64, 'base64');
-
-    await Promise.all([
-      sharp(imageBuffer).jpeg({ quality: 95 }).toFile(originalAbsPath),
-      sharp(imageBuffer).webp({ quality: 85 }).toFile(webpAbsPath),
-      sharp(imageBuffer)
-        .resize(300, 300, { fit: 'inside', withoutEnlargement: true })
-        .webp({ quality: 75 })
-        .toFile(thumbAbsPath)
-    ]);
-
-    return { originalRelPath, thumbRelPath, webpRelPath, sizeBytes: imageBuffer.length };
-  }
-
-  /**
-   * Clean up orphaned image files after a failed DB transaction.
-   */
-  private async cleanupImageFiles(executionId: number): Promise<void> {
-    const partition = Math.floor(executionId / 1000);
-    const filesToDelete = [
-      path.join(this.IMAGE_CACHE_PATH, `original/${partition}/${executionId}.jpg`),
-      path.join(this.IMAGE_CACHE_PATH, `webp/${partition}/${executionId}.webp`),
-      path.join(this.IMAGE_CACHE_PATH, `thumb/${partition}/${executionId}.webp`),
-    ];
-
-    await Promise.allSettled(
-      filesToDelete.map(f => fs.unlink(f))
-    );
   }
 
   /**

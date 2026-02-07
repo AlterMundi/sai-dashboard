@@ -95,6 +95,13 @@ export interface Execution {
   yoloProcessingTimeMs: number | null;
   processingTimeMs: number | null;
   extractedAt: string | null;
+
+  // ============================================================================
+  // False Positive Tracking
+  // ============================================================================
+  isFalsePositive: boolean;
+  falsePositiveReason: string | null;
+  markedFalsePositiveAt: string | null;
 }
 
 /**
