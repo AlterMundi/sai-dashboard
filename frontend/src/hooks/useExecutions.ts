@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { executionsApi } from '@/services/api';
 import { ExecutionWithImageUrls, ExecutionFilters, UseExecutionsReturn, ExecutionStats, DailySummary, ProcessingStage } from '@/types';
 
@@ -8,6 +8,7 @@ export function useExecutions(
 ): UseExecutionsReturn {
   const [executions, setExecutions] = useState<ExecutionWithImageUrls[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const isFirstMount = useRef(true);
   const [error, setError] = useState<string | null>(null);
   const [hasNext, setHasNext] = useState(false);
   const [currentPage, setCurrentPage] = useState(0);
@@ -33,8 +34,14 @@ export function useExecutions(
         setExecutions(response.executions);
         setCurrentPage(0);
       } else {
-        // Append new executions for pagination
-        setExecutions(prev => [...prev, ...response.executions]);
+        // Append new executions for pagination, deduplicating in case of overlap
+        setExecutions(prev => {
+          const existingIds = new Set(prev.map(exec => exec.id));
+          const uniqueNewExecutions = response.executions.filter(
+            (exec: ExecutionWithImageUrls) => !existingIds.has(exec.id)
+          );
+          return [...prev, ...uniqueNewExecutions];
+        });
         setCurrentPage(prev => prev + 1);
       }
 
@@ -121,6 +128,17 @@ export function useExecutions(
       return exec;
     }));
   }, []);
+
+  // Sync internal filters when external initialFilters change
+  const initialFiltersKey = JSON.stringify(initialFilters);
+  useEffect(() => {
+    if (isFirstMount.current) {
+      isFirstMount.current = false;
+      return;
+    }
+    setFilters(initialFilters);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialFiltersKey]);
 
   // Initial fetch and refetch when filters change
   useEffect(() => {
