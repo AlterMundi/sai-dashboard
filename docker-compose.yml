@@ -1,0 +1,18 @@
+services:
+  sai-dashboard:
+    image: ghcr.io/altermundi/sai-dashboard:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sai-dashboard
+    restart: unless-stopped
+    network_mode: host
+    env_file:
+      - .env
+    volumes:
+      - /mnt/raid1/n8n-backup/images:/mnt/raid1/n8n-backup/images:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/dashboard/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3

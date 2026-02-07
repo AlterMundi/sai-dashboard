@@ -3,6 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
 import morgan from 'morgan';
+import { resolve } from 'path';
 import { appConfig, isDevelopment } from '@/config';
 import { logger, expressLogger } from '@/utils/logger';
 import { twoStageETLManager } from '@/services/two-stage-etl-manager';
@@ -62,6 +63,17 @@ app.get('/dashboard/api/health', (req, res) => {
 // API routes - Self-contained under /dashboard/api
 import apiRoutes from '@/routes';
 app.use('/dashboard/api', apiRoutes);
+
+// In production, serve frontend static files from the Docker image
+if (!isDevelopment) {
+  const frontendPath = resolve(__dirname, '../../frontend/dist');
+  app.use('/dashboard/', express.static(frontendPath));
+  // SPA fallback: non-API routes under /dashboard/ serve index.html
+  app.get('/dashboard/*', (req, res, next) => {
+    if (req.path.startsWith('/dashboard/api')) return next();
+    res.sendFile(resolve(frontendPath, 'index.html'));
+  });
+}
 
 // Global error handler
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
