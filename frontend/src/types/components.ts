@@ -22,6 +22,7 @@ export interface ImageModalProps {
   execution: ExecutionWithImageUrls | null;
   isOpen: boolean;
   onClose: () => void;
+  onUpdate?: (execution: ExecutionWithImageUrls) => void;
 }
 
 export interface ImageGalleryProps {

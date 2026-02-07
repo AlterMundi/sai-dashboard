@@ -6,6 +6,7 @@ import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { SSEProvider } from '@/contexts/SSEContext';
 import { Dashboard } from '@/pages/Dashboard';
 import { Login } from '@/pages/Login';
+import { Stats } from '@/pages/Stats';
 import { SSEDebugPage } from '@/pages/SSEDebugPage';
 import './index.css';
 
@@ -52,16 +53,26 @@ function App() {
               } 
             />
             
+            {/* Statistics Page */}
+            <Route
+              path="/stats"
+              element={
+                <ProtectedRoute>
+                  <Stats />
+                </ProtectedRoute>
+              }
+            />
+
             {/* SSE Debug Page */}
-            <Route 
-              path="/sse-debug" 
+            <Route
+              path="/sse-debug"
               element={
                 <ProtectedRoute>
                   <SSEProvider>
                     <SSEDebugPage />
                   </SSEProvider>
                 </ProtectedRoute>
-              } 
+              }
             />
             
             {/* Legacy dashboard route redirect */}

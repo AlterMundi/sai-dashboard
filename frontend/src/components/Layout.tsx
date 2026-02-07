@@ -1,22 +1,24 @@
-import { ReactNode } from 'react';
+import { ReactNode, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useSSE } from '@/contexts/SSEContext';
 import { LoadingSpinner } from './ui/LoadingSpinner';
 import { cn } from '@/utils';
-import { 
-  LogOut, 
-  Activity, 
-  Users, 
-  Wifi, 
-  WifiOff, 
+import {
+  LogOut,
+  Activity,
+  Users,
+  Wifi,
+  WifiOff,
   RefreshCw,
   Settings,
   BarChart3,
   Image as ImageIcon,
   Home,
   Bug,
+  Menu,
+  X,
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import toast from 'react-hot-toast';
 
 interface LayoutProps {
@@ -27,6 +29,8 @@ interface LayoutProps {
 export function Layout({ children, className }: LayoutProps) {
   const { logout, isLoading: authLoading } = useAuth();
   const { isConnected, connectionStatus, clientCount } = useSSE();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const location = useLocation();
 
   const handleLogout = async () => {
     try {
@@ -34,6 +38,10 @@ export function Layout({ children, className }: LayoutProps) {
     } catch (error) {
       toast.error('Logout failed');
     }
+  };
+
+  const handleSettingsClick = () => {
+    toast('Settings coming soon', { icon: '⚙️' });
   };
 
   const getConnectionStatusIcon = () => {
@@ -62,6 +70,16 @@ export function Layout({ children, className }: LayoutProps) {
       default:
         return 'Unknown status';
     }
+  };
+
+  const navLinks = [
+    { to: '/', label: 'Gallery', icon: Home },
+    { to: '/stats', label: 'Statistics', icon: BarChart3 },
+  ];
+
+  const isActiveRoute = (path: string) => {
+    if (path === '/') return location.pathname === '/';
+    return location.pathname.startsWith(path);
   };
 
   if (authLoading) {
@@ -93,18 +111,25 @@ export function Layout({ children, className }: LayoutProps) {
                   </h1>
                 </div>
               </div>
-              
-              {/* Navigation Links */}
+
+              {/* Desktop Navigation Links */}
               <div className="hidden md:block ml-10">
                 <div className="flex items-baseline space-x-4">
-                  <Link to="/" className="text-gray-900 hover:text-primary-600 px-3 py-2 rounded-md text-sm font-medium flex items-center">
-                    <Home className="h-4 w-4 mr-2" aria-hidden="true" />
-                    Gallery
-                  </Link>
-                  <button className="text-gray-500 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium flex items-center">
-                    <BarChart3 className="h-4 w-4 mr-2" aria-hidden="true" />
-                    Statistics
-                  </button>
+                  {navLinks.map(({ to, label, icon: Icon }) => (
+                    <Link
+                      key={to}
+                      to={to}
+                      className={cn(
+                        'px-3 py-2 rounded-md text-sm font-medium flex items-center transition-colors',
+                        isActiveRoute(to)
+                          ? 'text-primary-600 bg-primary-50'
+                          : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'
+                      )}
+                    >
+                      <Icon className="h-4 w-4 mr-2" aria-hidden="true" />
+                      {label}
+                    </Link>
+                  ))}
                 </div>
               </div>
             </div>
@@ -136,28 +161,91 @@ export function Layout({ children, className }: LayoutProps) {
                   <Bug className="h-5 w-5" aria-hidden="true" />
                 </Link>
               )}
-              
+
               {/* Settings Button */}
               <button
-                className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                onClick={handleSettingsClick}
+                className="hidden sm:block p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
                 title="Settings"
                 aria-label="Settings"
               >
                 <Settings className="h-5 w-5" aria-hidden="true" />
               </button>
 
-              {/* Logout Button */}
+              {/* Logout Button - Desktop */}
               <button
                 onClick={handleLogout}
-                className="flex items-center px-3 py-2 text-sm text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                className="hidden sm:flex items-center px-3 py-2 text-sm text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
                 title="Sign out"
               >
                 <LogOut className="h-4 w-4 mr-2" aria-hidden="true" />
-                <span className="hidden sm:inline">Sign out</span>
+                <span>Sign out</span>
+              </button>
+
+              {/* Mobile menu button */}
+              <button
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                className="md:hidden p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                aria-expanded={mobileMenuOpen}
+                aria-label="Toggle menu"
+              >
+                {mobileMenuOpen ? (
+                  <X className="h-6 w-6" aria-hidden="true" />
+                ) : (
+                  <Menu className="h-6 w-6" aria-hidden="true" />
+                )}
               </button>
             </div>
           </div>
         </div>
+
+        {/* Mobile Navigation Menu */}
+        {mobileMenuOpen && (
+          <div className="md:hidden border-t border-gray-200 bg-white">
+            <div className="px-4 py-3 space-y-1">
+              {navLinks.map(({ to, label, icon: Icon }) => (
+                <Link
+                  key={to}
+                  to={to}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={cn(
+                    'flex items-center px-3 py-2 rounded-md text-base font-medium transition-colors',
+                    isActiveRoute(to)
+                      ? 'text-primary-600 bg-primary-50'
+                      : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'
+                  )}
+                >
+                  <Icon className="h-5 w-5 mr-3" aria-hidden="true" />
+                  {label}
+                </Link>
+              ))}
+
+              <hr className="my-2 border-gray-200" />
+
+              <button
+                onClick={() => {
+                  handleSettingsClick();
+                  setMobileMenuOpen(false);
+                }}
+                className="flex items-center w-full px-3 py-2 rounded-md text-base font-medium text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors"
+              >
+                <Settings className="h-5 w-5 mr-3" aria-hidden="true" />
+                Settings
+              </button>
+
+              <button
+                onClick={() => {
+                  handleLogout();
+                  setMobileMenuOpen(false);
+                }}
+                className="flex items-center w-full px-3 py-2 rounded-md text-base font-medium text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors"
+              >
+                <LogOut className="h-5 w-5 mr-3" aria-hidden="true" />
+                Sign out
+              </button>
+            </div>
+          </div>
+        )}
       </nav>
 
       {/* Main Content */}
@@ -175,7 +263,7 @@ export function Layout({ children, className }: LayoutProps) {
               <span className="mx-2">•</span>
               <span>v1.0.0</span>
             </div>
-            
+
             <div className="flex items-center space-x-6 mt-4 md:mt-0 text-sm text-gray-500">
               <span>Visual interface for n8n workflows</span>
               <div className="flex items-center">

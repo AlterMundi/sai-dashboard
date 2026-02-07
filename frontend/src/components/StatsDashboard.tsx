@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
-import { 
-  Activity, Clock, AlertCircle, 
-  CheckCircle, XCircle, BarChart3
+import {
+  Activity, Clock, AlertCircle,
+  CheckCircle, XCircle, BarChart3, Flame
 } from 'lucide-react';
 import { cn } from '@/utils';
 import { api } from '@/services/api';
+import { useDailySummary } from '@/hooks/useExecutions';
+import { TrendChart } from '@/components/charts/TrendChart';
 
 interface StatisticsData {
   overview: {
@@ -43,6 +45,9 @@ export function StatsDashboard() {
   const [stats, setStats] = useState<StatisticsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Fetch daily summary for trend chart
+  const { summary: dailySummary, isLoading: summaryLoading } = useDailySummary(14);
 
   useEffect(() => {
     fetchStatistics();
@@ -105,7 +110,7 @@ export function StatsDashboard() {
   return (
     <div className="space-y-6">
       {/* Overview Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex items-center justify-between">
             <div>
@@ -165,7 +170,40 @@ export function StatsDashboard() {
             <Activity className="h-8 w-8 text-orange-500" />
           </div>
         </div>
+
+        {/* Detection Summary Card */}
+        {!summaryLoading && dailySummary.length > 0 && (() => {
+          const totalFire = dailySummary.reduce((sum, day) => sum + (day.fireDetections || 0), 0);
+          const totalSmoke = dailySummary.reduce((sum, day) => sum + (day.smokeDetections || 0), 0);
+          return (
+            <div className="bg-white rounded-lg shadow p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Detections (14d)</p>
+                  <div className="flex items-center gap-3 mt-1">
+                    <span className="text-lg font-bold text-red-600">{totalFire} fire</span>
+                    <span className="text-lg font-bold text-gray-500">{totalSmoke} smoke</span>
+                  </div>
+                </div>
+                <Flame className="h-8 w-8 text-red-500" />
+              </div>
+            </div>
+          );
+        })()}
       </div>
+
+      {/* Detection Trend Chart */}
+      {!summaryLoading && dailySummary.length > 0 && (
+        <TrendChart
+          data={dailySummary.map(day => ({
+            date: day.date,
+            fire: day.fireDetections || 0,
+            smoke: day.smokeDetections || 0,
+            total: day.totalExecutions,
+          })).reverse()}
+          title="Detection Trends (Last 14 Days)"
+        />
+      )}
 
       {/* Status Breakdown and Recent Activity */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

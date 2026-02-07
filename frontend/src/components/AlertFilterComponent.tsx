@@ -43,7 +43,16 @@ export function AlertFilterComponent({
   const [showAdvanced, setShowAdvanced] = useState(false);
 
   const handleFilterChange = useCallback((key: keyof ExecutionFilters, value: any) => {
-    onFiltersChange({ ...filters, [key]: value, page: 0 });
+    const newFilters = { ...filters, [key]: value, page: 0 };
+
+    // Mutual exclusivity: datePreset and custom date range
+    if (key === 'datePreset' && value) {
+      // When selecting a preset, clear custom date range
+      newFilters.startDate = undefined;
+      newFilters.endDate = undefined;
+    }
+
+    onFiltersChange(newFilters);
   }, [filters, onFiltersChange]);
 
 
@@ -207,6 +216,7 @@ export function AlertFilterComponent({
               <SelectItem value="">All levels</SelectItem>
               <SelectItem value="critical">Critical</SelectItem>
               <SelectItem value="high">High</SelectItem>
+              <SelectItem value="medium">Medium</SelectItem>
               <SelectItem value="low">Low</SelectItem>
               <SelectItem value="none">None</SelectItem>
             </SelectContent>
