@@ -115,8 +115,8 @@ export class Stage2ETLService extends EventEmitter {
   private workerId: string;
 
   // Configuration
-  private readonly BATCH_SIZE = 10;
-  private readonly POLL_INTERVAL_MS = 30000;  // Reduced: NOTIFY handles immediate processing
+  private readonly BATCH_SIZE = parseInt(process.env.ETL_BATCH_SIZE || '10', 10);
+  private readonly POLL_INTERVAL_MS = parseInt(process.env.ETL_POLL_INTERVAL_MS || '30000', 10);
   private readonly CLEANUP_INTERVAL_MS = 60000;  // Cleanup stale workers every 60s
   private readonly STALE_THRESHOLD_MINUTES = 5;
   private readonly STATEMENT_TIMEOUT_MS = 30000;  // 30 second query timeout
