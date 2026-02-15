@@ -167,16 +167,18 @@ export class NewExecutionService {
     }
 
     // Date range filtering
+    // Parse ISO strings to Date objects so the pg driver serializes them
+    // in the local timezone (matching the naive TIMESTAMP columns in the DB)
     if (startDate) {
       paramCount++;
       whereConditions.push(`e.execution_timestamp >= $${paramCount}`);
-      queryParams.push(startDate);
+      queryParams.push(new Date(startDate));
     }
 
     if (endDate) {
       paramCount++;
       whereConditions.push(`e.execution_timestamp <= $${paramCount}`);
-      queryParams.push(endDate);
+      queryParams.push(new Date(endDate));
     }
 
     // Search query (location, device, camera) - only if not already filtered by specific fields
