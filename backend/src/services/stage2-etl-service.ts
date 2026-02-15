@@ -362,7 +362,7 @@ export class Stage2ETLService extends EventEmitter {
       [this.workerId, this.BATCH_SIZE]
     );
 
-    return result.rows.map(row => row.execution_id);
+    return result.rows.map(row => Number(row.execution_id));
   }
 
   /**
