@@ -615,6 +615,30 @@ export class Stage2ETLService extends EventEmitter {
   }
 
   /**
+   * Extract binary field from a node's output (e.g. Webhook binary.image)
+   * Returns the resolved binary object with {mimeType, data, id, fileName, ...}
+   */
+  private extractNodeBinary(data: any[], nodeName: string, binaryKey: string): any | null {
+    const runData = this.findRunData(data);
+    if (!runData || !(nodeName in runData)) return null;
+
+    const nodeOutputArray = this.deepResolve(runData[nodeName], data);
+    if (!Array.isArray(nodeOutputArray) || nodeOutputArray.length === 0) return null;
+
+    const execution = nodeOutputArray[0];
+    const outputItems = execution?.data?.main?.[0];
+    if (!Array.isArray(outputItems) || outputItems.length === 0) return null;
+
+    const firstOutputItem = outputItems[0];
+    if (!firstOutputItem?.binary) return null;
+
+    const binaryObj = this.deepResolve(firstOutputItem.binary, data);
+    if (!binaryObj || !(binaryKey in binaryObj)) return null;
+
+    return this.deepResolve(binaryObj[binaryKey], data);
+  }
+
+  /**
    * ========================================================================
    * EXTRACTION LOGIC: Extract YOLO and metadata from n8n data
    * ========================================================================
@@ -713,9 +737,10 @@ export class Stage2ETLService extends EventEmitter {
   /**
    * Extract original camera image from Webhook node and save to disk
    *
-   * The Webhook node contains the full-resolution camera frame as a
-   * data:image/jpeg;base64,... string. This is higher resolution than
-   * the YOLO-processed image (which is resized to 768x432).
+   * The Webhook node stores the full-resolution camera frame in n8n's
+   * filesystem-v2 binary storage. We read it directly from disk.
+   * This is higher resolution (1920x1080) than the YOLO-processed
+   * image (which is resized to 768x432).
    *
    * Saves three variants:
    * - original/{partition}/{executionId}.jpg  (full-res JPEG)
@@ -734,31 +759,33 @@ export class Stage2ETLService extends EventEmitter {
     height: number;
   } | null> {
     try {
-      // 1. Extract Webhook node output
-      const webhookData = this.extractNodeOutput(data, 'Webhook');
-      if (!webhookData) {
-        logger.debug(`Stage 2: No Webhook node output for execution ${executionId}`);
+      // 1. Extract Webhook node binary image reference
+      const binaryImage = this.extractNodeBinary(data, 'Webhook', 'image');
+      if (!binaryImage || !binaryImage.id) {
+        logger.debug(`Stage 2: No Webhook binary image for execution ${executionId}`);
         return null;
       }
 
-      // 2. Find base64 image data URL in the resolved JSON
-      const jsonStr = JSON.stringify(webhookData);
-      const match = jsonStr.match(/data:image\/[^;]+;base64,[A-Za-z0-9+/=]+/);
-      if (!match) {
-        logger.debug(`Stage 2: No base64 image in Webhook data for execution ${executionId}`);
+      // 2. Resolve filesystem-v2 path from binary id
+      // id format: "filesystem-v2:workflows/xxx/executions/temp/binary_data/{uuid}"
+      const binaryId: string = binaryImage.id;
+      const fsPrefix = 'filesystem-v2:';
+      if (!binaryId.startsWith(fsPrefix)) {
+        logger.debug(`Stage 2: Unsupported binary storage type for execution ${executionId}: ${binaryId.substring(0, 30)}`);
         return null;
       }
 
-      const imageDataUrl = match[0];
-      const dataUrlMatch = imageDataUrl.match(/^data:([^;]+);base64,(.+)$/);
-      if (!dataUrlMatch) {
-        logger.debug(`Stage 2: Invalid data URL format for execution ${executionId}`);
+      const relativePath = binaryId.slice(fsPrefix.length);
+      const n8nFilePath = path.join(cacheConfig.n8nBinaryDataPath, relativePath);
+
+      // 3. Read image from n8n binary storage
+      let imageBuffer: Buffer;
+      try {
+        imageBuffer = await fs.readFile(n8nFilePath);
+      } catch (err) {
+        logger.warn(`Stage 2: Cannot read n8n binary file for execution ${executionId}: ${n8nFilePath}`);
         return null;
       }
-
-      // 3. Decode base64 to Buffer
-      const base64Data = dataUrlMatch[2];
-      const imageBuffer = Buffer.from(base64Data, 'base64');
 
       // 4. Get image metadata with Sharp
       const metadata = await sharp(imageBuffer).metadata();
@@ -800,6 +827,7 @@ export class Stage2ETLService extends EventEmitter {
 
       logger.info(`📸 Stage 2: Saved original camera image for execution ${executionId}`, {
         executionId,
+        source: n8nFilePath,
         dimensions: `${width}x${height}`,
         sizeBytes: imageBuffer.length,
         paths: { original: originalRelative, webp: webpRelative, thumb: thumbRelative }
