@@ -168,6 +168,7 @@ export interface SessionData {
 export interface CacheConfig {
   path: string;
   basePath: string;  // Base path for image storage (used by ETL services)
+  n8nBinaryDataPath: string;  // Path to n8n's filesystem-v2 binary storage
   enableThumbnails: boolean;
   thumbnailSize: number;
   thumbnailQuality: number;
