@@ -174,6 +174,7 @@ const resolvedImageBasePath = rawImageBasePath.startsWith('/')
 export const cacheConfig: CacheConfig = {
   path: process.env.CACHE_PATH || '/cache',
   basePath: resolvedImageBasePath,
+  n8nBinaryDataPath: process.env.N8N_BINARY_DATA_PATH || '/mnt/n8n-data/.n8n/binaryData',
   enableThumbnails: process.env.ENABLE_THUMBNAIL_GENERATION === 'true',
   thumbnailSize: parseInt(process.env.THUMBNAIL_SIZE || '200', 10),
   thumbnailQuality: parseInt(process.env.THUMBNAIL_QUALITY || '70', 10),
