@@ -41,8 +41,9 @@ export class NewExecutionService {
       location,
       searchQuery,
       search,
-      startDate,
-      endDate,
+      startDate: startDateRaw,
+      endDate: endDateRaw,
+      datePreset,
       hasImage,
       telegramSent,
       hasFire,
@@ -57,6 +58,48 @@ export class NewExecutionService {
 
     // Handle search/searchQuery alias
     const searchTerm = search || searchQuery;
+
+    // Resolve datePreset to startDate/endDate (if no explicit dates given)
+    let startDate = startDateRaw;
+    let endDate = endDateRaw;
+    if (datePreset && !startDate && !endDate) {
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      switch (datePreset) {
+        case 'today':
+          startDate = today.toISOString();
+          break;
+        case 'yesterday': {
+          const yesterday = new Date(today);
+          yesterday.setDate(yesterday.getDate() - 1);
+          startDate = yesterday.toISOString();
+          endDate = today.toISOString();
+          break;
+        }
+        case 'last7days': {
+          const d = new Date(today);
+          d.setDate(d.getDate() - 7);
+          startDate = d.toISOString();
+          break;
+        }
+        case 'last30days': {
+          const d = new Date(today);
+          d.setDate(d.getDate() - 30);
+          startDate = d.toISOString();
+          break;
+        }
+        case 'thisMonth':
+          startDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+          break;
+        case 'lastMonth': {
+          const firstOfLast = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+          const firstOfThis = new Date(now.getFullYear(), now.getMonth(), 1);
+          startDate = firstOfLast.toISOString();
+          endDate = firstOfThis.toISOString();
+          break;
+        }
+      }
+    }
 
     let whereConditions = ['1=1'];
     const queryParams: any[] = [];
