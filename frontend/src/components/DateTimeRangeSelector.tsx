@@ -1,12 +1,7 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
-import { Badge } from './ui/badge';
-import {
-  Calendar,
-  Clock,
-  X,
-} from 'lucide-react';
+import { X } from 'lucide-react';
 import { cn } from '@/utils';
 
 interface DateTimeRange {
@@ -21,206 +16,140 @@ interface DateTimeRangeSelectorProps {
   disabled?: boolean;
 }
 
+function toLocalDatetime(iso: string): string {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+const presets = [
+  { label: '5m', minutes: 5 },
+  { label: '15m', minutes: 15 },
+  { label: '30m', minutes: 30 },
+  { label: '1h', minutes: 60 },
+  { label: '2h', minutes: 120 },
+  { label: '6h', minutes: 360 },
+  { label: '12h', minutes: 720 },
+  { label: '24h', minutes: 1440 },
+];
+
 export function DateTimeRangeSelector({
   value,
   onChange,
   className,
   disabled = false
 }: DateTimeRangeSelectorProps) {
-  const [startDate, setStartDate] = useState(value?.startDate || '');
-  const [startTime, setStartTime] = useState(value?.startDate ? new Date(value.startDate).toTimeString().slice(0, 5) : '00:00');
-  const [endDate, setEndDate] = useState(value?.endDate || '');
-  const [endTime, setEndTime] = useState(value?.endDate ? new Date(value.endDate).toTimeString().slice(0, 5) : '23:59');
+  const [from, setFrom] = useState(value?.startDate ? toLocalDatetime(value.startDate) : '');
+  const [to, setTo] = useState(value?.endDate ? toLocalDatetime(value.endDate) : '');
 
+  // Sync external value changes (e.g. preset clicks) into local state
+  useEffect(() => {
+    setFrom(value?.startDate ? toLocalDatetime(value.startDate) : '');
+    setTo(value?.endDate ? toLocalDatetime(value.endDate) : '');
+  }, [value?.startDate, value?.endDate]);
 
-  const handleApply = useCallback(() => {
-    if (!startDate || !endDate) {
-      onChange(undefined);
-      return;
-    }
+  // Auto-apply when both inputs are valid and form a valid range
+  useEffect(() => {
+    if (!from || !to) return;
+    const start = new Date(from);
+    const end = new Date(to);
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) return;
+    if (start >= end) return;
 
-    const startDateTime = new Date(`${startDate}T${startTime}:00`);
-    const endDateTime = new Date(`${endDate}T${endTime}:00`);
+    const startIso = start.toISOString();
+    const endIso = end.toISOString();
 
-    if (startDateTime >= endDateTime) {
-      // Invalid range, don't apply
-      console.warn('Invalid date range: start time must be before end time');
-      return;
-    }
+    // Only fire if actually different from current value
+    if (value?.startDate === startIso && value?.endDate === endIso) return;
 
-    console.log('Applying date range:', {
-      start: startDateTime.toISOString(),
-      end: endDateTime.toISOString()
-    });
-
-    onChange({
-      startDate: startDateTime.toISOString(),
-      endDate: endDateTime.toISOString()
-    });
-  }, [startDate, startTime, endDate, endTime, onChange]);
+    onChange({ startDate: startIso, endDate: endIso });
+  }, [from, to]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleClear = useCallback(() => {
-    setStartDate('');
-    setStartTime('00:00');
-    setEndDate('');
-    setEndTime('23:59');
+    setFrom('');
+    setTo('');
     onChange(undefined);
   }, [onChange]);
 
-
   const handlePreset = useCallback((minutes: number) => {
-    const now = new Date();
-    const start = new Date(now.getTime() - minutes * 60 * 1000);
+    const offset = minutes * 60 * 1000;
+    const fromDate = from ? new Date(from) : null;
+    const toDate = to ? new Date(to) : null;
 
-    setStartDate(start.toISOString().split('T')[0]);
-    setStartTime(start.toTimeString().slice(0, 5));
-    setEndDate(now.toISOString().split('T')[0]);
-    setEndTime(now.toTimeString().slice(0, 5));
-
-    onChange({
-      startDate: start.toISOString(),
-      endDate: now.toISOString()
-    });
-  }, [onChange]);
-
-  const formatDateTime = (dateStr: string) => {
-    if (!dateStr) return '';
-    const date = new Date(dateStr);
-    return date.toLocaleString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false
-    });
-  };
+    if (fromDate && !isNaN(fromDate.getTime())) {
+      // From is set (takes precedence even if To is also set): N minutes after From
+      onChange({
+        startDate: fromDate.toISOString(),
+        endDate: new Date(fromDate.getTime() + offset).toISOString()
+      });
+    } else if (toDate && !isNaN(toDate.getTime())) {
+      // Only To is set: N minutes before To
+      onChange({
+        startDate: new Date(toDate.getTime() - offset).toISOString(),
+        endDate: toDate.toISOString()
+      });
+    } else {
+      // Neither set: N minutes before now
+      const now = new Date();
+      onChange({
+        startDate: new Date(now.getTime() - offset).toISOString(),
+        endDate: now.toISOString()
+      });
+    }
+  }, [from, to, onChange]);
 
   const hasActiveRange = value?.startDate && value?.endDate;
 
   return (
-    <div className={cn("bg-white border border-gray-200 rounded-lg p-4 space-y-4", className)}>
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-2">
-          <Calendar className="h-5 w-5 text-gray-600" />
-          <h3 className="text-sm font-semibold text-gray-900">Precise Date-Time Range</h3>
-          {hasActiveRange && (
-            <Badge variant="secondary" className="bg-blue-50 text-blue-700 border-blue-200">
-              Active
-            </Badge>
-          )}
-        </div>
-        {hasActiveRange && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleClear}
-            disabled={disabled}
-          >
-            <X className="h-4 w-4 mr-1" />
-            Clear
-          </Button>
-        )}
-      </div>
-
-      {/* Quick Presets */}
-      <div className="flex flex-wrap gap-2">
-        <span className="text-xs text-gray-500 self-center mr-2">Quick:</span>
-        {[
-          { label: '5 min', minutes: 5 },
-          { label: '15 min', minutes: 15 },
-          { label: '30 min', minutes: 30 },
-          { label: '1 hour', minutes: 60 },
-          { label: '2 hours', minutes: 120 },
-          { label: '6 hours', minutes: 360 },
-          { label: '12 hours', minutes: 720 },
-          { label: '24 hours', minutes: 1440 },
-        ].map((preset) => (
-          <Button
-            key={preset.minutes}
-            variant="outline"
-            size="sm"
-            onClick={() => handlePreset(preset.minutes)}
-            disabled={disabled}
-            className="text-xs px-2 py-1 h-7"
-          >
-            {preset.label}
-          </Button>
-        ))}
-      </div>
-
-      {/* Date-Time Inputs */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {/* Start Date-Time */}
-        <div className="space-y-2">
-          <label className="block text-sm font-medium text-gray-700 flex items-center">
-            <Clock className="h-3.5 w-3.5 mr-1" />
-            Start Date & Time
-          </label>
-          <div className="flex gap-2">
-            <Input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              disabled={disabled}
-              className="flex-1"
-            />
-            <Input
-              type="time"
-              value={startTime}
-              onChange={(e) => setStartTime(e.target.value)}
-              disabled={disabled}
-              className="w-24"
-              step="60"
-            />
-          </div>
-        </div>
-
-        {/* End Date-Time */}
-        <div className="space-y-2">
-          <label className="block text-sm font-medium text-gray-700 flex items-center">
-            <Clock className="h-3.5 w-3.5 mr-1" />
-            End Date & Time
-          </label>
-          <div className="flex gap-2">
-            <Input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              disabled={disabled}
-              className="flex-1"
-            />
-            <Input
-              type="time"
-              value={endTime}
-              onChange={(e) => setEndTime(e.target.value)}
-              disabled={disabled}
-              className="w-24"
-              step="60"
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Apply Button */}
-      <div className="flex justify-between items-center pt-2 border-t border-gray-200">
-        <div className="text-xs text-gray-500">
-          {hasActiveRange && (
-            <span>
-              Range: {formatDateTime(value!.startDate!)} → {formatDateTime(value!.endDate!)}
-            </span>
-          )}
-        </div>
+    <div className={cn("flex flex-wrap items-center gap-2", className)}>
+      {/* From / To datetime-local inputs + clear */}
+      <label className="text-xs text-gray-500">From</label>
+      <Input
+        type="datetime-local"
+        lang="en-GB"
+        value={from}
+        onChange={(e) => setFrom(e.target.value)}
+        disabled={disabled}
+        className="h-8 text-sm w-auto"
+      />
+      <label className="text-xs text-gray-500">To</label>
+      <Input
+        type="datetime-local"
+        lang="en-GB"
+        value={to}
+        onChange={(e) => setTo(e.target.value)}
+        disabled={disabled}
+        className="h-8 text-sm w-auto"
+      />
+      {hasActiveRange && (
         <Button
-          onClick={handleApply}
-          disabled={disabled || !startDate || !endDate}
+          variant="ghost"
           size="sm"
-          className="bg-blue-600 hover:bg-blue-700 text-white"
+          onClick={handleClear}
+          disabled={disabled}
+          className="h-6 w-6 p-0 text-gray-400 hover:text-gray-600"
         >
-          Apply Range
+          <X className="h-3.5 w-3.5" />
         </Button>
-      </div>
+      )}
+
+      {/* Separator */}
+      <div className="h-5 w-px bg-gray-300 mx-1" />
+
+      {/* Quick presets to the right */}
+      <span className="text-xs text-gray-500">Quick:</span>
+      {presets.map((p) => (
+        <Button
+          key={p.minutes}
+          variant="outline"
+          size="sm"
+          onClick={() => handlePreset(p.minutes)}
+          disabled={disabled}
+          className="text-xs px-2 py-0.5 h-6"
+        >
+          {p.label}
+        </Button>
+      ))}
     </div>
   );
 }
