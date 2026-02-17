@@ -7,7 +7,6 @@ import { SSEProvider } from '@/contexts/SSEContext';
 import { Dashboard } from '@/pages/Dashboard';
 import { Login } from '@/pages/Login';
 import { Stats } from '@/pages/Stats';
-import { SSEDebugPage } from '@/pages/SSEDebugPage';
 import './index.css';
 
 // Protected Route Component
@@ -63,18 +62,6 @@ function App() {
               }
             />
 
-            {/* SSE Debug Page */}
-            <Route
-              path="/sse-debug"
-              element={
-                <ProtectedRoute>
-                  <SSEProvider>
-                    <SSEDebugPage />
-                  </SSEProvider>
-                </ProtectedRoute>
-              }
-            />
-            
             {/* Legacy dashboard route redirect */}
             <Route path="/dashboard" element={<Navigate to="/" replace />} />
             
