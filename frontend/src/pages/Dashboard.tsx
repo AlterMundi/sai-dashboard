@@ -5,10 +5,9 @@ import { ImageGallery } from '@/components/ImageGallery';
 import { AlertFilterComponent } from '@/components/AlertFilterComponent';
 import { ExportDropdown } from '@/components/ExportDropdown';
 import { AdvancedSearchPanel, CompoundSearchCriteria } from '@/components/AdvancedSearchPanel';
-import { SystemHealthIndicator } from '@/components/LiveStatsCard';
 import { useDailySummary, useExecutions } from '@/hooks/useExecutions';
 import { executionsApi, detectionsApi, DetectionFilterCriteria } from '@/services/api';
-import { useSSEHandler, useSSE } from '@/contexts/SSEContext';
+import { useSSEHandler } from '@/contexts/SSEContext';
 import { ExecutionFilters, SSEStage2CompletionEvent, SSEStage2FailureEvent } from '@/types';
 import toast from 'react-hot-toast';
 
@@ -59,8 +58,6 @@ export function Dashboard() {
   const galleryPrependRef = useRef<((executions: any[]) => void) | null>(null);
 
   useDailySummary(7);
-  const { isConnected, systemHealth, lastEvent } = useSSE();
-
   const {
     updateExecutionStage,
     totalResults,
@@ -218,23 +215,6 @@ export function Dashboard() {
   return (
     <Layout>
       <div className="space-y-8">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-          <div />
-
-          {/* Real-time Status */}
-          <div className="mt-4 sm:mt-0 flex items-center space-x-3">
-            {systemHealth && <SystemHealthIndicator />}
-
-            {isConnected && (
-              <div className="flex items-center px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm">
-                <div className="h-2 w-2 bg-green-600 rounded-full mr-2 animate-pulse" />
-                Live Updates
-              </div>
-            )}
-          </div>
-        </div>
-
         {/* Filters and Export */}
         <div className="space-y-4">
           <AlertFilterComponent
@@ -245,7 +225,6 @@ export function Dashboard() {
             currentPage={1}
             totalPages={Math.ceil(totalResults / 50)}
             pageSize={50}
-            lastUpdateTime={lastEvent?.timestamp ? new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: 'numeric', second: 'numeric' }).format(lastEvent.timestamp) : 'waiting\u2026'}
             isLoading={false}
           />
 

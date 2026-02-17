@@ -7,9 +7,6 @@ import {
   LogOut,
   Activity,
   Users,
-  Wifi,
-  WifiOff,
-  RefreshCw,
   Settings,
   BarChart3,
   Image as ImageIcon,
@@ -27,7 +24,7 @@ interface LayoutProps {
 
 export function Layout({ children, className }: LayoutProps) {
   const { logout, isLoading: authLoading } = useAuth();
-  const { isConnected, connectionStatus, clientCount } = useSSE();
+  const { isConnected, clientCount, lastEvent } = useSSE();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const location = useLocation();
 
@@ -41,34 +38,6 @@ export function Layout({ children, className }: LayoutProps) {
 
   const handleSettingsClick = () => {
     toast('Settings coming soon', { icon: '⚙️' });
-  };
-
-  const getConnectionStatusIcon = () => {
-    switch (connectionStatus) {
-      case 'connected':
-        return <Wifi className="h-4 w-4 text-success-600" />;
-      case 'connecting':
-        return <RefreshCw className="h-4 w-4 text-warning-600 animate-spin" />;
-      case 'error':
-        return <WifiOff className="h-4 w-4 text-danger-600" />;
-      default:
-        return <WifiOff className="h-4 w-4 text-gray-400" />;
-    }
-  };
-
-  const getConnectionStatusText = () => {
-    switch (connectionStatus) {
-      case 'connected':
-        return 'Real-time connected';
-      case 'connecting':
-        return 'Connecting...';
-      case 'error':
-        return 'Connection failed';
-      case 'disconnected':
-        return 'Disconnected';
-      default:
-        return 'Unknown status';
-    }
   };
 
   const navLinks = [
@@ -135,17 +104,22 @@ export function Layout({ children, className }: LayoutProps) {
 
             {/* Right side controls */}
             <div className="flex items-center space-x-4">
-              {/* Connection Status */}
-              <div className="flex items-center space-x-2 text-sm">
-                {getConnectionStatusIcon()}
-                <span className="hidden sm:inline text-gray-600">
-                  {getConnectionStatusText()}
-                </span>
-                {isConnected && clientCount > 0 && (
-                  <div className="flex items-center text-xs text-gray-500">
-                    <Users className="h-3 w-3 mr-1" aria-hidden="true" />
+              {/* Connection Status: dot · clients · last update */}
+              <div className="flex items-center gap-2 text-xs text-gray-500">
+                <div className={cn(
+                  "h-2 w-2 rounded-full flex-shrink-0",
+                  isConnected ? "bg-green-500" : "bg-red-500"
+                )} title={isConnected ? "Connected" : "Disconnected"} />
+                {clientCount > 0 && (
+                  <span className="flex items-center gap-0.5">
+                    <Users className="h-3 w-3" aria-hidden="true" />
                     {clientCount}
-                  </div>
+                  </span>
+                )}
+                {lastEvent?.timestamp && (
+                  <span className="hidden sm:inline text-gray-400">
+                    Updated: {new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).format(lastEvent.timestamp)}
+                  </span>
                 )}
               </div>
 

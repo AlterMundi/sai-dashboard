@@ -26,7 +26,6 @@ interface AlertFilterComponentProps {
   currentPage?: number;
   totalPages?: number;
   pageSize?: number;
-  lastUpdateTime?: string;
   className?: string;
 }
 
@@ -39,7 +38,6 @@ export function AlertFilterComponent({
   currentPage = 1,
   totalPages = 1,
   pageSize = 50,
-  lastUpdateTime = 'just now',
   className
 }: AlertFilterComponentProps) {
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -493,7 +491,7 @@ export function AlertFilterComponent({
             Results: {totalResults.toLocaleString()} executions found
           </div>
           <div className="text-gray-500">
-            Page {currentPage} of {totalPages} ({pageSize} per page) | Updated: {lastUpdateTime}
+            Page {currentPage} of {totalPages} ({pageSize} per page)
           </div>
         </div>
       </div>
