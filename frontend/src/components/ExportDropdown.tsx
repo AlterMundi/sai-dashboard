@@ -1,18 +1,21 @@
 import { useState, useRef, useEffect } from 'react';
-import { Download, FileJson, FileSpreadsheet, ChevronDown, BarChart3 } from 'lucide-react';
-import { ExecutionWithImageUrls } from '@/types';
+import { Download, FileJson, FileSpreadsheet, ChevronDown, BarChart3, Loader2 } from 'lucide-react';
+import { ExecutionFilters } from '@/types';
+import { executionsApi } from '@/services/api';
 import { exportToCSV, exportToJSON, exportSummary } from '@/utils';
 import { cn } from '@/utils';
 import toast from 'react-hot-toast';
 
 interface ExportDropdownProps {
-  executions: ExecutionWithImageUrls[];
+  filters: ExecutionFilters;
+  totalResults: number;
   disabled?: boolean;
   className?: string;
 }
 
-export function ExportDropdown({ executions, disabled, className }: ExportDropdownProps) {
+export function ExportDropdown({ filters, totalResults, disabled, className }: ExportDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Close dropdown when clicking outside
@@ -27,36 +30,47 @@ export function ExportDropdown({ executions, disabled, className }: ExportDropdo
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleExport = (type: 'csv' | 'json' | 'summary') => {
-    if (executions.length === 0) {
+  const handleExport = async (type: 'csv' | 'json' | 'summary') => {
+    if (totalResults === 0) {
       toast.error('No data to export');
       return;
     }
 
-    const timestamp = new Date().toISOString().split('T')[0];
-    const filename = `sai-executions-${timestamp}`;
+    setIsExporting(true);
+    const toastId = toast.loading(`Fetching ${totalResults.toLocaleString()} executions…`);
 
     try {
+      const response = await executionsApi.getExecutions({
+        ...filters,
+        page: 1,
+        limit: totalResults,
+      });
+
+      const executions = response.executions;
+      const timestamp = new Date().toISOString().split('T')[0];
+      const filename = `sai-executions-${timestamp}`;
+
       switch (type) {
         case 'csv':
           exportToCSV(executions, filename);
-          toast.success(`Exported ${executions.length} executions to CSV`);
+          toast.success(`Exported ${executions.length} executions to CSV`, { id: toastId });
           break;
         case 'json':
           exportToJSON(executions, filename);
-          toast.success(`Exported ${executions.length} executions to JSON`);
+          toast.success(`Exported ${executions.length} executions to JSON`, { id: toastId });
           break;
         case 'summary':
           exportSummary(executions, `${filename}-summary`);
-          toast.success('Exported summary report');
+          toast.success('Exported summary report', { id: toastId });
           break;
       }
     } catch (error) {
-      toast.error('Export failed');
+      toast.error('Export failed', { id: toastId });
       console.error('Export error:', error);
+    } finally {
+      setIsExporting(false);
+      setIsOpen(false);
     }
-
-    setIsOpen(false);
   };
 
   const exportOptions = [
@@ -87,15 +101,19 @@ export function ExportDropdown({ executions, disabled, className }: ExportDropdo
     <div ref={dropdownRef} className={cn('relative', className)}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        disabled={disabled || executions.length === 0}
+        disabled={disabled || totalResults === 0 || isExporting}
         className={cn(
           'flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
           'border border-gray-300 bg-white hover:bg-gray-50',
           'disabled:opacity-50 disabled:cursor-not-allowed'
         )}
-        title={executions.length === 0 ? 'No data to export' : `Export ${executions.length} executions`}
+        title={totalResults === 0 ? 'No data to export' : `Export ${totalResults.toLocaleString()} executions`}
       >
-        <Download className="h-4 w-4" />
+        {isExporting ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : (
+          <Download className="h-4 w-4" />
+        )}
         <span className="hidden sm:inline">Export</span>
         <ChevronDown className={cn('h-4 w-4 transition-transform', isOpen && 'rotate-180')} />
       </button>
@@ -104,7 +122,7 @@ export function ExportDropdown({ executions, disabled, className }: ExportDropdo
         <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
           <div className="px-3 py-2 border-b border-gray-100">
             <p className="text-xs font-medium text-gray-500 uppercase">
-              {executions.length} execution{executions.length !== 1 ? 's' : ''} loaded
+              {totalResults.toLocaleString()} execution{totalResults !== 1 ? 's' : ''} total
             </p>
           </div>
 
@@ -112,7 +130,8 @@ export function ExportDropdown({ executions, disabled, className }: ExportDropdo
             <button
               key={option.id}
               onClick={option.action}
-              className="w-full flex items-start gap-3 px-3 py-2 hover:bg-gray-50 transition-colors text-left"
+              disabled={isExporting}
+              className="w-full flex items-start gap-3 px-3 py-2 hover:bg-gray-50 transition-colors text-left disabled:opacity-50"
             >
               <option.icon className="h-5 w-5 text-gray-400 mt-0.5" />
               <div>

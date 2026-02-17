@@ -5,20 +5,12 @@ import { ImageGallery } from '@/components/ImageGallery';
 import { AlertFilterComponent } from '@/components/AlertFilterComponent';
 import { ExportDropdown } from '@/components/ExportDropdown';
 import { AdvancedSearchPanel, CompoundSearchCriteria } from '@/components/AdvancedSearchPanel';
-import { LoadingState } from '@/components/ui/LoadingSpinner';
-import { LiveStatsCard, SystemHealthIndicator } from '@/components/LiveStatsCard';
-import { useExecutionStats, useDailySummary, useExecutions } from '@/hooks/useExecutions';
+import { SystemHealthIndicator } from '@/components/LiveStatsCard';
+import { useDailySummary, useExecutions } from '@/hooks/useExecutions';
 import { executionsApi, detectionsApi, DetectionFilterCriteria } from '@/services/api';
 import { useSSEHandler, useSSE } from '@/contexts/SSEContext';
 import { ExecutionFilters, SSEStage2CompletionEvent, SSEStage2FailureEvent } from '@/types';
-import { formatPercentage } from '@/utils';
 import toast from 'react-hot-toast';
-import {
-  Activity,
-  CheckCircle,
-  Users,
-  Timer,
-} from 'lucide-react';
 
 function parseFiltersFromURL(searchParams: URLSearchParams): ExecutionFilters {
   const filters: ExecutionFilters = {};
@@ -66,12 +58,10 @@ export function Dashboard() {
   const [batchUpdateTrigger, setBatchUpdateTrigger] = useState(0);
   const galleryPrependRef = useRef<((executions: any[]) => void) | null>(null);
 
-  const { stats, isLoading: statsLoading, error: statsError } = useExecutionStats();
   useDailySummary(7);
   const { isConnected, systemHealth, lastEvent } = useSSE();
 
   const {
-    executions,
     updateExecutionStage,
     totalResults,
   } = useExecutions(filters, batchUpdateTrigger);
@@ -230,12 +220,7 @@ export function Dashboard() {
       <div className="space-y-8">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-            <p className="mt-2 text-gray-600">
-              Real-time fire and smoke detection monitoring
-            </p>
-          </div>
+          <div />
 
           {/* Real-time Status */}
           <div className="mt-4 sm:mt-0 flex items-center space-x-3">
@@ -250,50 +235,8 @@ export function Dashboard() {
           </div>
         </div>
 
-        {/* Statistics Cards */}
-        <LoadingState isLoading={statsLoading} error={statsError}>
-          {stats && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <LiveStatsCard
-                title="Total Executions"
-                icon={<Activity className="h-6 w-6" />}
-                statKey="totalExecutions"
-                initialValue={stats.totalExecutions}
-                format={(v) => v.toLocaleString()}
-              />
-
-              <LiveStatsCard
-                title="Success Rate"
-                icon={<CheckCircle className="h-6 w-6" />}
-                statKey="successRate"
-                initialValue={stats.successRate}
-                format={(v) => formatPercentage(v)}
-              />
-
-              <LiveStatsCard
-                title="Queue Size"
-                icon={<Users className="h-6 w-6" />}
-                statKey="queueSize"
-                initialValue={0}
-                format={(v) => `${v} pending`}
-              />
-
-              <LiveStatsCard
-                title="Avg Processing"
-                icon={<Timer className="h-6 w-6" />}
-                statKey="avgProcessingTime"
-                initialValue={stats.avgProcessingTime || 0}
-                format={(v) => `${v.toFixed(1)}s`}
-              />
-            </div>
-          )}
-        </LoadingState>
-
         {/* Filters and Export */}
         <div className="space-y-4">
-          <div className="flex justify-end">
-            <ExportDropdown executions={executions} />
-          </div>
           <AlertFilterComponent
             filters={filters}
             onFiltersChange={setFilters}
@@ -311,6 +254,7 @@ export function Dashboard() {
             onSearch={handleAdvancedSearch}
             onClear={handleClearAdvancedSearch}
             isLoading={advancedSearchLoading}
+            headerRight={<ExportDropdown filters={filters} totalResults={totalResults} />}
           />
 
           {advancedSearchActive && (

@@ -30,6 +30,7 @@ interface AdvancedSearchPanelProps {
   onClear: () => void;
   isLoading?: boolean;
   className?: string;
+  headerRight?: React.ReactNode;
 }
 
 const FIELD_OPTIONS = [
@@ -89,6 +90,7 @@ export function AdvancedSearchPanel({
   onClear,
   isLoading,
   className,
+  headerRight,
 }: AdvancedSearchPanelProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [logic, setLogic] = useState<'AND' | 'OR'>('AND');
@@ -188,11 +190,11 @@ export function AdvancedSearchPanel({
   return (
     <div className={cn('bg-white rounded-lg shadow border border-gray-200', className)}>
       {/* Header */}
-      <button
-        onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
-      >
-        <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between p-4">
+        <button
+          onClick={() => setIsExpanded(!isExpanded)}
+          className="flex items-center gap-2 hover:bg-gray-50 transition-colors rounded-lg px-2 py-1 -ml-2"
+        >
           <SlidersHorizontal className="h-5 w-5 text-gray-600" />
           <span className="font-medium text-gray-900">Advanced Search</span>
           {conditions.length > 1 && (
@@ -200,13 +202,16 @@ export function AdvancedSearchPanel({
               {conditions.length} conditions
             </span>
           )}
+          {isExpanded ? (
+            <ChevronUp className="h-5 w-5 text-gray-400" />
+          ) : (
+            <ChevronDown className="h-5 w-5 text-gray-400" />
+          )}
+        </button>
+        <div className="flex items-center gap-2">
+          {headerRight}
         </div>
-        {isExpanded ? (
-          <ChevronUp className="h-5 w-5 text-gray-400" />
-        ) : (
-          <ChevronDown className="h-5 w-5 text-gray-400" />
-        )}
-      </button>
+      </div>
 
       {/* Expanded Content */}
       {isExpanded && (
