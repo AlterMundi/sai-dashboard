@@ -1,6 +1,5 @@
 import { StatusBadge } from './ui/StatusBadge';
 import { LoadingSpinner } from './ui/LoadingSpinner';
-import { DynamicTimeAgo } from './ui/DynamicTimeAgo';
 import { cn } from '@/utils';
 import { ImageCardProps } from '@/types';
 import { useImageCard } from '@/hooks/useImageCard';
@@ -183,8 +182,12 @@ export function ImageCard({ execution, onClick, loading = false }: ImageCardProp
           <span className="font-mono text-sm font-semibold text-gray-800">
             #{String(execution.id).padStart(6, '0')}
           </span>
-          <span className="text-xs text-gray-500">
-            <DynamicTimeAgo date={execution.executionTimestamp} />
+          <span className="text-xs text-gray-500 tabular-nums">
+            {new Date(execution.executionTimestamp).toLocaleString('en-GB', {
+              day: '2-digit', month: '2-digit',
+              hour: '2-digit', minute: '2-digit',
+              hour12: false
+            })}
           </span>
         </div>
 
