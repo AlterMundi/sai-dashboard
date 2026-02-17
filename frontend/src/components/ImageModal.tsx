@@ -11,6 +11,7 @@ import {
   copyToClipboard,
   cn
 } from '@/utils';
+import { useTranslation } from '@/contexts/LanguageContext';
 import { DynamicTimeAgo } from './ui/DynamicTimeAgo';
 import { ImageModalProps } from '@/types';
 import {
@@ -35,6 +36,7 @@ import {
 import toast from 'react-hot-toast';
 
 export function ImageModal({ execution, isOpen, onClose, onUpdate }: ImageModalProps) {
+  const { t } = useTranslation();
   const [zoomLevel, setZoomLevel] = useState(1);
   const [naturalSize, setNaturalSize] = useState<{ w: number; h: number } | null>(null);
   const [downloading, setDownloading] = useState(false);
@@ -100,14 +102,14 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate }: ImageModalP
       );
 
       setLocalIsFalsePositive(newValue);
-      toast.success(newValue ? 'Marked as false positive' : 'Marked as valid detection');
+      toast.success(newValue ? t('modal.markedFalsePositive') : t('modal.markedValidDetection'));
 
       // Notify parent component if callback provided
       if (onUpdate) {
         onUpdate(updatedExecution);
       }
     } catch (error) {
-      toast.error('Failed to update false positive status');
+      toast.error(t('modal.updateFailed'));
       console.error('False positive toggle error:', error);
     } finally {
       setUpdatingFalsePositive(false);
@@ -137,9 +139,9 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate }: ImageModalP
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
-      toast.success('Image downloaded');
+      toast.success(t('modal.imageDownloaded'));
     } catch (error) {
-      toast.error('Failed to download image');
+      toast.error(t('modal.imageDownloadFailed'));
     } finally {
       setDownloading(false);
     }
@@ -154,9 +156,9 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate }: ImageModalP
   const handleCopyId = async () => {
     const success = await copyToClipboard(String(execution.id));
     if (success) {
-      toast.success('Execution ID copied to clipboard');
+      toast.success(t('modal.idCopied'));
     } else {
-      toast.error('Failed to copy to clipboard');
+      toast.error(t('modal.copyFailed'));
     }
   };
 
@@ -175,9 +177,9 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate }: ImageModalP
       // Fallback: copy URL to clipboard
       const success = await copyToClipboard(window.location.href);
       if (success) {
-        toast.success('URL copied to clipboard');
+        toast.success(t('modal.urlCopied'));
       } else {
-        toast.error('Failed to copy URL');
+        toast.error(t('modal.copyFailed'));
       }
     }
   };
@@ -194,7 +196,7 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate }: ImageModalP
             <StatusBadge status={execution.status} />
             <div>
               <h2 className="text-lg font-semibold text-gray-900">
-                Execution Details
+                {t('modal.executionDetails')}
               </h2>
               <p className="text-sm text-gray-500 font-mono">
                 ID: {execution.id}
@@ -206,7 +208,7 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate }: ImageModalP
             <button
               onClick={handleCopyId}
               className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-              title="Copy ID"
+              title={t('modal.copyId')}
             >
               <Copy className="h-5 w-5" />
             </button>
@@ -218,7 +220,7 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate }: ImageModalP
                   "p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors",
                   downloading && "opacity-50 cursor-not-allowed"
                 )}
-                title="Download Image"
+                title={t('modal.downloadImage')}
               >
                 <Download className={cn("h-5 w-5", downloading && "animate-pulse")} />
               </button>
@@ -226,14 +228,14 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate }: ImageModalP
             <button
               onClick={handleShare}
               className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-              title="Share"
+              title={t('modal.share')}
             >
               <MessageCircle className="h-5 w-5" />
             </button>
             <button
               onClick={onClose}
               className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-              title="Close (Esc)"
+              title={t('modal.closeEsc')}
             >
               <X className="h-5 w-5" />
             </button>
@@ -270,7 +272,7 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate }: ImageModalP
                   {imageError ? (
                     <div className="flex flex-col items-center text-gray-400">
                       <AlertTriangle className="h-16 w-16 mb-4" />
-                      <p className="text-lg">Failed to load image</p>
+                      <p className="text-lg">{t('modal.failedToLoadImage')}</p>
                     </div>
                   ) : imageUrl ? (
                     <div className="relative inline-block">
@@ -302,7 +304,7 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate }: ImageModalP
               ) : (
                 <div className="flex flex-col items-center text-gray-400">
                   <AlertTriangle className="h-16 w-16 mb-4" />
-                  <p className="text-lg">No image available</p>
+                  <p className="text-lg">{t('modal.noImageAvailable')}</p>
                 </div>
               )}
             </div>
@@ -337,12 +339,12 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate }: ImageModalP
               {/* Execution Metadata */}
               <div className="space-y-3">
                 <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
-                  Execution Info
+                  {t('modal.executionInfo')}
                 </h3>
 
                 <div className="grid grid-cols-2 gap-3 text-sm">
                   <div>
-                    <p className="text-gray-500">Started</p>
+                    <p className="text-gray-500">{t('modal.started')}</p>
                     <p className="font-medium mt-1">
                       <DynamicTimeAgo date={execution.executionTimestamp} />
                     </p>
@@ -353,7 +355,7 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate }: ImageModalP
 
                   {duration && (
                     <div>
-                      <p className="text-gray-500">Duration</p>
+                      <p className="text-gray-500">{t('modal.duration')}</p>
                       <div className="flex items-center mt-1">
                         <Clock className="h-4 w-4 text-gray-400 mr-1" />
                         <span className="font-medium">{formatDuration(duration)}</span>
@@ -362,7 +364,7 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate }: ImageModalP
                   )}
 
                   <div>
-                    <p className="text-gray-500">Status</p>
+                    <p className="text-gray-500">{t('modal.statusLabel')}</p>
                     <div className="flex items-center mt-1">
                       {execution.status === 'success' && <CheckCircle className="h-4 w-4 text-success-600 mr-1" />}
                       {execution.status === 'error' && <AlertTriangle className="h-4 w-4 text-danger-600 mr-1" />}
@@ -371,7 +373,7 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate }: ImageModalP
                   </div>
 
                   <div>
-                    <p className="text-gray-500">Mode</p>
+                    <p className="text-gray-500">{t('modal.mode')}</p>
                     <p className="font-medium mt-1 capitalize">{execution.mode}</p>
                   </div>
                 </div>
@@ -380,13 +382,13 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate }: ImageModalP
               {/* YOLO Analysis Results */}
               <div className="space-y-3">
                 <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
-                  YOLO Analysis
+                  {t('modal.yoloAnalysis')}
                 </h3>
 
                 {/* Alert Level */}
                 {execution.alertLevel && (
                   <div className="p-3 bg-gray-50 rounded-lg">
-                    <p className="text-xs text-gray-500 mb-2">Alert Level</p>
+                    <p className="text-xs text-gray-500 mb-2">{t('modal.alertLevelLabel')}</p>
                     <div
                       className={cn(
                         "px-3 py-2 rounded text-sm font-bold text-center uppercase",
@@ -416,13 +418,13 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate }: ImageModalP
                         "text-xs font-bold uppercase",
                         execution.hasFire ? 'text-red-700' : 'text-gray-500'
                       )}>
-                        {execution.hasFire ? 'Detected' : 'Clear'}
+                        {execution.hasFire ? t('modal.detected') : t('modal.clear')}
                       </span>
                     </div>
-                    <p className="text-sm font-medium text-gray-700">Fire</p>
+                    <p className="text-sm font-medium text-gray-700">{t('modal.fireLabel')}</p>
                     {execution.confidenceFire !== null && execution.confidenceFire > 0 && (
                       <p className="text-xs text-gray-600 mt-1">
-                        {Math.round(execution.confidenceFire * 100)}% confidence
+                        {t('modal.confidence', { value: String(Math.round(execution.confidenceFire * 100)) })}
                       </p>
                     )}
                   </div>
@@ -439,13 +441,13 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate }: ImageModalP
                         "text-xs font-bold uppercase",
                         execution.hasSmoke ? 'text-gray-800' : 'text-gray-500'
                       )}>
-                        {execution.hasSmoke ? 'Detected' : 'Clear'}
+                        {execution.hasSmoke ? t('modal.detected') : t('modal.clear')}
                       </span>
                     </div>
-                    <p className="text-sm font-medium text-gray-700">Smoke</p>
+                    <p className="text-sm font-medium text-gray-700">{t('modal.smokeLabel')}</p>
                     {execution.confidenceSmoke !== null && execution.confidenceSmoke > 0 && (
                       <p className="text-xs text-gray-600 mt-1">
-                        {Math.round(execution.confidenceSmoke * 100)}% confidence
+                        {t('modal.confidence', { value: String(Math.round(execution.confidenceSmoke * 100)) })}
                       </p>
                     )}
                   </div>
@@ -457,7 +459,7 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate }: ImageModalP
                     <div className="flex items-center">
                       <Box className="h-4 w-4 text-blue-600 mr-2" />
                       <span className="text-sm font-medium text-blue-900">
-                        Total Detections
+                        {t('modal.totalDetections')}
                       </span>
                     </div>
                     <span className="text-lg font-bold text-blue-700">
@@ -485,7 +487,7 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate }: ImageModalP
                           "text-sm font-medium",
                           localIsFalsePositive ? "text-yellow-800" : "text-gray-700"
                         )}>
-                          {localIsFalsePositive ? 'False Positive' : 'Valid Detection'}
+                          {localIsFalsePositive ? t('modal.falsePositive') : t('modal.validDetection')}
                         </span>
                         {localIsFalsePositive && execution.falsePositiveReason && (
                           <p className="text-xs text-yellow-700 mt-0.5">
@@ -508,9 +510,9 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate }: ImageModalP
                       {updatingFalsePositive ? (
                         <span className="animate-pulse">...</span>
                       ) : localIsFalsePositive ? (
-                        'Mark Valid'
+                        t('modal.markValid')
                       ) : (
-                        'Mark False'
+                        t('modal.markFalse')
                       )}
                     </button>
                   </div>
@@ -521,19 +523,19 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate }: ImageModalP
                   <div className="space-y-1.5 text-xs text-gray-600">
                     {execution.yoloModelVersion && (
                       <div className="flex items-center justify-between">
-                        <span>Model:</span>
+                        <span>{t('modal.model')}</span>
                         <span className="font-mono">{execution.yoloModelVersion}</span>
                       </div>
                     )}
                     {execution.yoloProcessingTimeMs && (
                       <div className="flex items-center justify-between">
-                        <span>Processing:</span>
+                        <span>{t('modal.processing')}</span>
                         <span className="font-mono">{execution.yoloProcessingTimeMs}ms</span>
                       </div>
                     )}
                     {execution.requestId && (
                       <div className="flex items-center justify-between">
-                        <span>Request ID:</span>
+                        <span>{t('modal.requestId')}</span>
                         <span className="font-mono text-xs">{execution.requestId.slice(0, 8)}...</span>
                       </div>
                     )}
@@ -545,28 +547,28 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate }: ImageModalP
               {(execution.cameraId || execution.deviceId || execution.location) && (
                 <div className="space-y-3">
                   <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
-                    Device Info
+                    {t('modal.deviceInfo')}
                   </h3>
 
                   <div className="space-y-2 text-sm">
                     {execution.cameraId && (
                       <div className="flex items-center">
                         <Camera className="h-4 w-4 text-gray-400 mr-2" />
-                        <span className="text-gray-500 mr-2">Camera:</span>
+                        <span className="text-gray-500 mr-2">{t('modal.cameraLabel')}</span>
                         <span className="font-mono font-medium">{execution.cameraId}</span>
                       </div>
                     )}
                     {execution.location && (
                       <div className="flex items-center">
                         <MapPin className="h-4 w-4 text-gray-400 mr-2" />
-                        <span className="text-gray-500 mr-2">Location:</span>
+                        <span className="text-gray-500 mr-2">{t('modal.locationLabel')}</span>
                         <span className="font-medium">{execution.location}</span>
                       </div>
                     )}
                     {execution.deviceId && (
                       <div className="flex items-center">
                         <Zap className="h-4 w-4 text-gray-400 mr-2" />
-                        <span className="text-gray-500 mr-2">Device:</span>
+                        <span className="text-gray-500 mr-2">{t('modal.deviceLabel')}</span>
                         <span className="font-mono font-medium text-xs">{execution.deviceId}</span>
                       </div>
                     )}
@@ -578,13 +580,13 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate }: ImageModalP
               {execution.hasImage && (
                 <div className="space-y-3">
                   <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
-                    Image Info
+                    {t('modal.imageInfo')}
                   </h3>
 
                   <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
                     {execution.imageWidth && execution.imageHeight && (
                       <div>
-                        <span className="text-gray-500">Dimensions:</span>
+                        <span className="text-gray-500">{t('modal.dimensions')}</span>
                         <p className="font-medium mt-0.5">
                           {execution.imageWidth} × {execution.imageHeight}
                         </p>
@@ -592,7 +594,7 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate }: ImageModalP
                     )}
                     {execution.imageSizeBytes && (
                       <div>
-                        <span className="text-gray-500">Size:</span>
+                        <span className="text-gray-500">{t('modal.size')}</span>
                         <p className="font-medium mt-0.5">
                           {(execution.imageSizeBytes / 1024).toFixed(1)} KB
                         </p>
@@ -600,7 +602,7 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate }: ImageModalP
                     )}
                     {execution.imageFormat && (
                       <div>
-                        <span className="text-gray-500">Format:</span>
+                        <span className="text-gray-500">{t('modal.format')}</span>
                         <p className="font-medium mt-0.5 uppercase">{execution.imageFormat}</p>
                       </div>
                     )}
@@ -614,7 +616,7 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate }: ImageModalP
                   <div className="flex items-center">
                     <MessageCircle className="h-5 w-5 text-success-600 mr-2" />
                     <div className="flex-1">
-                      <p className="text-sm font-medium text-success-900">Telegram Notification Sent</p>
+                      <p className="text-sm font-medium text-success-900">{t('modal.telegramNotifSent')}</p>
                       {execution.telegramSentAt && (
                         <p className="text-xs text-success-700 mt-0.5">
                           {formatDate(execution.telegramSentAt)}

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Flag, Image, FileSpreadsheet, X, Loader2 } from 'lucide-react';
+import { useTranslation } from '@/contexts/LanguageContext';
 
 interface BatchActionBarProps {
   selectedCount: number;
@@ -16,6 +17,7 @@ export function BatchActionBar({
   onDownloadImages,
   onClearSelection,
 }: BatchActionBarProps) {
+  const { t } = useTranslation();
   const [isFpLoading, setIsFpLoading] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
 
@@ -40,7 +42,7 @@ export function BatchActionBar({
   return (
     <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 px-5 py-3 bg-gray-900 text-white rounded-xl shadow-2xl transition-transform duration-200">
       <span className="text-sm font-medium whitespace-nowrap">
-        {selectedCount} selected
+        {t('batch.selected', { count: String(selectedCount) })}
       </span>
 
       <div className="w-px h-6 bg-gray-600" />
@@ -55,7 +57,7 @@ export function BatchActionBar({
         ) : (
           <Flag className="h-4 w-4" />
         )}
-        False Positive
+        {t('batch.falsePositive')}
       </button>
 
       <button
@@ -68,7 +70,7 @@ export function BatchActionBar({
         ) : (
           <Image className="h-4 w-4" />
         )}
-        Download Images
+        {t('batch.downloadImages')}
       </button>
 
       <button
@@ -76,7 +78,7 @@ export function BatchActionBar({
         className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors"
       >
         <FileSpreadsheet className="h-4 w-4" />
-        Export CSV
+        {t('batch.exportCsv')}
       </button>
 
       <div className="w-px h-6 bg-gray-600" />
@@ -84,7 +86,7 @@ export function BatchActionBar({
       <button
         onClick={onClearSelection}
         className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition-colors"
-        title="Clear selection"
+        title={t('batch.clearSelection')}
       >
         <X className="h-4 w-4" />
       </button>

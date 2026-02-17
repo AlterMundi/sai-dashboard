@@ -1,9 +1,10 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, Link } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { HelmetProvider } from 'react-helmet-async';
 import { useAuth } from '@/hooks/useAuth';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { SSEProvider } from '@/contexts/SSEContext';
+import { LanguageProvider, useTranslation } from '@/contexts/LanguageContext';
 import { Dashboard } from '@/pages/Dashboard';
 import { Login } from '@/pages/Login';
 import { Stats } from '@/pages/Stats';
@@ -12,13 +13,14 @@ import './index.css';
 // Protected Route Component
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
+  const { t } = useTranslation();
 
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <LoadingSpinner size="xl" />
-          <p className="mt-4 text-gray-600">Loading\u2026</p>
+          <p className="mt-4 text-gray-600">{t('common.loading')}</p>
         </div>
       </div>
     );
@@ -31,9 +33,28 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function NotFoundPage() {
+  const { t } = useTranslation();
+  return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="text-center">
+        <h1 className="text-6xl font-bold text-gray-300">{t('notFound.title')}</h1>
+        <p className="text-gray-600 mt-4">{t('notFound.message')}</p>
+        <Link
+          to="/"
+          className="inline-block mt-6 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+        >
+          {t('notFound.goToDashboard')}
+        </Link>
+      </div>
+    </div>
+  );
+}
+
 function App() {
   return (
     <HelmetProvider>
+      <LanguageProvider>
       <Router basename={import.meta.env.VITE_BASE_PATH || '/'}>
         <div className="App">
           <Routes>
@@ -66,22 +87,9 @@ function App() {
             <Route path="/dashboard" element={<Navigate to="/" replace />} />
             
             {/* 404 fallback */}
-            <Route 
-              path="*" 
-              element={
-                <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-                  <div className="text-center">
-                    <h1 className="text-6xl font-bold text-gray-300">404</h1>
-                    <p className="text-gray-600 mt-4">Page not found</p>
-                    <a 
-                      href="/" 
-                      className="inline-block mt-6 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
-                    >
-                      Go to Dashboard
-                    </a>
-                  </div>
-                </div>
-              } 
+            <Route
+              path="*"
+              element={<NotFoundPage />}
             />
           </Routes>
         </div>
@@ -113,6 +121,7 @@ function App() {
           }}
         />
       </Router>
+      </LanguageProvider>
     </HelmetProvider>
   );
 }

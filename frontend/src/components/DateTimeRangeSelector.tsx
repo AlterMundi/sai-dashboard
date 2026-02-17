@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
+import { useTranslation } from '@/contexts/LanguageContext';
 import { X } from 'lucide-react';
 import { cn } from '@/utils';
 
@@ -39,6 +40,7 @@ export function DateTimeRangeSelector({
   className,
   disabled = false
 }: DateTimeRangeSelectorProps) {
+  const { t } = useTranslation();
   const [from, setFrom] = useState(value?.startDate ? toLocalDatetime(value.startDate) : '');
   const [to, setTo] = useState(value?.endDate ? toLocalDatetime(value.endDate) : '');
 
@@ -103,7 +105,7 @@ export function DateTimeRangeSelector({
   return (
     <div className={cn("flex flex-wrap items-center gap-2", className)}>
       {/* From / To datetime-local inputs + clear */}
-      <label className="text-xs text-gray-500">From</label>
+      <label className="text-xs text-gray-500">{t('dateRange.from')}</label>
       <Input
         type="datetime-local"
         lang="en-GB"
@@ -112,7 +114,7 @@ export function DateTimeRangeSelector({
         disabled={disabled}
         className="h-8 text-sm w-auto"
       />
-      <label className="text-xs text-gray-500">To</label>
+      <label className="text-xs text-gray-500">{t('dateRange.to')}</label>
       <Input
         type="datetime-local"
         lang="en-GB"
@@ -137,7 +139,7 @@ export function DateTimeRangeSelector({
       <div className="h-5 w-px bg-gray-300 mx-1" />
 
       {/* Quick presets to the right */}
-      <span className="text-xs text-gray-500">Quick:</span>
+      <span className="text-xs text-gray-500">{t('dateRange.quick')}</span>
       {presets.map((p) => (
         <Button
           key={p.minutes}

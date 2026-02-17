@@ -1,13 +1,14 @@
 import { ReactNode, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useSSE } from '@/contexts/SSEContext';
+import { useTranslation } from '@/contexts/LanguageContext';
 import { LoadingSpinner } from './ui/LoadingSpinner';
+import { SettingsDropdown } from './SettingsDropdown';
 import { cn } from '@/utils';
 import {
   LogOut,
   Activity,
   Users,
-  Settings,
   BarChart3,
   Image as ImageIcon,
   Home,
@@ -25,6 +26,7 @@ interface LayoutProps {
 export function Layout({ children, className }: LayoutProps) {
   const { logout, isLoading: authLoading } = useAuth();
   const { isConnected, clientCount, lastEvent } = useSSE();
+  const { t } = useTranslation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const location = useLocation();
 
@@ -32,17 +34,13 @@ export function Layout({ children, className }: LayoutProps) {
     try {
       await logout();
     } catch (error) {
-      toast.error('Logout failed');
+      toast.error(t('login.logoutFailed'));
     }
   };
 
-  const handleSettingsClick = () => {
-    toast('Settings coming soon', { icon: '⚙️' });
-  };
-
   const navLinks = [
-    { to: '/', label: 'Gallery', icon: Home },
-    { to: '/stats', label: 'Statistics', icon: BarChart3 },
+    { to: '/', labelKey: 'nav.gallery', icon: Home },
+    { to: '/stats', labelKey: 'nav.statistics', icon: BarChart3 },
   ];
 
   const isActiveRoute = (path: string) => {
@@ -55,7 +53,7 @@ export function Layout({ children, className }: LayoutProps) {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <LoadingSpinner size="xl" />
-          <p className="mt-4 text-gray-600">Loading dashboard...</p>
+          <p className="mt-4 text-gray-600">{t('loadingDashboard')}</p>
         </div>
       </div>
     );
@@ -83,7 +81,7 @@ export function Layout({ children, className }: LayoutProps) {
               {/* Desktop Navigation Links */}
               <div className="hidden md:block ml-10">
                 <div className="flex items-baseline space-x-4">
-                  {navLinks.map(({ to, label, icon: Icon }) => (
+                  {navLinks.map(({ to, labelKey, icon: Icon }) => (
                     <Link
                       key={to}
                       to={to}
@@ -95,7 +93,7 @@ export function Layout({ children, className }: LayoutProps) {
                       )}
                     >
                       <Icon className="h-4 w-4 mr-2" aria-hidden="true" />
-                      {label}
+                      {t(labelKey)}
                     </Link>
                   ))}
                 </div>
@@ -109,7 +107,7 @@ export function Layout({ children, className }: LayoutProps) {
                 <div className={cn(
                   "h-2 w-2 rounded-full flex-shrink-0",
                   isConnected ? "bg-green-500" : "bg-red-500"
-                )} title={isConnected ? "Connected" : "Disconnected"} />
+                )} title={isConnected ? t('nav.connected') : t('nav.disconnected')} />
                 {clientCount > 0 && (
                   <span className="flex items-center gap-0.5">
                     <Users className="h-3 w-3" aria-hidden="true" />
@@ -118,29 +116,22 @@ export function Layout({ children, className }: LayoutProps) {
                 )}
                 {lastEvent?.timestamp && (
                   <span className="hidden sm:inline text-gray-400">
-                    Updated: {new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).format(lastEvent.timestamp)}
+                    {t('nav.updated')}: {new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).format(lastEvent.timestamp)}
                   </span>
                 )}
               </div>
 
-              {/* Settings Button */}
-              <button
-                onClick={handleSettingsClick}
-                className="hidden sm:block p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-                title="Settings"
-                aria-label="Settings"
-              >
-                <Settings className="h-5 w-5" aria-hidden="true" />
-              </button>
+              {/* Settings Dropdown */}
+              <SettingsDropdown className="hidden sm:block" />
 
               {/* Logout Button - Desktop */}
               <button
                 onClick={handleLogout}
                 className="hidden sm:flex items-center px-3 py-2 text-sm text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-                title="Sign out"
+                title={t('nav.signOut')}
               >
                 <LogOut className="h-4 w-4 mr-2" aria-hidden="true" />
-                <span>Sign out</span>
+                <span>{t('nav.signOut')}</span>
               </button>
 
               {/* Mobile menu button */}
@@ -148,7 +139,7 @@ export function Layout({ children, className }: LayoutProps) {
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
                 className="md:hidden p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
                 aria-expanded={mobileMenuOpen}
-                aria-label="Toggle menu"
+                aria-label={t('nav.toggleMenu')}
               >
                 {mobileMenuOpen ? (
                   <X className="h-6 w-6" aria-hidden="true" />
@@ -164,7 +155,7 @@ export function Layout({ children, className }: LayoutProps) {
         {mobileMenuOpen && (
           <div className="md:hidden border-t border-gray-200 bg-white">
             <div className="px-4 py-3 space-y-1">
-              {navLinks.map(({ to, label, icon: Icon }) => (
+              {navLinks.map(({ to, labelKey, icon: Icon }) => (
                 <Link
                   key={to}
                   to={to}
@@ -177,22 +168,13 @@ export function Layout({ children, className }: LayoutProps) {
                   )}
                 >
                   <Icon className="h-5 w-5 mr-3" aria-hidden="true" />
-                  {label}
+                  {t(labelKey)}
                 </Link>
               ))}
 
               <hr className="my-2 border-gray-200" />
 
-              <button
-                onClick={() => {
-                  handleSettingsClick();
-                  setMobileMenuOpen(false);
-                }}
-                className="flex items-center w-full px-3 py-2 rounded-md text-base font-medium text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors"
-              >
-                <Settings className="h-5 w-5 mr-3" aria-hidden="true" />
-                Settings
-              </button>
+              <SettingsDropdown className="w-full" />
 
               <button
                 onClick={() => {
@@ -202,7 +184,7 @@ export function Layout({ children, className }: LayoutProps) {
                 className="flex items-center w-full px-3 py-2 rounded-md text-base font-medium text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors"
               >
                 <LogOut className="h-5 w-5 mr-3" aria-hidden="true" />
-                Sign out
+                {t('nav.signOut')}
               </button>
             </div>
           </div>
@@ -220,16 +202,16 @@ export function Layout({ children, className }: LayoutProps) {
           <div className="flex flex-col md:flex-row justify-between items-center">
             <div className="flex items-center text-sm text-gray-500">
               <Activity className="h-4 w-4 mr-2" aria-hidden="true" />
-              <span>SAI Image Analysis Dashboard</span>
+              <span>{t('footer.title')}</span>
               <span className="mx-2">•</span>
-              <span>v1.0.0</span>
+              <span>{t('footer.version')}</span>
             </div>
 
             <div className="flex items-center space-x-6 mt-4 md:mt-0 text-sm text-gray-500">
-              <span>Visual interface for n8n workflows</span>
+              <span>{t('footer.subtitle')}</span>
               <div className="flex items-center">
                 <div className="h-2 w-2 bg-success-500 rounded-full mr-2 animate-pulse"></div>
-                <span>Production Ready</span>
+                <span>{t('footer.productionReady')}</span>
               </div>
             </div>
           </div>
