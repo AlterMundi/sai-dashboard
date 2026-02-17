@@ -35,6 +35,7 @@ class DualDatabasePool {
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 5000,
       ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+      options: '-c timezone=UTC', // Force UTC on every connection at the protocol level
     });
 
     // LEGACY DATABASE: n8n (read-only access for migration)

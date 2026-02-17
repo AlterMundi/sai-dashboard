@@ -167,18 +167,17 @@ export class NewExecutionService {
     }
 
     // Date range filtering
-    // Parse ISO strings to Date objects so the pg driver serializes them
-    // in the local timezone (matching the naive TIMESTAMP columns in the DB)
+    // With TIMESTAMPTZ columns, PostgreSQL correctly handles ISO strings with Z suffix
     if (startDate) {
       paramCount++;
       whereConditions.push(`e.execution_timestamp >= $${paramCount}`);
-      queryParams.push(new Date(startDate));
+      queryParams.push(startDate);
     }
 
     if (endDate) {
       paramCount++;
       whereConditions.push(`e.execution_timestamp <= $${paramCount}`);
-      queryParams.push(new Date(endDate));
+      queryParams.push(endDate);
     }
 
     // Search query (location, device, camera) - only if not already filtered by specific fields
