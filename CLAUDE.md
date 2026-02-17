@@ -7,10 +7,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 SAI Dashboard is a real-time fire detection monitoring system that provides a web interface for analyzing images processed by n8n workflows with **YOLO-based fire/smoke detection**.
 
 **Key Context:**
-- This is NOT an Ollama-based system (historical confusion from Sept 2025)
 - Uses custom YOLO Inference service for fire/smoke detection
 - Two-database architecture: `n8n` (source) + `sai_dashboard` (analytics)
-- Production deployment via SSH tunnels to public nginx reverse proxy
+- Production deployment on public server with nginx
 
 **Stack:** React 18 + TypeScript, Node.js + Express, PostgreSQL, Sharp (image processing)
 
@@ -397,9 +396,8 @@ Images are stored on filesystem, not in database. Always check `execution_images
 
 **Architecture:**
 ```
-Public Server (88.207.86.56:443)
-  ↓ [nginx reverse proxy]
-  ↓ [SSH Tunnel - systemd service]
+Public Server (131.72.205.6:443)
+  ↓ [nginx]
   ↓
 Private Server (localhost)
   ├── Dashboard API :3001
