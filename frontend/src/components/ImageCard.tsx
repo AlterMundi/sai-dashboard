@@ -3,9 +3,11 @@ import { LoadingSpinner } from './ui/LoadingSpinner';
 import { cn } from '@/utils';
 import { ImageCardProps } from '@/types';
 import { useImageCard } from '@/hooks/useImageCard';
+import { useTranslation } from '@/contexts/LanguageContext';
 import { AlertTriangle, MessageCircle, Flame, Wind, Camera, MapPin, RefreshCw, X } from 'lucide-react';
 
 export function ImageCard({ execution, onClick, loading = false }: ImageCardProps) {
+  const { t } = useTranslation();
   const {
     imageLoading,
     imageError,
@@ -55,7 +57,7 @@ export function ImageCard({ execution, onClick, loading = false }: ImageCardProp
             {imageError ? (
               <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-400">
                 <AlertTriangle className="h-8 w-8 mb-2" aria-hidden="true" />
-                <span className="text-xs">Failed to load</span>
+                <span className="text-xs">{t('imageCard.failedToLoad')}</span>
               </div>
             ) : (
               <img
@@ -79,17 +81,17 @@ export function ImageCard({ execution, onClick, loading = false }: ImageCardProp
             {isStage1Only ? (
               <>
                 <RefreshCw className="h-8 w-8 mb-2 animate-spin text-blue-500" aria-hidden="true" />
-                <span className="text-xs text-blue-600">Processing{'\u2026'}</span>
+                <span className="text-xs text-blue-600">{t('imageCard.processing')}</span>
               </>
             ) : hasStage2Error ? (
               <>
                 <X className="h-8 w-8 mb-2 text-red-400" />
-                <span className="text-xs text-red-500">Failed</span>
+                <span className="text-xs text-red-500">{t('imageCard.failed')}</span>
               </>
             ) : (
               <>
                 <Camera className="h-8 w-8 mb-2 opacity-50" aria-hidden="true" />
-                <span className="text-xs">No image</span>
+                <span className="text-xs">{t('imageCard.noImage')}</span>
               </>
             )}
           </div>
@@ -129,7 +131,7 @@ export function ImageCard({ execution, onClick, loading = false }: ImageCardProp
                 "flex items-center gap-1 px-2 py-1 rounded-full text-white text-xs font-medium shadow-lg backdrop-blur-sm",
                 isStage1Only ? "bg-gray-500/80" : "bg-red-600/90"
               )}
-              title={isStage1Only ? "Fire detection pending" : `Fire: ${execution.confidenceFire ? Math.round(execution.confidenceFire * 100) + '%' : 'detected'}`}
+              title={isStage1Only ? t('imageCard.fireDetectionPending') : t('imageCard.fireConfidence', { value: execution.confidenceFire ? Math.round(execution.confidenceFire * 100) + '%' : t('modal.detected') })}
             >
               <Flame className="h-3 w-3" aria-hidden="true" />
               {!isStage1Only && execution.confidenceFire !== null && (
@@ -143,7 +145,7 @@ export function ImageCard({ execution, onClick, loading = false }: ImageCardProp
                 "flex items-center gap-1 px-2 py-1 rounded-full text-white text-xs font-medium shadow-lg backdrop-blur-sm",
                 isStage1Only ? "bg-gray-500/80" : "bg-slate-600/90"
               )}
-              title={isStage1Only ? "Smoke detection pending" : `Smoke: ${execution.confidenceSmoke ? Math.round(execution.confidenceSmoke * 100) + '%' : 'detected'}`}
+              title={isStage1Only ? t('imageCard.smokeDetectionPending') : t('imageCard.smokeConfidence', { value: execution.confidenceSmoke ? Math.round(execution.confidenceSmoke * 100) + '%' : t('modal.detected') })}
             >
               <Wind className="h-3 w-3" aria-hidden="true" />
               {!isStage1Only && execution.confidenceSmoke !== null && (
@@ -158,8 +160,8 @@ export function ImageCard({ execution, onClick, loading = false }: ImageCardProp
           {execution.telegramSent && (
             <div
               className="bg-emerald-500/90 text-white rounded-full p-1.5 shadow-lg backdrop-blur-sm"
-              title="Telegram sent"
-              aria-label="Telegram notification sent"
+              title={t('imageCard.telegramSent')}
+              aria-label={t('imageCard.telegramSent')}
             >
               <MessageCircle className="h-3 w-3" aria-hidden="true" />
             </div>
@@ -206,7 +208,7 @@ export function ImageCard({ execution, onClick, loading = false }: ImageCardProp
             </div>
           )}
           {!execution.cameraId && !execution.location && (
-            <span className="text-gray-400 italic">No location data</span>
+            <span className="text-gray-400 italic">{t('imageCard.noLocationData')}</span>
           )}
         </div>
 
@@ -214,7 +216,7 @@ export function ImageCard({ execution, onClick, loading = false }: ImageCardProp
         {execution.detectionCount > 0 && !isStage1Only && (
           <div className="mt-2 pt-2 border-t border-gray-100">
             <span className="text-xs text-gray-600">
-              {execution.detectionCount} detection{execution.detectionCount > 1 ? 's' : ''}
+              {t('imageCard.detections', { count: String(execution.detectionCount), s: execution.detectionCount > 1 ? 's' : '' })}
             </span>
           </div>
         )}

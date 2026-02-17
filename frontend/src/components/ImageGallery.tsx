@@ -10,6 +10,7 @@ import { useExecutions } from '@/hooks/useExecutions';
 import { executionsApi, tokenManager } from '@/services/api';
 import { ExecutionWithImageUrls, ExecutionFilters } from '@/types';
 import { cn } from '@/utils';
+import { useTranslation } from '@/contexts/LanguageContext';
 import { Grid, List, RefreshCw, ArrowUp } from 'lucide-react';
 
 interface ImageGalleryProps {
@@ -20,6 +21,7 @@ interface ImageGalleryProps {
 }
 
 export function ImageGallery({ initialFilters = {}, className, refreshTrigger, onPrependRegister }: ImageGalleryProps) {
+  const { t } = useTranslation();
   const [selectedExecution, setSelectedExecution] = useState<ExecutionWithImageUrls | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -121,7 +123,7 @@ export function ImageGallery({ initialFilters = {}, className, refreshTrigger, o
   const handleBulkFalsePositive = useCallback(async () => {
     const ids = Array.from(selectedIds);
     const result = await executionsApi.bulkMarkFalsePositive(ids, true, 'Batch marked');
-    toast.success(`Marked ${result.updatedCount} executions as false positive`);
+    toast.success(t('gallery.markedFalsePositive', { count: String(result.updatedCount) }));
     clearSelection();
     refresh();
   }, [selectedIds, clearSelection, refresh]);
@@ -151,13 +153,13 @@ export function ImageGallery({ initialFilters = {}, className, refreshTrigger, o
     a.download = `sai-executions-${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-    toast.success(`Exported ${selected.length} executions to CSV`);
+    toast.success(t('gallery.exported', { count: String(selected.length) }));
   }, [executions, selectedIds]);
 
   const handleDownloadImages = useCallback(async () => {
     const selected = executions.filter(e => selectedIds.has(e.id) && e.hasImage);
     if (selected.length === 0) {
-      toast.error('No images available for selected executions');
+      toast.error(t('gallery.noImagesAvailable'));
       return;
     }
 
@@ -188,9 +190,9 @@ export function ImageGallery({ initialFilters = {}, className, refreshTrigger, o
     }
 
     if (downloaded > 0) {
-      toast.success(`Downloaded ${downloaded} image${downloaded > 1 ? 's' : ''}`);
+      toast.success(t('gallery.downloaded', { count: String(downloaded), s: downloaded > 1 ? 's' : '' }));
     } else {
-      toast.error('Failed to download images');
+      toast.error(t('gallery.downloadFailed'));
     }
   }, [executions, selectedIds]);
 
@@ -221,14 +223,14 @@ export function ImageGallery({ initialFilters = {}, className, refreshTrigger, o
     return (
       <div className="text-center py-12">
         <div className="text-danger-600 text-6xl mb-4">⚠️</div>
-        <h3 className="text-lg font-medium text-gray-900 mb-2">Failed to Load Executions</h3>
+        <h3 className="text-lg font-medium text-gray-900 mb-2">{t('gallery.failedToLoad')}</h3>
         <p className="text-gray-500 mb-4">{error}</p>
         <button
           onClick={handleRefresh}
           className="inline-flex items-center px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
         >
           <RefreshCw className="h-4 w-4 mr-2" />
-          Try Again
+          {t('gallery.tryAgain')}
         </button>
       </div>
     );
@@ -240,9 +242,9 @@ export function ImageGallery({ initialFilters = {}, className, refreshTrigger, o
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center space-x-4">
           <h2 className="text-xl font-semibold text-gray-900">
-            Executions {executions.length > 0 && (
+            {t('gallery.executions')} {executions.length > 0 && (
               <span className="text-sm font-normal text-gray-500">
-                ({executions.length} loaded)
+                ({t('gallery.loaded', { count: String(executions.length) })})
               </span>
             )}
           </h2>
@@ -260,7 +262,7 @@ export function ImageGallery({ initialFilters = {}, className, refreshTrigger, o
             onClick={handleRefresh}
             disabled={isLoading}
             className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
-            title="Refresh executions"
+            title={t('gallery.refreshExecutions')}
           >
             <RefreshCw className={cn('h-4 w-4', isLoading && 'animate-spin')} />
           </button>
@@ -275,7 +277,7 @@ export function ImageGallery({ initialFilters = {}, className, refreshTrigger, o
                   ? 'bg-primary-600 text-white' 
                   : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
               )}
-              title="Grid view"
+              title={t('gallery.gridView')}
             >
               <Grid className="h-4 w-4" />
             </button>
@@ -287,7 +289,7 @@ export function ImageGallery({ initialFilters = {}, className, refreshTrigger, o
                   ? 'bg-primary-600 text-white' 
                   : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
               )}
-              title="List view"
+              title={t('gallery.listView')}
             >
               <List className="h-4 w-4" />
             </button>
@@ -302,11 +304,11 @@ export function ImageGallery({ initialFilters = {}, className, refreshTrigger, o
           {executions.length === 0 && !isLoading && (
             <div className="text-center py-12">
               <div className="text-gray-400 text-6xl mb-4">📷</div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No Executions Found</h3>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">{t('gallery.noExecutionsFound')}</h3>
               <p className="text-gray-500 mb-4">
-                {Object.keys(filters).length > 0 
-                  ? 'Try adjusting your filters to see more results.' 
-                  : 'No SAI workflow executions are available yet.'
+                {Object.keys(filters).length > 0
+                  ? t('gallery.adjustFilters')
+                  : t('gallery.noExecutionsYet')
                 }
               </p>
               {Object.keys(filters).length > 0 && (
@@ -314,7 +316,7 @@ export function ImageGallery({ initialFilters = {}, className, refreshTrigger, o
                   onClick={() => updateFilters({})}
                   className="text-primary-600 hover:text-primary-800 font-medium"
                 >
-                  Clear all filters
+                  {t('gallery.clearAllFilters')}
                 </button>
               )}
             </div>
@@ -345,16 +347,16 @@ export function ImageGallery({ initialFilters = {}, className, refreshTrigger, o
                     ref={(el) => { if (el) el.indeterminate = selectedIds.size > 0 && selectedIds.size < executions.length; }}
                     onChange={toggleSelectAll}
                     className="h-4 w-4 rounded border-gray-300 text-primary-600 accent-primary-600 cursor-pointer"
-                    aria-label="Select all executions"
+                    aria-label={t('gallery.selectAll')}
                   />
                 </div>
-                <div className="w-16">Image</div>
-                <div className="w-32">ID / Time</div>
-                <div className="flex-1">Camera / Location</div>
-                <div className="w-20">Alert</div>
-                <div className="w-24">Detections</div>
-                <div className="w-16 text-center">Count</div>
-                <div className="w-24 text-right">Status</div>
+                <div className="w-16">{t('gallery.image')}</div>
+                <div className="w-32">{t('gallery.idTime')}</div>
+                <div className="flex-1">{t('gallery.cameraLocation')}</div>
+                <div className="w-20">{t('gallery.alert')}</div>
+                <div className="w-24">{t('gallery.listDetections')}</div>
+                <div className="w-16 text-center">{t('gallery.count')}</div>
+                <div className="w-24 text-right">{t('gallery.listStatus')}</div>
                 <div className="w-10"></div>
               </div>
               {/* List Items */}
@@ -377,7 +379,7 @@ export function ImageGallery({ initialFilters = {}, className, refreshTrigger, o
               className="flex justify-center items-center py-8"
             >
               <LoadingSpinner size="lg" />
-              <span className="ml-3 text-gray-600">Loading more executions...</span>
+              <span className="ml-3 text-gray-600">{t('gallery.loadingMore')}</span>
             </div>
           )}
 
@@ -385,7 +387,7 @@ export function ImageGallery({ initialFilters = {}, className, refreshTrigger, o
           {!hasNext && executions.length > 0 && (
             <div className="text-center py-8">
               <div className="inline-flex items-center px-4 py-2 bg-gray-100 text-gray-600 rounded-full text-sm">
-                <span>You've reached the end of the results</span>
+                <span>{t('gallery.endOfResults')}</span>
               </div>
             </div>
           )}
@@ -415,7 +417,7 @@ export function ImageGallery({ initialFilters = {}, className, refreshTrigger, o
         <button
           onClick={scrollToTop}
           className="fixed bottom-6 right-6 z-40 p-3 bg-primary-600 text-white rounded-full shadow-lg hover:bg-primary-700 transition-all duration-300 hover:scale-110"
-          title="Back to top"
+          title={t('gallery.backToTop')}
         >
           <ArrowUp className="h-5 w-5" />
         </button>

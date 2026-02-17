@@ -5,6 +5,7 @@ import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Badge } from './ui/badge';
 import { DateTimeRangeSelector } from './DateTimeRangeSelector';
+import { useTranslation } from '@/contexts/LanguageContext';
 import {
   Filter,
   Wind,
@@ -40,6 +41,7 @@ export function AlertFilterComponent({
   pageSize = 50,
   className
 }: AlertFilterComponentProps) {
+  const { t } = useTranslation();
   const [showAdvanced, setShowAdvanced] = useState(false);
 
   const handleFilterChange = useCallback((key: keyof ExecutionFilters, value: any) => {
@@ -72,7 +74,7 @@ export function AlertFilterComponent({
   const quickFilters = [
     {
       id: 'smoke_detected',
-      label: 'Smoke',
+      labelKey: 'filters.smoke',
       icon: Wind,
       color: 'neutral',
       isActive: filters.hasSmoke === true,
@@ -80,7 +82,7 @@ export function AlertFilterComponent({
     },
     {
       id: 'critical_alerts',
-      label: 'Critical',
+      labelKey: 'filters.critical',
       icon: AlertTriangle,
       color: 'danger',
       isActive: filters.alertLevels?.includes('critical'),
@@ -94,7 +96,7 @@ export function AlertFilterComponent({
     },
     {
       id: 'high_alerts',
-      label: 'High',
+      labelKey: 'filters.high',
       icon: AlertTriangle,
       color: 'warning',
       isActive: filters.alertLevels?.includes('high'),
@@ -108,7 +110,7 @@ export function AlertFilterComponent({
     },
     {
       id: 'low_alerts',
-      label: 'Low',
+      labelKey: 'filters.low',
       icon: AlertTriangle,
       color: 'info',
       isActive: filters.alertLevels?.includes('low'),
@@ -128,10 +130,10 @@ export function AlertFilterComponent({
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-3">
           <Filter className="h-5 w-5 text-gray-600" />
-          <h2 className="text-lg font-semibold text-gray-900">Filters</h2>
+          <h2 className="text-lg font-semibold text-gray-900">{t('filters.title')}</h2>
           {activeCount > 0 && (
             <Badge variant="secondary" className="bg-blue-50 text-blue-700 border-blue-200">
-              {activeCount} active
+              {activeCount} {t('common.active')}
             </Badge>
           )}
         </div>
@@ -140,7 +142,7 @@ export function AlertFilterComponent({
             onClick={() => setShowAdvanced(!showAdvanced)}
             className="text-sm text-gray-600 hover:text-gray-900 flex items-center"
           >
-            {showAdvanced ? 'Basic' : 'Advanced'}
+            {showAdvanced ? t('filters.basic') : t('filters.advanced')}
             <ChevronDown className={cn(
               "h-4 w-4 ml-1 transition-transform",
               showAdvanced && "rotate-180"
@@ -154,7 +156,7 @@ export function AlertFilterComponent({
               disabled={isLoading}
             >
               <RotateCcw className="h-4 w-4 mr-1" />
-              Reset
+              {t('common.reset')}
             </Button>
           )}
         </div>
@@ -166,17 +168,17 @@ export function AlertFilterComponent({
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
             <MapPin className="h-3.5 w-3.5 mr-1" />
-            Location
+            {t('filters.location')}
           </label>
           <Select
             value={filters.location || ''}
             onValueChange={(value) => handleFilterChange('location', value || undefined)}
           >
             <SelectTrigger>
-              <SelectValue placeholder="All locations" />
+              <SelectValue placeholder={t('filters.allLocations')} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All locations</SelectItem>
+              <SelectItem value="">{t('filters.allLocations')}</SelectItem>
               <SelectItem value="La Rancherita">La Rancherita</SelectItem>
               <SelectItem value="Molinari">Molinari</SelectItem>
               <SelectItem value="Quintana">Quintana</SelectItem>
@@ -190,17 +192,17 @@ export function AlertFilterComponent({
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
             <Camera className="h-3.5 w-3.5 mr-1" />
-            Camera
+            {t('filters.camera')}
           </label>
           <Select
             value={filters.cameraId || ''}
             onValueChange={(value) => handleFilterChange('cameraId', value || undefined)}
           >
             <SelectTrigger>
-              <SelectValue placeholder="All cameras" />
+              <SelectValue placeholder={t('filters.allCameras')} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All cameras</SelectItem>
+              <SelectItem value="">{t('filters.allCameras')}</SelectItem>
               <SelectItem value="cam1">cam1</SelectItem>
               <SelectItem value="cam2">cam2</SelectItem>
               <SelectItem value="cam3">cam3</SelectItem>
@@ -214,23 +216,23 @@ export function AlertFilterComponent({
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
             <Calendar className="h-3.5 w-3.5 mr-1" />
-            Date Preset
+            {t('filters.datePreset')}
           </label>
           <Select
             value={filters.datePreset || ''}
             onValueChange={(value) => handleFilterChange('datePreset', value || undefined)}
           >
             <SelectTrigger>
-              <SelectValue placeholder="All time" />
+              <SelectValue placeholder={t('filters.allTime')} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All time</SelectItem>
-              <SelectItem value="today">Today</SelectItem>
-              <SelectItem value="yesterday">Yesterday</SelectItem>
-              <SelectItem value="last7days">Last 7 days</SelectItem>
-              <SelectItem value="last30days">Last 30 days</SelectItem>
-              <SelectItem value="thisMonth">This month</SelectItem>
-              <SelectItem value="lastMonth">Last month</SelectItem>
+              <SelectItem value="">{t('filters.allTime')}</SelectItem>
+              <SelectItem value="today">{t('filters.today')}</SelectItem>
+              <SelectItem value="yesterday">{t('filters.yesterday')}</SelectItem>
+              <SelectItem value="last7days">{t('filters.last7days')}</SelectItem>
+              <SelectItem value="last30days">{t('filters.last30days')}</SelectItem>
+              <SelectItem value="thisMonth">{t('filters.thisMonth')}</SelectItem>
+              <SelectItem value="lastMonth">{t('filters.lastMonth')}</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -252,7 +254,7 @@ export function AlertFilterComponent({
                 )}
               >
                 <Icon className="h-4 w-4" />
-                <span>{filter.label}</span>
+                <span>{t(filter.labelKey)}</span>
               </Button>
             );
           })}
@@ -286,26 +288,26 @@ export function AlertFilterComponent({
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
                 <Wind className="h-3.5 w-3.5 mr-1 text-gray-600" />
-                Smoke Detection
+                {t('filters.smokeDetection')}
               </label>
               <Select
                 value={filters.hasSmoke !== undefined ? String(filters.hasSmoke) : ''}
                 onValueChange={(value) => handleFilterChange('hasSmoke', value === '' ? undefined : value === 'true')}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Any" />
+                  <SelectValue placeholder={t('common.any')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Any</SelectItem>
-                  <SelectItem value="true">Detected</SelectItem>
-                  <SelectItem value="false">Not detected</SelectItem>
+                  <SelectItem value="">{t('common.any')}</SelectItem>
+                  <SelectItem value="true">{t('filters.detected')}</SelectItem>
+                  <SelectItem value="false">{t('filters.notDetected')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Min Detections
+                {t('filters.minDetections')}
               </label>
               <Input
                 type="number"
@@ -319,7 +321,7 @@ export function AlertFilterComponent({
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
                 <Wind className="h-3.5 w-3.5 mr-1 text-gray-600" />
-                Smoke Confidence
+                {t('filters.smokeConfidence')}
               </label>
               <Input
                 type="number"
@@ -334,19 +336,19 @@ export function AlertFilterComponent({
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Detection Mode
+                {t('filters.detectionMode')}
               </label>
               <Select
                 value={filters.detectionMode || ''}
                 onValueChange={(value) => handleFilterChange('detectionMode', value || undefined)}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Any mode" />
+                  <SelectValue placeholder={t('filters.anyMode')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Any mode</SelectItem>
-                  <SelectItem value="smoke-only">Smoke Only</SelectItem>
-                  <SelectItem value="both">Both</SelectItem>
+                  <SelectItem value="">{t('filters.anyMode')}</SelectItem>
+                  <SelectItem value="smoke-only">{t('filters.smokeOnly')}</SelectItem>
+                  <SelectItem value="both">{t('filters.both')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -356,7 +358,7 @@ export function AlertFilterComponent({
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Camera ID
+                {t('filters.cameraId')}
               </label>
               <Input
                 type="text"
@@ -368,17 +370,17 @@ export function AlertFilterComponent({
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Camera Type
+                {t('filters.cameraType')}
               </label>
               <Select
                 value={filters.cameraTypes?.[0] || ''}
                 onValueChange={(value) => handleFilterChange('cameraTypes', value ? [value] : undefined)}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="All types" />
+                  <SelectValue placeholder={t('filters.allTypes')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All types</SelectItem>
+                  <SelectItem value="">{t('filters.allTypes')}</SelectItem>
                   <SelectItem value="onvif">ONVIF</SelectItem>
                   <SelectItem value="rtsp">RTSP</SelectItem>
                 </SelectContent>
@@ -387,7 +389,7 @@ export function AlertFilterComponent({
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Node ID
+                {t('filters.nodeId')}
               </label>
               <Input
                 type="text"
@@ -399,7 +401,7 @@ export function AlertFilterComponent({
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Device ID
+                {t('filters.deviceId')}
               </label>
               <Input
                 type="text"
@@ -411,7 +413,7 @@ export function AlertFilterComponent({
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Location
+                {t('filters.location')}
               </label>
               <Input
                 type="text"
@@ -423,19 +425,19 @@ export function AlertFilterComponent({
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Telegram
+                {t('filters.telegram')}
               </label>
               <Select
                 value={filters.telegramSent !== undefined ? String(filters.telegramSent) : ''}
                 onValueChange={(value) => handleFilterChange('telegramSent', value === '' ? undefined : value === 'true')}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Any" />
+                  <SelectValue placeholder={t('common.any')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Any</SelectItem>
-                  <SelectItem value="true">Sent</SelectItem>
-                  <SelectItem value="false">Not sent</SelectItem>
+                  <SelectItem value="">{t('common.any')}</SelectItem>
+                  <SelectItem value="true">{t('filters.sent')}</SelectItem>
+                  <SelectItem value="false">{t('filters.notSent')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -445,38 +447,38 @@ export function AlertFilterComponent({
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Status
+                {t('filters.status')}
               </label>
               <Select
                 value={filters.status || ''}
                 onValueChange={(value) => handleFilterChange('status', value || undefined)}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="All statuses" />
+                  <SelectValue placeholder={t('filters.allStatuses')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All statuses</SelectItem>
-                  <SelectItem value="success">Success</SelectItem>
-                  <SelectItem value="error">Error</SelectItem>
+                  <SelectItem value="">{t('filters.allStatuses')}</SelectItem>
+                  <SelectItem value="success">{t('filters.success')}</SelectItem>
+                  <SelectItem value="error">{t('filters.errorStatus')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Images
+                {t('filters.images')}
               </label>
               <Select
                 value={filters.hasImage !== undefined ? String(filters.hasImage) : ''}
                 onValueChange={(value) => handleFilterChange('hasImage', value === '' ? undefined : value === 'true')}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Any" />
+                  <SelectValue placeholder={t('common.any')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Any</SelectItem>
-                  <SelectItem value="true">With images</SelectItem>
-                  <SelectItem value="false">Without images</SelectItem>
+                  <SelectItem value="">{t('common.any')}</SelectItem>
+                  <SelectItem value="true">{t('filters.withImages')}</SelectItem>
+                  <SelectItem value="false">{t('filters.withoutImages')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -488,10 +490,10 @@ export function AlertFilterComponent({
       <div className="pt-4 border-t border-gray-200">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-sm text-gray-600">
           <div className="font-medium">
-            Results: {totalResults.toLocaleString()} executions found
+            {t('filters.results')}: {t('filters.executionsFound', { count: totalResults.toLocaleString() })}
           </div>
           <div className="text-gray-500">
-            Page {currentPage} of {totalPages} ({pageSize} per page)
+            {t('filters.page', { current: String(currentPage), total: String(totalPages), size: String(pageSize) })}
           </div>
         </div>
       </div>

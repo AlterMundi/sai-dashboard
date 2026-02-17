@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
+import { useTranslation } from '@/contexts/LanguageContext';
 import { LoadingSpinner } from './ui/LoadingSpinner';
 import { cn } from '@/utils';
 import { Eye, EyeOff, Lock, Shield, AlertCircle } from 'lucide-react';
@@ -14,18 +15,19 @@ export function LoginForm({ onSuccess, className }: LoginFormProps) {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const { login, isLoading, error } = useAuth();
+  const { t } = useTranslation();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!password.trim()) {
-      toast.error('Password is required');
+      toast.error(t('login.passwordRequired'));
       return;
     }
 
     try {
       await login(password);
-      toast.success('Successfully logged in!');
+      toast.success(t('login.loginSuccess'));
       onSuccess?.();
     } catch (error) {
       // Error is already handled by useAuth and shown in the form
@@ -41,9 +43,9 @@ export function LoginForm({ onSuccess, className }: LoginFormProps) {
           <div className="inline-flex items-center justify-center w-16 h-16 bg-primary-100 rounded-full mb-4">
             <Shield className="h-8 w-8 text-primary-600" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">SAI Dashboard</h1>
+          <h1 className="text-2xl font-bold text-gray-900">{t('login.title')}</h1>
           <p className="text-gray-600 mt-2">
-            Enter your dashboard password to continue
+            {t('login.subtitle')}
           </p>
         </div>
 
@@ -52,7 +54,7 @@ export function LoginForm({ onSuccess, className }: LoginFormProps) {
           <div className="mb-6 p-4 bg-danger-50 border border-danger-200 rounded-lg flex items-start">
             <AlertCircle className="h-5 w-5 text-danger-600 mt-0.5 mr-3 flex-shrink-0" />
             <div>
-              <h3 className="text-sm font-medium text-danger-800">Login Failed</h3>
+              <h3 className="text-sm font-medium text-danger-800">{t('login.loginFailed')}</h3>
               <p className="text-sm text-danger-700 mt-1">{error}</p>
             </div>
           </div>
@@ -62,7 +64,7 @@ export function LoginForm({ onSuccess, className }: LoginFormProps) {
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
             <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
-              Dashboard Password
+              {t('login.passwordLabel')}
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -81,7 +83,7 @@ export function LoginForm({ onSuccess, className }: LoginFormProps) {
                     ? 'border-danger-300 bg-danger-50'
                     : 'border-gray-300 bg-white hover:border-gray-400'
                 )}
-                placeholder="Enter your password"
+                placeholder={t('login.passwordPlaceholder')}
                 disabled={isLoading}
                 autoComplete="current-password"
                 autoFocus
@@ -117,12 +119,12 @@ export function LoginForm({ onSuccess, className }: LoginFormProps) {
             {isLoading ? (
               <>
                 <LoadingSpinner size="sm" color="white" className="mr-2" />
-                Signing in...
+                {t('login.signingIn')}
               </>
             ) : (
               <>
                 <Shield className="h-4 w-4 mr-2" />
-                Sign In
+                {t('login.signIn')}
               </>
             )}
           </button>
@@ -131,10 +133,10 @@ export function LoginForm({ onSuccess, className }: LoginFormProps) {
         {/* Footer */}
         <div className="mt-8 text-center">
           <p className="text-xs text-gray-500">
-            SAI Image Analysis Dashboard v1.0.0
+            {t('login.footerTitle')}
           </p>
           <p className="text-xs text-gray-400 mt-1">
-            Visual management interface for n8n workflows
+            {t('login.footerSubtitle')}
           </p>
         </div>
       </div>
@@ -142,7 +144,7 @@ export function LoginForm({ onSuccess, className }: LoginFormProps) {
       {/* Security Note */}
       <div className="mt-6 text-center">
         <p className="text-xs text-gray-500">
-          🔐 This is a secure area. All sessions are encrypted and monitored.
+          {t('login.securityNote')}
         </p>
       </div>
     </div>

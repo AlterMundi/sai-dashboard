@@ -4,6 +4,7 @@ import { ExecutionFilters } from '@/types';
 import { executionsApi } from '@/services/api';
 import { exportToCSV, exportToJSON, exportSummary } from '@/utils';
 import { cn } from '@/utils';
+import { useTranslation } from '@/contexts/LanguageContext';
 import toast from 'react-hot-toast';
 
 interface ExportDropdownProps {
@@ -17,6 +18,7 @@ export function ExportDropdown({ filters, totalResults, disabled, className }: E
   const [isOpen, setIsOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const { t } = useTranslation();
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -32,12 +34,12 @@ export function ExportDropdown({ filters, totalResults, disabled, className }: E
 
   const handleExport = async (type: 'csv' | 'json' | 'summary') => {
     if (totalResults === 0) {
-      toast.error('No data to export');
+      toast.error(t('export.noDataToExport'));
       return;
     }
 
     setIsExporting(true);
-    const toastId = toast.loading(`Fetching ${totalResults.toLocaleString()} executions…`);
+    const toastId = toast.loading(t('export.fetching', { count: totalResults.toLocaleString() }));
 
     try {
       const response = await executionsApi.getExecutions({
@@ -53,19 +55,19 @@ export function ExportDropdown({ filters, totalResults, disabled, className }: E
       switch (type) {
         case 'csv':
           exportToCSV(executions, filename);
-          toast.success(`Exported ${executions.length} executions to CSV`, { id: toastId });
+          toast.success(t('export.exportedCsv', { count: String(executions.length) }), { id: toastId });
           break;
         case 'json':
           exportToJSON(executions, filename);
-          toast.success(`Exported ${executions.length} executions to JSON`, { id: toastId });
+          toast.success(t('export.exportedJson', { count: String(executions.length) }), { id: toastId });
           break;
         case 'summary':
           exportSummary(executions, `${filename}-summary`);
-          toast.success('Exported summary report', { id: toastId });
+          toast.success(t('export.exportedSummary'), { id: toastId });
           break;
       }
     } catch (error) {
-      toast.error('Export failed', { id: toastId });
+      toast.error(t('export.exportFailed'), { id: toastId });
       console.error('Export error:', error);
     } finally {
       setIsExporting(false);
@@ -76,22 +78,22 @@ export function ExportDropdown({ filters, totalResults, disabled, className }: E
   const exportOptions = [
     {
       id: 'csv',
-      label: 'Export as CSV',
-      description: 'Spreadsheet-compatible format',
+      labelKey: 'export.exportAsCsv',
+      descKey: 'export.csvDescription',
       icon: FileSpreadsheet,
       action: () => handleExport('csv'),
     },
     {
       id: 'json',
-      label: 'Export as JSON',
-      description: 'Full data with detections',
+      labelKey: 'export.exportAsJson',
+      descKey: 'export.jsonDescription',
       icon: FileJson,
       action: () => handleExport('json'),
     },
     {
       id: 'summary',
-      label: 'Export Summary',
-      description: 'Statistics and breakdown',
+      labelKey: 'export.exportSummary',
+      descKey: 'export.summaryDescription',
       icon: BarChart3,
       action: () => handleExport('summary'),
     },
@@ -107,14 +109,14 @@ export function ExportDropdown({ filters, totalResults, disabled, className }: E
           'border border-gray-300 bg-white hover:bg-gray-50',
           'disabled:opacity-50 disabled:cursor-not-allowed'
         )}
-        title={totalResults === 0 ? 'No data to export' : `Export ${totalResults.toLocaleString()} executions`}
+        title={totalResults === 0 ? t('export.noDataToExport') : t('export.exportExecutions', { count: totalResults.toLocaleString() })}
       >
         {isExporting ? (
           <Loader2 className="h-4 w-4 animate-spin" />
         ) : (
           <Download className="h-4 w-4" />
         )}
-        <span className="hidden sm:inline">Export</span>
+        <span className="hidden sm:inline">{t('export.export')}</span>
         <ChevronDown className={cn('h-4 w-4 transition-transform', isOpen && 'rotate-180')} />
       </button>
 
@@ -122,7 +124,7 @@ export function ExportDropdown({ filters, totalResults, disabled, className }: E
         <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
           <div className="px-3 py-2 border-b border-gray-100">
             <p className="text-xs font-medium text-gray-500 uppercase">
-              {totalResults.toLocaleString()} execution{totalResults !== 1 ? 's' : ''} total
+              {t('export.executionsTotal', { count: totalResults.toLocaleString(), s: totalResults !== 1 ? 's' : '' })}
             </p>
           </div>
 
@@ -135,8 +137,8 @@ export function ExportDropdown({ filters, totalResults, disabled, className }: E
             >
               <option.icon className="h-5 w-5 text-gray-400 mt-0.5" />
               <div>
-                <p className="text-sm font-medium text-gray-900">{option.label}</p>
-                <p className="text-xs text-gray-500">{option.description}</p>
+                <p className="text-sm font-medium text-gray-900">{t(option.labelKey)}</p>
+                <p className="text-xs text-gray-500">{t(option.descKey)}</p>
               </div>
             </button>
           ))}

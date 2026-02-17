@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { cn } from '@/utils';
+import { useTranslation } from '@/contexts/LanguageContext';
 import {
   Search,
   Plus,
@@ -34,50 +35,50 @@ interface AdvancedSearchPanelProps {
 }
 
 const FIELD_OPTIONS = [
-  { value: 'class', label: 'Detection Class', type: 'select' },
-  { value: 'confidence', label: 'Confidence', type: 'number' },
-  { value: 'detectionCount', label: 'Detection Count', type: 'number' },
-  { value: 'alertLevel', label: 'Alert Level', type: 'select' },
-  { value: 'hasFire', label: 'Has Fire', type: 'boolean' },
-  { value: 'hasSmoke', label: 'Has Smoke', type: 'boolean' },
-  { value: 'position', label: 'Position', type: 'select' },
-  { value: 'boundingBoxSize', label: 'Bounding Box Size', type: 'number' },
+  { value: 'class', labelKey: 'advancedSearch.detectionClass', type: 'select' },
+  { value: 'confidence', labelKey: 'advancedSearch.confidence', type: 'number' },
+  { value: 'detectionCount', labelKey: 'advancedSearch.detectionCount', type: 'number' },
+  { value: 'alertLevel', labelKey: 'advancedSearch.alertLevel', type: 'select' },
+  { value: 'hasFire', labelKey: 'advancedSearch.hasFire', type: 'boolean' },
+  { value: 'hasSmoke', labelKey: 'advancedSearch.hasSmoke', type: 'boolean' },
+  { value: 'position', labelKey: 'advancedSearch.position', type: 'select' },
+  { value: 'boundingBoxSize', labelKey: 'advancedSearch.boundingBoxSize', type: 'number' },
 ] as const;
 
-const OPERATOR_OPTIONS: Record<string, { value: string; label: string }[]> = {
+const OPERATOR_OPTIONS: Record<string, { value: string; labelKey: string }[]> = {
   select: [
-    { value: 'equals', label: 'equals' },
-    { value: 'in', label: 'is one of' },
+    { value: 'equals', labelKey: 'advancedSearch.equals' },
+    { value: 'in', labelKey: 'advancedSearch.isOneOf' },
   ],
   number: [
-    { value: 'equals', label: 'equals' },
-    { value: 'greaterThan', label: 'greater than' },
-    { value: 'lessThan', label: 'less than' },
-    { value: 'between', label: 'between' },
+    { value: 'equals', labelKey: 'advancedSearch.equals' },
+    { value: 'greaterThan', labelKey: 'advancedSearch.greaterThan' },
+    { value: 'lessThan', labelKey: 'advancedSearch.lessThan' },
+    { value: 'between', labelKey: 'advancedSearch.between' },
   ],
   boolean: [
-    { value: 'equals', label: 'is' },
+    { value: 'equals', labelKey: 'advancedSearch.is' },
   ],
 };
 
-const VALUE_OPTIONS: Record<string, { value: string; label: string }[]> = {
+const VALUE_OPTIONS: Record<string, { value: string; labelKey: string }[]> = {
   class: [
-    { value: 'fire', label: 'Fire' },
-    { value: 'smoke', label: 'Smoke' },
+    { value: 'fire', labelKey: 'advancedSearch.fire' },
+    { value: 'smoke', labelKey: 'advancedSearch.smokeVal' },
   ],
   alertLevel: [
-    { value: 'none', label: 'None' },
-    { value: 'low', label: 'Low' },
-    { value: 'medium', label: 'Medium' },
-    { value: 'high', label: 'High' },
-    { value: 'critical', label: 'Critical' },
+    { value: 'none', labelKey: 'advancedSearch.none' },
+    { value: 'low', labelKey: 'advancedSearch.lowVal' },
+    { value: 'medium', labelKey: 'advancedSearch.medium' },
+    { value: 'high', labelKey: 'advancedSearch.highVal' },
+    { value: 'critical', labelKey: 'advancedSearch.criticalVal' },
   ],
   position: [
-    { value: 'top', label: 'Top' },
-    { value: 'bottom', label: 'Bottom' },
-    { value: 'left', label: 'Left' },
-    { value: 'right', label: 'Right' },
-    { value: 'center', label: 'Center' },
+    { value: 'top', labelKey: 'advancedSearch.top' },
+    { value: 'bottom', labelKey: 'advancedSearch.bottom' },
+    { value: 'left', labelKey: 'advancedSearch.left' },
+    { value: 'right', labelKey: 'advancedSearch.right' },
+    { value: 'center', labelKey: 'advancedSearch.center' },
   ],
 };
 
@@ -92,6 +93,7 @@ export function AdvancedSearchPanel({
   className,
   headerRight,
 }: AdvancedSearchPanelProps) {
+  const { t } = useTranslation();
   const [isExpanded, setIsExpanded] = useState(false);
   const [logic, setLogic] = useState<'AND' | 'OR'>('AND');
   const [conditions, setConditions] = useState<SearchCondition[]>([
@@ -118,7 +120,7 @@ export function AdvancedSearchPanel({
   const removeCondition = useCallback((id: string) => {
     setConditions((prev) => {
       if (prev.length === 1) {
-        toast.error('At least one condition is required');
+        toast.error(t('advancedSearch.atLeastOne'));
         return prev;
       }
       return prev.filter((c) => c.id !== id);
@@ -163,7 +165,7 @@ export function AdvancedSearchPanel({
     });
 
     if (invalidConditions.length > 0) {
-      toast.error('Please fill in all condition values');
+      toast.error(t('advancedSearch.fillValues'));
       return;
     }
 
@@ -196,10 +198,10 @@ export function AdvancedSearchPanel({
           className="flex items-center gap-2 hover:bg-gray-50 transition-colors rounded-lg px-2 py-1 -ml-2"
         >
           <SlidersHorizontal className="h-5 w-5 text-gray-600" />
-          <span className="font-medium text-gray-900">Advanced Search</span>
+          <span className="font-medium text-gray-900">{t('advancedSearch.title')}</span>
           {conditions.length > 1 && (
             <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full">
-              {conditions.length} conditions
+              {t('advancedSearch.conditions', { count: String(conditions.length) })}
             </span>
           )}
           {isExpanded ? (
@@ -218,7 +220,7 @@ export function AdvancedSearchPanel({
         <div className="p-4 pt-0 space-y-4">
           {/* Logic Selector */}
           <div className="flex items-center gap-4">
-            <span className="text-sm text-gray-600">Match:</span>
+            <span className="text-sm text-gray-600">{t('advancedSearch.match')}</span>
             <div className="flex rounded-lg border border-gray-200 overflow-hidden">
               <button
                 onClick={() => setLogic('AND')}
@@ -229,7 +231,7 @@ export function AdvancedSearchPanel({
                     : 'bg-white text-gray-700 hover:bg-gray-50'
                 )}
               >
-                All conditions (AND)
+                {t('advancedSearch.allConditions')}
               </button>
               <button
                 onClick={() => setLogic('OR')}
@@ -240,7 +242,7 @@ export function AdvancedSearchPanel({
                     : 'bg-white text-gray-700 hover:bg-gray-50'
                 )}
               >
-                Any condition (OR)
+                {t('advancedSearch.anyCondition')}
               </button>
             </div>
           </div>
@@ -271,7 +273,7 @@ export function AdvancedSearchPanel({
                   >
                     {FIELD_OPTIONS.map((opt) => (
                       <option key={opt.value} value={opt.value}>
-                        {opt.label}
+                        {t(opt.labelKey)}
                       </option>
                     ))}
                   </select>
@@ -286,7 +288,7 @@ export function AdvancedSearchPanel({
                   >
                     {operators.map((opt) => (
                       <option key={opt.value} value={opt.value}>
-                        {opt.label}
+                        {t(opt.labelKey)}
                       </option>
                     ))}
                   </select>
@@ -300,8 +302,8 @@ export function AdvancedSearchPanel({
                       }
                       className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     >
-                      <option value="true">Yes</option>
-                      <option value="false">No</option>
+                      <option value="true">{t('common.yes')}</option>
+                      <option value="false">{t('common.no')}</option>
                     </select>
                   ) : fieldType === 'number' ? (
                     <div className="flex items-center gap-2 flex-1">
@@ -315,11 +317,11 @@ export function AdvancedSearchPanel({
                         min={0}
                         max={condition.field === 'confidence' ? 1 : undefined}
                         className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        placeholder={condition.field === 'confidence' ? '0.0 - 1.0' : 'Value'}
+                        placeholder={condition.field === 'confidence' ? '0.0 - 1.0' : t('common.value')}
                       />
                       {condition.operator === 'between' && (
                         <>
-                          <span className="text-gray-500">and</span>
+                          <span className="text-gray-500">{t('common.and')}</span>
                           <input
                             type="number"
                             value={condition.secondValue ?? ''}
@@ -332,7 +334,7 @@ export function AdvancedSearchPanel({
                             min={0}
                             max={condition.field === 'confidence' ? 1 : undefined}
                             className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                            placeholder={condition.field === 'confidence' ? '0.0 - 1.0' : 'Value'}
+                            placeholder={condition.field === 'confidence' ? '0.0 - 1.0' : t('common.value')}
                           />
                         </>
                       )}
@@ -345,7 +347,7 @@ export function AdvancedSearchPanel({
                     >
                       {VALUE_OPTIONS[condition.field].map((opt) => (
                         <option key={opt.value} value={opt.value}>
-                          {opt.label}
+                          {t(opt.labelKey)}
                         </option>
                       ))}
                     </select>
@@ -355,7 +357,7 @@ export function AdvancedSearchPanel({
                       value={String(condition.value)}
                       onChange={(e) => updateCondition(condition.id, { value: e.target.value })}
                       className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      placeholder="Value"
+                      placeholder={t('common.value')}
                     />
                   )}
 
@@ -363,7 +365,7 @@ export function AdvancedSearchPanel({
                   <button
                     onClick={() => removeCondition(condition.id)}
                     className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                    title="Remove condition"
+                    title={t('advancedSearch.removeCondition')}
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
@@ -378,7 +380,7 @@ export function AdvancedSearchPanel({
             className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
           >
             <Plus className="h-4 w-4" />
-            Add condition
+            {t('advancedSearch.addCondition')}
           </button>
 
           {/* Action Buttons */}
@@ -388,7 +390,7 @@ export function AdvancedSearchPanel({
               className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
             >
               <X className="h-4 w-4" />
-              Clear
+              {t('common.clear')}
             </button>
 
             <button
@@ -402,12 +404,12 @@ export function AdvancedSearchPanel({
               {isLoading ? (
                 <>
                   <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  Searching...
+                  {t('common.searching')}
                 </>
               ) : (
                 <>
                   <Search className="h-4 w-4" />
-                  Search
+                  {t('common.search')}
                 </>
               )}
             </button>
