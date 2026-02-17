@@ -14,7 +14,6 @@ import {
   BarChart3,
   Image as ImageIcon,
   Home,
-  Bug,
   Menu,
   X,
 } from 'lucide-react';
@@ -149,18 +148,6 @@ export function Layout({ children, className }: LayoutProps) {
                   </div>
                 )}
               </div>
-
-              {/* SSE Debug Button (only in debug mode) */}
-              {(import.meta.env.DEV || import.meta.env.VITE_SSE_DEBUG === 'true') && (
-                <Link
-                  to="/sse-debug"
-                  className="p-2 text-orange-500 hover:text-orange-700 hover:bg-orange-100 rounded-lg transition-colors"
-                  title="SSE Debug Console"
-                  aria-label="SSE Debug Console"
-                >
-                  <Bug className="h-5 w-5" aria-hidden="true" />
-                </Link>
-              )}
 
               {/* Settings Button */}
               <button
