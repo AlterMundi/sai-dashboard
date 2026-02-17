@@ -10,6 +10,8 @@ import {
   Wind,
   AlertTriangle,
   Calendar,
+  Camera,
+  MapPin,
   RotateCcw,
   ChevronDown,
 } from 'lucide-react';
@@ -107,12 +109,18 @@ export function AlertFilterComponent({
       }
     },
     {
-      id: 'today',
-      label: 'Today',
-      icon: Calendar,
+      id: 'low_alerts',
+      label: 'Low',
+      icon: AlertTriangle,
       color: 'info',
-      isActive: filters.datePreset === 'today',
-      onClick: () => handleFilterChange('datePreset', filters.datePreset === 'today' ? undefined : 'today')
+      isActive: filters.alertLevels?.includes('low'),
+      onClick: () => {
+        const currentLevels = filters.alertLevels || [];
+        const newLevels = currentLevels.includes('low')
+          ? currentLevels.filter(l => l !== 'low')
+          : [...currentLevels, 'low'];
+        handleFilterChange('alertLevels', newLevels.length > 0 ? newLevels : undefined);
+      }
     }
   ];
 
@@ -154,71 +162,52 @@ export function AlertFilterComponent({
         </div>
       </div>
 
-      {/* Quick Filters */}
-      <div className="flex flex-wrap gap-2">
-        {quickFilters.map((filter) => {
-          const Icon = filter.icon;
-          return (
-            <Button
-              key={filter.id}
-              variant={filter.isActive ? "default" : "outline"}
-              size="sm"
-              onClick={filter.onClick}
-              disabled={isLoading}
-              className={cn(
-                "flex items-center space-x-2",
-                filter.isActive && "bg-blue-600 hover:bg-blue-700"
-              )}
-            >
-              <Icon className="h-4 w-4" />
-              <span>{filter.label}</span>
-            </Button>
-          );
-        })}
-      </div>
-
-      {/* Basic Filters */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Status Filter */}
+      {/* Basic Filters: Location, Camera, Date Preset + Alert Quick Filters */}
+      <div className="flex flex-wrap items-end gap-4">
+        {/* Location Filter */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Status
+          <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
+            <MapPin className="h-3.5 w-3.5 mr-1" />
+            Location
           </label>
           <Select
-            value={filters.status || ''}
-            onValueChange={(value) => handleFilterChange('status', value || undefined)}
+            value={filters.location || ''}
+            onValueChange={(value) => handleFilterChange('location', value || undefined)}
           >
             <SelectTrigger>
-              <SelectValue placeholder="All statuses" />
+              <SelectValue placeholder="All locations" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All statuses</SelectItem>
-              <SelectItem value="success">Success</SelectItem>
-              <SelectItem value="error">Error</SelectItem>
+              <SelectItem value="">All locations</SelectItem>
+              <SelectItem value="La Rancherita">La Rancherita</SelectItem>
+              <SelectItem value="Molinari">Molinari</SelectItem>
+              <SelectItem value="Quintana">Quintana</SelectItem>
+              <SelectItem value="La Paisanita">La Paisanita</SelectItem>
+              <SelectItem value="La Serranita">La Serranita</SelectItem>
             </SelectContent>
           </Select>
         </div>
 
-        {/* Alert Level Filter */}
+        {/* Camera / Cardinal Direction Filter */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
-            <AlertTriangle className="h-3.5 w-3.5 mr-1" />
-            Alert Level
+            <Camera className="h-3.5 w-3.5 mr-1" />
+            Camera
           </label>
           <Select
-            value={filters.alertLevels?.[0] || ''}
-            onValueChange={(value) => handleFilterChange('alertLevels', value ? [value] : undefined)}
+            value={filters.cameraId || ''}
+            onValueChange={(value) => handleFilterChange('cameraId', value || undefined)}
           >
             <SelectTrigger>
-              <SelectValue placeholder="All levels" />
+              <SelectValue placeholder="All cameras" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All levels</SelectItem>
-              <SelectItem value="critical">Critical</SelectItem>
-              <SelectItem value="high">High</SelectItem>
-              <SelectItem value="medium">Medium</SelectItem>
-              <SelectItem value="low">Low</SelectItem>
-              <SelectItem value="none">None</SelectItem>
+              <SelectItem value="">All cameras</SelectItem>
+              <SelectItem value="cam1">cam1</SelectItem>
+              <SelectItem value="cam2">cam2</SelectItem>
+              <SelectItem value="cam3">cam3</SelectItem>
+              <SelectItem value="cam4">cam4</SelectItem>
+              <SelectItem value="cam5">cam5</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -248,24 +237,27 @@ export function AlertFilterComponent({
           </Select>
         </div>
 
-        {/* Has Image Filter */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Images
-          </label>
-          <Select
-            value={filters.hasImage !== undefined ? String(filters.hasImage) : ''}
-            onValueChange={(value) => handleFilterChange('hasImage', value === '' ? undefined : value === 'true')}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Any" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="">Any</SelectItem>
-              <SelectItem value="true">With images</SelectItem>
-              <SelectItem value="false">Without images</SelectItem>
-            </SelectContent>
-          </Select>
+        {/* Alert Quick Filters */}
+        <div className="flex flex-wrap items-center gap-2 pb-0.5">
+          {quickFilters.map((filter) => {
+            const Icon = filter.icon;
+            return (
+              <Button
+                key={filter.id}
+                variant={filter.isActive ? "default" : "outline"}
+                size="sm"
+                onClick={filter.onClick}
+                disabled={isLoading}
+                className={cn(
+                  "flex items-center space-x-2",
+                  filter.isActive && "bg-blue-600 hover:bg-blue-700"
+                )}
+              >
+                <Icon className="h-4 w-4" />
+                <span>{filter.label}</span>
+              </Button>
+            );
+          })}
         </div>
       </div>
 
@@ -276,7 +268,6 @@ export function AlertFilterComponent({
           endDate: filters.endDate
         } : undefined}
         onChange={(range) => {
-          console.log('DateTimeRangeSelector onChange:', range);
           const newFilters = {
             ...filters,
             startDate: range?.startDate,
@@ -447,6 +438,47 @@ export function AlertFilterComponent({
                   <SelectItem value="">Any</SelectItem>
                   <SelectItem value="true">Sent</SelectItem>
                   <SelectItem value="false">Not sent</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Status & Images Filters */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Status
+              </label>
+              <Select
+                value={filters.status || ''}
+                onValueChange={(value) => handleFilterChange('status', value || undefined)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="All statuses" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">All statuses</SelectItem>
+                  <SelectItem value="success">Success</SelectItem>
+                  <SelectItem value="error">Error</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Images
+              </label>
+              <Select
+                value={filters.hasImage !== undefined ? String(filters.hasImage) : ''}
+                onValueChange={(value) => handleFilterChange('hasImage', value === '' ? undefined : value === 'true')}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Any" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Any</SelectItem>
+                  <SelectItem value="true">With images</SelectItem>
+                  <SelectItem value="false">Without images</SelectItem>
                 </SelectContent>
               </Select>
             </div>
