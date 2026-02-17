@@ -907,7 +907,7 @@ export class Stage2ETLService extends EventEmitter {
         node_id = COALESCE($2, node_id),
         location = COALESCE($4, location),
         camera_type = COALESCE($5, camera_type),
-        capture_timestamp = COALESCE($6::timestamp, capture_timestamp),
+        capture_timestamp = COALESCE($6::timestamptz, capture_timestamp),
         updated_at = NOW()
       WHERE id = $1
     `, [

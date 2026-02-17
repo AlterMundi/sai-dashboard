@@ -71,7 +71,6 @@ jobs:
               --network host \
               --restart unless-stopped \
               --env-file .env \
-              -e TZ=America/Argentina/Buenos_Aires \
               -v /mnt/raid1/n8n-backup/images:/mnt/raid1/n8n-backup/images \
               -v /mnt/n8n-data/.n8n/binaryData:/mnt/n8n-data/.n8n/binaryData:ro \
               --health-cmd="curl -f http://localhost:3001/dashboard/api/health || exit 1" \

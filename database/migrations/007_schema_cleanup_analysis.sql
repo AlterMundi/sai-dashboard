@@ -1,18 +1,31 @@
 -- Migration 007: Schema Cleanup Based on Critical Analysis
--- Date: 2025-01-23
+-- Date: 2025-01-23 (updated 2026-02-16: fix timezone conversion)
 -- Source: Supabase Postgres Best Practices analysis
 --
 -- Changes:
--- 1. CRITICAL: Convert all timestamp -> timestamptz
--- 2. HIGH: Drop unused indexes (verified 0 scans)
--- 3. MEDIUM: Drop redundant idx_executions_timestamp
--- 4. MEDIUM: Add composite index for alert filtering
--- 5. LOW: Add CHECK constraints for confidence scores
+-- 1. CRITICAL: Convert all timestamp -> timestamptz (using correct source TZ)
+-- 2. CRITICAL: Set database default timezone to UTC
+-- 3. HIGH: Drop unused indexes (verified 0 scans)
+-- 4. MEDIUM: Drop redundant idx_executions_timestamp
+-- 5. MEDIUM: Add composite index for alert filtering
+-- 6. LOW: Add CHECK constraints for confidence scores
+
+-- ============================================================================
+-- Phase 0: Set database timezone to UTC
+-- ============================================================================
+-- All timestamps stored as UTC internally. Display conversion happens in the client.
+
+ALTER DATABASE sai_dashboard SET TimeZone TO 'UTC';
+
+-- Also set for the current session so the rest of this migration runs in UTC
+SET TIME ZONE 'UTC';
 
 -- ============================================================================
 -- Phase 1: CRITICAL - Convert timestamp to timestamptz
 -- ============================================================================
--- Without timezone info, timestamps become ambiguous if server TZ changes
+-- The stored naive timestamps represent Argentina local time (GMT-3).
+-- AT TIME ZONE 'America/Argentina/Buenos_Aires' tells PostgreSQL:
+--   "interpret these naive values as Argentina time" -> converts to UTC internally.
 
 -- First, drop views that depend on the columns we're altering
 DROP VIEW IF EXISTS etl_failed_items;
@@ -20,15 +33,20 @@ DROP VIEW IF EXISTS etl_failed_items;
 -- executions table
 ALTER TABLE executions
   ALTER COLUMN execution_timestamp TYPE timestamptz
-    USING execution_timestamp AT TIME ZONE 'UTC',
+    USING execution_timestamp AT TIME ZONE 'America/Argentina/Buenos_Aires',
   ALTER COLUMN completion_timestamp TYPE timestamptz
-    USING completion_timestamp AT TIME ZONE 'UTC',
+    USING completion_timestamp AT TIME ZONE 'America/Argentina/Buenos_Aires',
   ALTER COLUMN capture_timestamp TYPE timestamptz
-    USING capture_timestamp AT TIME ZONE 'UTC',
+    USING capture_timestamp AT TIME ZONE 'America/Argentina/Buenos_Aires',
   ALTER COLUMN created_at TYPE timestamptz
-    USING created_at AT TIME ZONE 'UTC',
+    USING created_at AT TIME ZONE 'America/Argentina/Buenos_Aires',
   ALTER COLUMN updated_at TYPE timestamptz
-    USING updated_at AT TIME ZONE 'UTC';
+    USING updated_at AT TIME ZONE 'America/Argentina/Buenos_Aires';
+
+-- Set sensible defaults for timestamp columns
+ALTER TABLE executions
+  ALTER COLUMN created_at SET DEFAULT now(),
+  ALTER COLUMN updated_at SET DEFAULT now();
 
 -- Recreate the etl_failed_items view
 CREATE OR REPLACE VIEW etl_failed_items AS
@@ -48,9 +66,24 @@ ORDER BY q.queued_at DESC;
 -- execution_analysis table
 ALTER TABLE execution_analysis
   ALTER COLUMN analysis_timestamp TYPE timestamptz
-    USING analysis_timestamp AT TIME ZONE 'UTC';
+    USING analysis_timestamp AT TIME ZONE 'America/Argentina/Buenos_Aires';
 
--- execution_images table (if has timestamp columns)
+-- Also convert updated_at if it exists and is naive
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'execution_analysis'
+    AND column_name = 'updated_at'
+    AND data_type = 'timestamp without time zone'
+  ) THEN
+    ALTER TABLE execution_analysis
+      ALTER COLUMN updated_at TYPE timestamptz
+        USING updated_at AT TIME ZONE 'America/Argentina/Buenos_Aires';
+  END IF;
+END $$;
+
+-- execution_images table
 DO $$
 BEGIN
   IF EXISTS (
@@ -61,7 +94,18 @@ BEGIN
   ) THEN
     ALTER TABLE execution_images
       ALTER COLUMN extracted_at TYPE timestamptz
-        USING extracted_at AT TIME ZONE 'UTC';
+        USING extracted_at AT TIME ZONE 'America/Argentina/Buenos_Aires';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'execution_images'
+    AND column_name = 'created_at'
+    AND data_type = 'timestamp without time zone'
+  ) THEN
+    ALTER TABLE execution_images
+      ALTER COLUMN created_at TYPE timestamptz
+        USING created_at AT TIME ZONE 'America/Argentina/Buenos_Aires';
   END IF;
 END $$;
 
@@ -76,12 +120,23 @@ BEGIN
   ) THEN
     ALTER TABLE execution_notifications
       ALTER COLUMN telegram_sent_at TYPE timestamptz
-        USING telegram_sent_at AT TIME ZONE 'UTC';
+        USING telegram_sent_at AT TIME ZONE 'America/Argentina/Buenos_Aires';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'execution_notifications'
+    AND column_name = 'updated_at'
+    AND data_type = 'timestamp without time zone'
+  ) THEN
+    ALTER TABLE execution_notifications
+      ALTER COLUMN updated_at TYPE timestamptz
+        USING updated_at AT TIME ZONE 'America/Argentina/Buenos_Aires';
   END IF;
 END $$;
 
-COMMENT ON COLUMN executions.execution_timestamp IS 'When n8n started executing (timezone-aware)';
-COMMENT ON COLUMN executions.completion_timestamp IS 'When n8n finished executing (timezone-aware)';
+COMMENT ON COLUMN executions.execution_timestamp IS 'When n8n started executing (timezone-aware, stored as UTC)';
+COMMENT ON COLUMN executions.completion_timestamp IS 'When n8n finished executing (timezone-aware, stored as UTC)';
 
 -- ============================================================================
 -- Phase 2: HIGH - Drop unused indexes (0 scans in production)
@@ -198,7 +253,11 @@ DECLARE
   dropped_indexes INTEGER;
   new_index_exists BOOLEAN;
   constraints_added INTEGER;
+  db_timezone TEXT;
 BEGIN
+  -- Verify database timezone
+  SELECT current_setting('TimeZone') INTO db_timezone;
+
   -- Count timestamptz columns in executions
   SELECT COUNT(*) INTO timestamptz_count
   FROM information_schema.columns
@@ -229,7 +288,8 @@ BEGIN
   AND conrelid = 'execution_analysis'::regclass;
 
   RAISE NOTICE '============================================';
-  RAISE NOTICE '✅ Migration 007 completed:';
+  RAISE NOTICE 'Migration 007 completed:';
+  RAISE NOTICE '   - Database timezone: %', db_timezone;
   RAISE NOTICE '   - timestamptz columns in executions: %', timestamptz_count;
   RAISE NOTICE '   - Remaining dropped indexes: % (should be 0)', dropped_indexes;
   RAISE NOTICE '   - New composite index created: %', new_index_exists;
@@ -245,9 +305,13 @@ END $$;
 -- Rollback instructions (manual)
 -- ============================================================================
 --
--- To rollback timestamptz changes:
--- ALTER TABLE executions ALTER COLUMN execution_timestamp TYPE timestamp;
--- (repeat for other columns)
+-- To rollback database timezone:
+-- ALTER DATABASE sai_dashboard SET TimeZone TO 'America/Argentina/Buenos_Aires';
+--
+-- To rollback timestamptz changes (convert back, treating stored UTC as UTC):
+-- ALTER TABLE executions ALTER COLUMN execution_timestamp TYPE timestamp
+--   USING execution_timestamp AT TIME ZONE 'America/Argentina/Buenos_Aires';
+-- (repeat for other columns - this converts UTC back to local naive timestamps)
 --
 -- To recreate dropped indexes:
 -- CREATE INDEX idx_executions_timestamp ON executions(execution_timestamp DESC);
