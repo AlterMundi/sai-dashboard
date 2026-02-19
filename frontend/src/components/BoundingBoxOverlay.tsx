@@ -15,7 +15,7 @@ interface BoundingBoxOverlayProps {
   className?: string;
 }
 
-const BB_COLOR = { bg: 'rgba(29, 78, 216, 0.25)', border: '#1d4ed8', text: '#eff6ff' };
+const BB_COLOR = { bg: 'transparent', border: '#1d4ed8', text: '#eff6ff' };
 
 /**
  * Renders bounding box overlays on top of an image.

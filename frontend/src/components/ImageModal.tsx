@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { LoadingSpinner } from './ui/LoadingSpinner';
 import { useSecureImage } from './ui/SecureImage';
@@ -36,9 +36,7 @@ import toast from 'react-hot-toast';
 
 export function ImageModal({ execution, isOpen, onClose, onUpdate }: ImageModalProps) {
   const { t } = useTranslation();
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [zoomLevel, setZoomLevel] = useState(1);
-  const [naturalSize, setNaturalSize] = useState<{ w: number; h: number } | null>(null);
   const [downloading, setDownloading] = useState(false);
   const [showBoundingBoxes, setShowBoundingBoxes] = useState(true);
   const [updatingFalsePositive, setUpdatingFalsePositive] = useState(false);
@@ -65,46 +63,25 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate }: ImageModalP
   useEffect(() => {
     if (execution) {
       setZoomLevel(1);
-      setNaturalSize(null);
     }
   }, [execution?.id]);
 
-  // Compute the centroid of all detections in normalized [0..1] coords
-  const detectionFocus = useMemo(() => {
+  // Compute the centroid of all detections in normalized [0..1] coords.
+  // Used as the CSS transform-origin for zoom, so zoom expands from the detection.
+  const zoomOrigin = useMemo(() => {
     const dets = execution?.detections;
     const imgW = execution?.imageWidth;
     const imgH = execution?.imageHeight;
-    if (!dets?.length || !imgW || !imgH) return null;
+    if (!dets?.length || !imgW || !imgH) return '50% 50%';
     let sumX = 0, sumY = 0;
     for (const det of dets) {
       sumX += det.bounding_box.x + det.bounding_box.width / 2;
       sumY += det.bounding_box.y + det.bounding_box.height / 2;
     }
-    return {
-      fx: (sumX / dets.length) / imgW,
-      fy: (sumY / dets.length) / imgH,
-    };
+    const fx = ((sumX / dets.length) / imgW * 100).toFixed(2);
+    const fy = ((sumY / dets.length) / imgH * 100).toFixed(2);
+    return `${fx}% ${fy}%`;
   }, [execution?.detections, execution?.imageWidth, execution?.imageHeight]);
-
-  // Scroll to keep detection (or center) in view when zoom changes
-  useEffect(() => {
-    const container = scrollContainerRef.current;
-    if (!container || !naturalSize) return;
-    if (zoomLevel <= 1) {
-      // Fit mode — no scroll needed
-      return;
-    }
-    const renderedW = naturalSize.w * zoomLevel;
-    const renderedH = naturalSize.h * zoomLevel;
-    const padding = 16; // matches p-4
-    const focusX = detectionFocus ? detectionFocus.fx * renderedW : renderedW / 2;
-    const focusY = detectionFocus ? detectionFocus.fy * renderedH : renderedH / 2;
-    container.scrollTo({
-      left: focusX + padding - container.clientWidth / 2,
-      top: focusY + padding - container.clientHeight / 2,
-      behavior: 'smooth',
-    });
-  }, [zoomLevel, naturalSize, detectionFocus]);
 
   // Handle escape key
   useEffect(() => {
@@ -293,14 +270,8 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate }: ImageModalP
               </div>
             )}
 
-            {/* Scrollable image container */}
-            <div
-              ref={scrollContainerRef}
-              className={cn(
-                "flex-1 min-h-0 p-4 overflow-auto",
-                zoomLevel <= 1 && "flex items-center justify-center"
-              )}
-            >
+            {/* Image container — overflow-hidden so scaled image clips cleanly */}
+            <div className="flex-1 min-h-0 p-4 overflow-hidden flex items-center justify-center">
               {secureImageUrl ? (
                 <>
                   {imageLoading && (
@@ -314,22 +285,18 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate }: ImageModalP
                       <p className="text-lg">{t('modal.failedToLoadImage')}</p>
                     </div>
                   ) : imageUrl ? (
-                    <div className="relative inline-block">
+                    <div
+                      className="relative inline-block"
+                      style={{
+                        transform: zoomLevel > 1 ? `scale(${zoomLevel})` : undefined,
+                        transformOrigin: zoomOrigin,
+                        transition: 'transform 0.2s ease-out',
+                      }}
+                    >
                       <img
                         src={imageUrl}
                         alt={`Execution ${execution.id}`}
-                        onLoad={(e) => {
-                          const img = e.currentTarget;
-                          setNaturalSize({ w: img.naturalWidth, h: img.naturalHeight });
-                        }}
-                        className={cn(
-                          zoomLevel <= 1 && 'max-w-full max-h-[calc(100vh-14rem)] object-contain'
-                        )}
-                        style={zoomLevel > 1 && naturalSize ? {
-                          width: naturalSize.w * zoomLevel,
-                          maxWidth: 'none',
-                          maxHeight: 'none',
-                        } : undefined}
+                        className="max-w-full max-h-[calc(100vh-14rem)] object-contain"
                       />
                       <BoundingBoxOverlay
                         detections={execution.detections}
