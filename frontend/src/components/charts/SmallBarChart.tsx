@@ -4,15 +4,15 @@ import { cn } from '@/utils';
 interface BarSeries {
   key: string;
   label: string;
-  color: string; // CSS color value (hex/rgb/tailwind-arbitrary)
-  bgClass: string; // Tailwind bg class for legend dot
+  color: string;   // CSS color value (hex/rgb) for tooltip dot
+  bgClass: string; // Tailwind bg class for bars and legend
 }
 
 interface SimpleBarChartProps {
   title: string;
   data: Array<{ date: string; value: number }>;
-  color: string;       // CSS hex/rgb color for bars
-  bgClass: string;     // Tailwind bg class for bars
+  color: string;    // CSS hex/rgb color for tooltip accent
+  bgClass: string;  // Tailwind bg class for bars
   unit?: string;
   emptyMessage?: string;
   className?: string;

@@ -83,7 +83,6 @@ export function StatsDashboard() {
       label: t('stats.smokeDetections7d'),
       value: totals.smoke,
       icon: Wind,
-      // Steel-blue accent — smoke
       accent: 'border-t-[3px] border-t-slate-400',
       numColor: 'text-slate-700',
       iconColor: 'text-slate-300',
@@ -94,7 +93,6 @@ export function StatsDashboard() {
       label: t('stats.criticalAlerts7d'),
       value: totals.critical,
       icon: AlertOctagon,
-      // Deep crimson — critical
       accent: 'border-t-[3px] border-t-red-600',
       numColor: 'text-red-700',
       iconColor: 'text-red-200',
@@ -105,7 +103,6 @@ export function StatsDashboard() {
       label: t('stats.highAlerts7d'),
       value: totals.high,
       icon: AlertTriangle,
-      // Amber — high risk
       accent: 'border-t-[3px] border-t-orange-400',
       numColor: 'text-orange-600',
       iconColor: 'text-orange-200',
@@ -116,7 +113,6 @@ export function StatsDashboard() {
       label: t('stats.telegramSent7d'),
       value: totals.telegram,
       icon: MessageCircle,
-      // Sky-blue — telegram
       accent: 'border-t-[3px] border-t-sky-500',
       numColor: 'text-sky-700',
       iconColor: 'text-sky-200',
@@ -141,8 +137,8 @@ export function StatsDashboard() {
             key={label}
             className={`bg-white rounded-xl shadow-sm ${accent} relative overflow-hidden`}
           >
-            {/* Decorative icon watermark */}
-            <div className="absolute right-3 top-3 opacity-100">
+            {/* Icon badge */}
+            <div className="absolute right-3 top-3">
               <div className={`p-2 rounded-lg ${bgClass}`}>
                 <Icon className={`h-5 w-5 ${iconColor}`} />
               </div>
