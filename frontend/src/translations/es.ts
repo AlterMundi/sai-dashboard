@@ -316,8 +316,7 @@ const es: TranslationKeys = {
     unknownError: 'Error desconocido',
     // notifyBatchComplete
     batchTitle: '{count} Nuevas Ejecuciones',
-    batchBodyWithRisk: '⚠️ {highRisk} alto riesgo, {successful} exitosas',
-    batchBody: '{successful} exitosas',
+    batchBodyWithRisk: '⚠️ {highRisk} alto riesgo',
     // notifySystemHealth
     systemCriticalTitle: 'Sistema Crítico',
     systemWarningTitle: 'Advertencia del Sistema',

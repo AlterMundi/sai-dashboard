@@ -314,8 +314,7 @@ const en = {
     unknownError: 'Unknown error occurred',
     // notifyBatchComplete
     batchTitle: '{count} New Executions',
-    batchBodyWithRisk: '⚠️ {highRisk} high risk, {successful} successful',
-    batchBody: '{successful} successful',
+    batchBodyWithRisk: '⚠️ {highRisk} high risk',
     // notifySystemHealth
     systemCriticalTitle: 'System Critical',
     systemWarningTitle: 'System Warning',

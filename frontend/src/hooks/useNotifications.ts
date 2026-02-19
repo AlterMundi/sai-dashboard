@@ -99,8 +99,8 @@ export function useNotifications() {
       icon: '📊',
       title: t('notifications.batchTitle', { count: batchData.count }),
       body: hasRisk
-        ? t('notifications.batchBodyWithRisk', { highRisk: batchData.highRisk!, successful: batchData.successful ?? 0 })
-        : t('notifications.batchBody', { successful: batchData.successful ?? 0 }),
+        ? t('notifications.batchBodyWithRisk', { highRisk: batchData.highRisk! })
+        : '',
       actions: [],
       duration: 8000,
       data: batchData
