@@ -206,6 +206,7 @@ export interface DailySummary {
   // New fields for enhanced daily summary
   highRiskDetections: number;
   criticalDetections: number;
+  lowAlertDetections: number;
   executionsWithImages: number;
   telegramNotificationsSent: number;
   avgProcessingTimeMs: number;

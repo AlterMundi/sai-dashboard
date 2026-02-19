@@ -319,7 +319,7 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate }: ImageModalP
             {imageUrl && !imageError && (
               <div className="absolute bottom-4 right-4 flex items-center gap-1 bg-black/70 rounded-lg p-1 z-10">
                 <button
-                  onClick={() => setZoomLevel(z => Math.max(z - 0.5, 1))}
+                  onClick={() => setZoomLevel(z => Math.max(z - 1, 1))}
                   disabled={zoomLevel <= 1}
                   className="p-1.5 text-white hover:bg-white/20 rounded disabled:opacity-30 disabled:cursor-not-allowed"
                 >
@@ -329,7 +329,7 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate }: ImageModalP
                   {zoomLevel === 1 ? 'Fit' : `${zoomLevel}x`}
                 </span>
                 <button
-                  onClick={() => setZoomLevel(z => Math.min(z + 0.5, 4))}
+                  onClick={() => setZoomLevel(z => Math.min(z + 1, 10))}
                   disabled={zoomLevel >= 4}
                   className="p-1.5 text-white hover:bg-white/20 rounded disabled:opacity-30 disabled:cursor-not-allowed"
                 >

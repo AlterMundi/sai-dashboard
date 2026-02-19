@@ -12,6 +12,16 @@ vi.mock('@/services/api', () => ({
   },
 }));
 
+// Mock useSecureImage so it doesn't try to fetch with tokenManager.
+// Returns blobUrl = the URL passed in (or undefined), loading = false, error = false.
+vi.mock('@/components/ui/SecureImage', () => ({
+  useSecureImage: vi.fn((url: string | undefined) => ({
+    blobUrl: url,
+    loading: false,
+    error: false,
+  })),
+}));
+
 describe('useImageCard', () => {
   it('returns thumbnailUrl when execution hasImage and not stage1', () => {
     const execution = createMockYoloExecution();
@@ -54,32 +64,34 @@ describe('useImageCard', () => {
     expect(result.current.hasStage2Error).toBe(false);
   });
 
-  it('starts with imageLoading=true and imageError=false', () => {
+  it('imageLoading and imageError reflect useSecureImage state', () => {
     const execution = createMockYoloExecution();
     const { result } = renderHook(() => useImageCard(execution));
 
-    expect(result.current.imageLoading).toBe(true);
+    // loading/error come from useSecureImage (mocked to false/false)
+    expect(result.current.imageLoading).toBe(false);
     expect(result.current.imageError).toBe(false);
   });
 
-  it('handleImageLoad sets correct state', () => {
+  it('handleImageLoad is callable (loading state managed by useSecureImage)', () => {
     const execution = createMockYoloExecution();
     const { result } = renderHook(() => useImageCard(execution));
 
+    // No-op: does not throw and does not change state
     act(() => result.current.handleImageLoad());
 
     expect(result.current.imageLoading).toBe(false);
     expect(result.current.imageError).toBe(false);
   });
 
-  it('handleImageError sets correct state', () => {
+  it('handleImageError is callable (error state managed by useSecureImage)', () => {
     const execution = createMockYoloExecution();
     const { result } = renderHook(() => useImageCard(execution));
 
+    // No-op: does not throw and does not change state
     act(() => result.current.handleImageError());
 
     expect(result.current.imageLoading).toBe(false);
-    expect(result.current.imageError).toBe(true);
   });
 
   it('returns thumbnailUrl for completed stage2 execution', () => {

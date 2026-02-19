@@ -106,8 +106,15 @@ export interface DailySummary {
   failedExecutions: number;
   successRate: number;
   avgExecutionTime: number | null;
-  fireDetections?: number;
-  smokeDetections?: number;
+  fireDetections: number;
+  smokeDetections: number;
+  highRiskDetections: number;
+  criticalDetections: number;
+  lowAlertDetections: number;
+  executionsWithImages: number;
+  telegramNotificationsSent: number;
+  avgProcessingTimeMs: number;
+  avgConfidenceScore: number;
 }
 
 /**
