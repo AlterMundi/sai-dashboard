@@ -70,6 +70,28 @@ export function AlertFilterComponent({
 
   const activeCount = getActiveFilterCount();
 
+  // Smoke master toggle: active only when all three alert levels are on
+  const SMOKE_ALERT_LEVELS = ['critical', 'high', 'low'] as const;
+  const smokeAllActive = SMOKE_ALERT_LEVELS.every(l => filters.alertLevels?.includes(l));
+
+  const handleSmokeToggle = () => {
+    if (smokeAllActive) {
+      onFiltersChange({ ...filters, alertLevels: undefined, hasSmoke: undefined, page: 0 });
+    } else {
+      onFiltersChange({ ...filters, alertLevels: ['critical', 'high', 'low'], hasSmoke: true, page: 0 });
+    }
+  };
+
+  const handleAlertLevelToggle = (level: 'critical' | 'high' | 'low') => {
+    const currentLevels = filters.alertLevels || [];
+    const newLevels = currentLevels.includes(level)
+      ? currentLevels.filter(l => l !== level)
+      : [...currentLevels, level];
+    // If deselecting a level while smoke master was fully on, also clear hasSmoke
+    const newHasSmoke = newLevels.length === 3 ? filters.hasSmoke : undefined;
+    onFiltersChange({ ...filters, alertLevels: newLevels.length > 0 ? newLevels : undefined, hasSmoke: newHasSmoke, page: 0 });
+  };
+
   // Quick filter definitions
   const quickFilters = [
     {
@@ -77,8 +99,8 @@ export function AlertFilterComponent({
       labelKey: 'filters.smoke',
       icon: Wind,
       color: 'neutral',
-      isActive: filters.hasSmoke === true,
-      onClick: () => handleFilterChange('hasSmoke', filters.hasSmoke === true ? undefined : true)
+      isActive: smokeAllActive,
+      onClick: handleSmokeToggle
     },
     {
       id: 'critical_alerts',
@@ -86,13 +108,7 @@ export function AlertFilterComponent({
       icon: AlertTriangle,
       color: 'danger',
       isActive: filters.alertLevels?.includes('critical'),
-      onClick: () => {
-        const currentLevels = filters.alertLevels || [];
-        const newLevels = currentLevels.includes('critical')
-          ? currentLevels.filter(l => l !== 'critical')
-          : [...currentLevels, 'critical'];
-        handleFilterChange('alertLevels', newLevels.length > 0 ? newLevels : undefined);
-      }
+      onClick: () => handleAlertLevelToggle('critical')
     },
     {
       id: 'high_alerts',
@@ -100,13 +116,7 @@ export function AlertFilterComponent({
       icon: AlertTriangle,
       color: 'warning',
       isActive: filters.alertLevels?.includes('high'),
-      onClick: () => {
-        const currentLevels = filters.alertLevels || [];
-        const newLevels = currentLevels.includes('high')
-          ? currentLevels.filter(l => l !== 'high')
-          : [...currentLevels, 'high'];
-        handleFilterChange('alertLevels', newLevels.length > 0 ? newLevels : undefined);
-      }
+      onClick: () => handleAlertLevelToggle('high')
     },
     {
       id: 'low_alerts',
@@ -114,13 +124,7 @@ export function AlertFilterComponent({
       icon: AlertTriangle,
       color: 'info',
       isActive: filters.alertLevels?.includes('low'),
-      onClick: () => {
-        const currentLevels = filters.alertLevels || [];
-        const newLevels = currentLevels.includes('low')
-          ? currentLevels.filter(l => l !== 'low')
-          : [...currentLevels, 'low'];
-        handleFilterChange('alertLevels', newLevels.length > 0 ? newLevels : undefined);
-      }
+      onClick: () => handleAlertLevelToggle('low')
     }
   ];
 

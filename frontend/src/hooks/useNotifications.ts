@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { NotificationData, NotificationAction } from '@/components/notifications/NotificationOverlay';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from '@/contexts/LanguageContext';
 
 interface CreateNotificationOptions {
   type: NotificationData['type'];
@@ -16,6 +17,7 @@ interface CreateNotificationOptions {
 export function useNotifications() {
   const [notifications, setNotifications] = useState<NotificationData[]>([]);
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   const createNotification = useCallback((options: CreateNotificationOptions): string => {
     const id = `notification_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -61,80 +63,83 @@ export function useNotifications() {
     return createNotification({
       type: 'execution:new',
       icon: isHighRisk ? '🚨' : '🔍',
-      title: isHighRisk ? 'High Risk Detection' : `Analysis Complete #${executionId}`,
+      title: isHighRisk
+        ? t('notifications.highRiskTitle')
+        : t('notifications.analysisCompleteTitle', { id: executionId }),
       body: isHighRisk
-        ? `Alert: ${alertLevel} (${(confidence * 100).toFixed(0)}% confidence)`
-        : `Alert: ${alertLevel || 'none'}`,
+        ? t('notifications.highRiskBody', { alertLevel: alertLevel!, confidence: (confidence * 100).toFixed(0) })
+        : t('notifications.alertBody', { alertLevel: alertLevel || 'none' }),
       actions: [
-        { label: 'View Details', action: 'view', priority: isHighRisk ? 'high' : 'medium' },
+        { label: t('notifications.viewDetails'), action: 'view', priority: isHighRisk ? 'high' : 'medium' },
       ],
       duration: isHighRisk ? 10000 : 6000,
       persistent: isHighRisk,
       data: executionData
     });
-  }, [createNotification]);
+  }, [createNotification, t]);
 
   const notifyExecutionError = useCallback((errorData: { executionId: string; error?: string }) => {
     return createNotification({
       type: 'execution:error',
       icon: '⚠️',
-      title: `Execution Failed #${errorData.executionId.slice(-6)}`,
-      body: errorData.error || 'Unknown error occurred',
+      title: t('notifications.executionFailedTitle', { id: errorData.executionId.slice(-6) }),
+      body: errorData.error || t('notifications.unknownError'),
       actions: [
-        { label: 'View Details', action: 'view', priority: 'medium' }
+        { label: t('notifications.viewDetails'), action: 'view', priority: 'medium' }
       ],
       duration: 8000,
       data: errorData
     });
-  }, [createNotification]);
+  }, [createNotification, t]);
 
   const notifyBatchComplete = useCallback((batchData: { count: number; highRisk?: number; successful?: number }) => {
+    const hasRisk = (batchData.highRisk ?? 0) > 0;
     return createNotification({
       type: 'execution:batch',
       icon: '📊',
-      title: `${batchData.count} New Executions`,
-      body: `${(batchData.highRisk ?? 0) > 0 ? `⚠️ ${batchData.highRisk} high risk, ` : ''}${batchData.successful} successful`,
-      actions: [], // No buttons - strict notification only
-      duration: 8000, // Show for 8 seconds
+      title: t('notifications.batchTitle', { count: batchData.count }),
+      body: hasRisk
+        ? t('notifications.batchBodyWithRisk', { highRisk: batchData.highRisk! })
+        : '',
+      actions: [],
+      duration: 8000,
       data: batchData
     });
-  }, [createNotification]);
+  }, [createNotification, t]);
 
   const notifySystemHealth = useCallback((healthData: { status: string; cpu?: number; memory?: number; queueSize?: number }) => {
     const isCritical = healthData.status === 'critical';
-    
-    if (healthData.status === 'healthy') return; // Don't notify for healthy status
-    
+
+    if (healthData.status === 'healthy') return;
+
     return createNotification({
       type: 'system:health',
       icon: isCritical ? '🔥' : '⚠️',
-      title: isCritical ? 'System Critical' : 'System Warning',
-      body: `CPU: ${healthData.cpu}% | Memory: ${healthData.memory}% | Queue: ${healthData.queueSize}`,
+      title: isCritical ? t('notifications.systemCriticalTitle') : t('notifications.systemWarningTitle'),
+      body: t('notifications.systemHealthBody', { cpu: healthData.cpu ?? 0, memory: healthData.memory ?? 0, queueSize: healthData.queueSize ?? 0 }),
       actions: [
-        { label: 'System Health', action: 'health', priority: isCritical ? 'high' : 'medium' }
+        { label: t('notifications.systemHealthAction'), action: 'health', priority: isCritical ? 'high' : 'medium' }
       ],
       duration: isCritical ? 20000 : 12000,
       persistent: isCritical,
       data: healthData
     });
-  }, [createNotification]);
+  }, [createNotification, t]);
 
   const notifySystemStats = useCallback((statsData: { successRate: number; queueSize?: number; avgProcessingTime?: number }) => {
-    // Only notify for significant changes in stats
     const successRate = (statsData.successRate * 100).toFixed(1);
-    
-    // Don't spam with stats notifications unless there's something notable
+
     if (parseFloat(successRate) < 90) {
       return createNotification({
         type: 'system:stats',
         icon: '📈',
-        title: 'Performance Update',
-        body: `Success Rate: ${successRate}% | Queue: ${statsData.queueSize} | Avg Time: ${statsData.avgProcessingTime?.toFixed(1)}s`,
+        title: t('notifications.performanceUpdateTitle'),
+        body: t('notifications.performanceBody', { successRate, queueSize: statsData.queueSize ?? 0, avgTime: statsData.avgProcessingTime?.toFixed(1) ?? '0' }),
         duration: 6000,
         data: statsData
       });
     }
-  }, [createNotification]);
+  }, [createNotification, t]);
 
   const clearAllNotifications = useCallback(() => {
     setNotifications([]);

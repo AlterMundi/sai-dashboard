@@ -304,6 +304,28 @@ const es: TranslationKeys = {
     goToDashboard: 'Ir al Dashboard',
   },
   loadingDashboard: 'Cargando dashboard\u2026',
+  notifications: {
+    // notifyNewExecution
+    highRiskTitle: 'Detección de Alto Riesgo',
+    analysisCompleteTitle: 'Análisis Completo #{id}',
+    highRiskBody: 'Alerta: {alertLevel} ({confidence}% confianza)',
+    alertBody: 'Alerta: {alertLevel}',
+    viewDetails: 'Ver Detalles',
+    // notifyExecutionError
+    executionFailedTitle: 'Ejecución Fallida #{id}',
+    unknownError: 'Error desconocido',
+    // notifyBatchComplete
+    batchTitle: '{count} Nuevas Ejecuciones',
+    batchBodyWithRisk: '⚠️ {highRisk} alto riesgo',
+    // notifySystemHealth
+    systemCriticalTitle: 'Sistema Crítico',
+    systemWarningTitle: 'Advertencia del Sistema',
+    systemHealthBody: 'CPU: {cpu}% | Memoria: {memory}% | Cola: {queueSize}',
+    systemHealthAction: 'Salud del Sistema',
+    // notifySystemStats
+    performanceUpdateTitle: 'Actualización de Rendimiento',
+    performanceBody: 'Tasa de Éxito: {successRate}% | Cola: {queueSize} | Tiempo Promedio: {avgTime}s',
+  },
 } as const;
 
 export default es;

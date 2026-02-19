@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { StatusBadge } from './ui/StatusBadge';
 import { LoadingSpinner } from './ui/LoadingSpinner';
 import { useSecureImage } from './ui/SecureImage';
 import { BoundingBoxOverlay, BoundingBoxToggle } from './BoundingBoxOverlay';
@@ -193,7 +192,6 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate }: ImageModalP
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gray-50">
           <div className="flex items-center space-x-3">
-            <StatusBadge status={execution.status} />
             <div>
               <h2 className="text-lg font-semibold text-gray-900">
                 {t('modal.executionDetails')}

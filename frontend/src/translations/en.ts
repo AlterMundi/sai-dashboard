@@ -302,6 +302,28 @@ const en = {
     goToDashboard: 'Go to Dashboard',
   },
   loadingDashboard: 'Loading dashboard\u2026',
+  notifications: {
+    // notifyNewExecution
+    highRiskTitle: 'High Risk Detection',
+    analysisCompleteTitle: 'Analysis Complete #{id}',
+    highRiskBody: 'Alert: {alertLevel} ({confidence}% confidence)',
+    alertBody: 'Alert: {alertLevel}',
+    viewDetails: 'View Details',
+    // notifyExecutionError
+    executionFailedTitle: 'Execution Failed #{id}',
+    unknownError: 'Unknown error occurred',
+    // notifyBatchComplete
+    batchTitle: '{count} New Executions',
+    batchBodyWithRisk: '⚠️ {highRisk} high risk',
+    // notifySystemHealth
+    systemCriticalTitle: 'System Critical',
+    systemWarningTitle: 'System Warning',
+    systemHealthBody: 'CPU: {cpu}% | Memory: {memory}% | Queue: {queueSize}',
+    systemHealthAction: 'System Health',
+    // notifySystemStats
+    performanceUpdateTitle: 'Performance Update',
+    performanceBody: 'Success Rate: {successRate}% | Queue: {queueSize} | Avg Time: {avgTime}s',
+  },
 } as const;
 
 // Widen literal string types to string for translation compatibility
