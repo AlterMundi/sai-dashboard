@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, Navigate, Link } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, Link, Outlet } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { HelmetProvider } from 'react-helmet-async';
 import { useAuth } from '@/hooks/useAuth';
@@ -61,27 +61,19 @@ function App() {
             {/* Public Routes */}
             <Route path="/login" element={<Login />} />
             
-            {/* Protected Routes */}
-            <Route 
-              path="/" 
+            {/* Protected Routes — SSEProvider shared across all of them via layout route */}
+            <Route
               element={
                 <ProtectedRoute>
                   <SSEProvider>
-                    <Dashboard />
+                    <Outlet />
                   </SSEProvider>
                 </ProtectedRoute>
-              } 
-            />
-            
-            {/* Statistics Page */}
-            <Route
-              path="/stats"
-              element={
-                <ProtectedRoute>
-                  <Stats />
-                </ProtectedRoute>
               }
-            />
+            >
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/stats" element={<Stats />} />
+            </Route>
 
             {/* Legacy dashboard route redirect */}
             <Route path="/dashboard" element={<Navigate to="/" replace />} />
