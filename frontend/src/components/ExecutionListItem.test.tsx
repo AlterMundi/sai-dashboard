@@ -12,6 +12,15 @@ vi.mock('@/services/api', () => ({
   },
 }));
 
+// Provide a blobUrl so the img element is rendered in tests.
+vi.mock('@/components/ui/SecureImage', () => ({
+  useSecureImage: vi.fn((url: string | undefined) => ({
+    blobUrl: url ?? 'blob:http://localhost/test-image',
+    loading: false,
+    error: false,
+  })),
+}));
+
 describe('ExecutionListItem', () => {
   const onClick = vi.fn();
   const execution = createMockYoloExecution();

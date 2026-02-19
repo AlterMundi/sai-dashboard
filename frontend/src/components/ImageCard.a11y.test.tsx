@@ -12,6 +12,15 @@ vi.mock('@/services/api', () => ({
   },
 }));
 
+// Return blobUrl from url so the img is rendered when a URL is provided.
+vi.mock('@/components/ui/SecureImage', () => ({
+  useSecureImage: vi.fn((url: string | undefined) => ({
+    blobUrl: url,
+    loading: false,
+    error: false,
+  })),
+}));
+
 describe('ImageCard Accessibility', () => {
   const onClick = vi.fn();
   const execution = createMockYoloExecution();
@@ -208,7 +217,7 @@ describe('ImageCard Accessibility', () => {
       <ImageCard execution={execution} onClick={onClick} />
     );
 
-    const telegram = document.querySelector('[aria-label="Telegram notification sent"]');
+    const telegram = document.querySelector('[aria-label="Telegram sent"]');
     expect(telegram).not.toBeNull();
   });
 });

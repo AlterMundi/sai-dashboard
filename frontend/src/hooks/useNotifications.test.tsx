@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
+import { LanguageProvider } from '@/contexts/LanguageContext';
 import { useNotifications } from './useNotifications';
 
 const mockNavigate = vi.fn();
@@ -16,7 +17,11 @@ vi.mock('react-router-dom', async () => {
 });
 
 function wrapper({ children }: { children: React.ReactNode }) {
-  return <BrowserRouter>{children}</BrowserRouter>;
+  return (
+    <LanguageProvider>
+      <BrowserRouter>{children}</BrowserRouter>
+    </LanguageProvider>
+  );
 }
 
 describe('useNotifications', () => {

@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom';
 import { HelmetProvider } from 'react-helmet-async';
 import { vi } from 'vitest';
 import { ExecutionWithImageUrls } from '@/types';
+import { LanguageProvider } from '@/contexts/LanguageContext';
 
 // Custom render with providers
 interface CustomRenderOptions extends Omit<RenderOptions, 'wrapper'> {
@@ -19,9 +20,11 @@ export function renderWithProviders(
   function Wrapper({ children }: { children: React.ReactNode }) {
     return (
       <HelmetProvider>
-        <BrowserRouter>
-          {children}
-        </BrowserRouter>
+        <LanguageProvider>
+          <BrowserRouter>
+            {children}
+          </BrowserRouter>
+        </LanguageProvider>
       </HelmetProvider>
     );
   }
