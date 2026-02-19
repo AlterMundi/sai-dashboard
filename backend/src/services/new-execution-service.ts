@@ -459,6 +459,7 @@ export class NewExecutionService {
         COUNT(CASE WHEN e.status = 'success' THEN 1 END) as successful_executions,
         COUNT(CASE WHEN ea.alert_level = 'high' THEN 1 END) as high_alert_detections,
         COUNT(CASE WHEN ea.alert_level = 'critical' THEN 1 END) as critical_detections,
+        COUNT(CASE WHEN ea.alert_level = 'low' THEN 1 END) as low_alert_detections,
         COUNT(CASE WHEN ea.has_fire = true THEN 1 END) as fire_detections,
         COUNT(CASE WHEN ea.has_smoke = true THEN 1 END) as smoke_detections,
         COUNT(CASE WHEN ei.execution_id IS NOT NULL THEN 1 END) as executions_with_images,
@@ -491,6 +492,7 @@ export class NewExecutionService {
         avgExecutionTime: parseFloat(row.avg_processing_time_ms) / 1000 || null, // Convert to seconds
         highRiskDetections: parseInt(row.high_alert_detections),
         criticalDetections: parseInt(row.critical_detections),
+        lowAlertDetections: parseInt(row.low_alert_detections) || 0,
         fireDetections: parseInt(row.fire_detections) || 0,
         smokeDetections: parseInt(row.smoke_detections) || 0,
         executionsWithImages: parseInt(row.executions_with_images),
