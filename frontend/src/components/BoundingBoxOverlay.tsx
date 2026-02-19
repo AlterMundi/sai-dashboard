@@ -15,11 +15,7 @@ interface BoundingBoxOverlayProps {
   className?: string;
 }
 
-const CLASS_COLORS: Record<string, { bg: string; border: string; text: string }> = {
-  fire: { bg: 'rgba(239, 68, 68, 0.25)', border: '#ef4444', text: '#fef2f2' },
-  smoke: { bg: 'rgba(156, 163, 175, 0.35)', border: '#9ca3af', text: '#f9fafb' },
-  unknown: { bg: 'rgba(59, 130, 246, 0.25)', border: '#3b82f6', text: '#eff6ff' },
-};
+const BB_COLOR = { bg: 'rgba(29, 78, 216, 0.25)', border: '#1d4ed8', text: '#eff6ff' };
 
 /**
  * Renders bounding box overlays on top of an image.
@@ -47,7 +43,7 @@ export function BoundingBoxOverlay({
     >
       {detections.map((detection, index) => {
         const { bounding_box, class: detectionClass, confidence } = detection;
-        const colors = CLASS_COLORS[detectionClass] || CLASS_COLORS.unknown;
+        const colors = BB_COLOR;
 
         const { x, y, width, height } = bounding_box;
         const isHovered = hoveredIndex === index;

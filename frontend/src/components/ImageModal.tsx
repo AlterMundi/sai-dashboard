@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { LoadingSpinner } from './ui/LoadingSpinner';
 import { useSecureImage } from './ui/SecureImage';
@@ -36,6 +36,7 @@ import toast from 'react-hot-toast';
 
 export function ImageModal({ execution, isOpen, onClose, onUpdate }: ImageModalProps) {
   const { t } = useTranslation();
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [zoomLevel, setZoomLevel] = useState(1);
   const [naturalSize, setNaturalSize] = useState<{ w: number; h: number } | null>(null);
   const [downloading, setDownloading] = useState(false);
@@ -67,6 +68,43 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate }: ImageModalP
       setNaturalSize(null);
     }
   }, [execution?.id]);
+
+  // Compute the centroid of all detections in normalized [0..1] coords
+  const detectionFocus = useMemo(() => {
+    const dets = execution?.detections;
+    const imgW = execution?.imageWidth;
+    const imgH = execution?.imageHeight;
+    if (!dets?.length || !imgW || !imgH) return null;
+    let sumX = 0, sumY = 0;
+    for (const det of dets) {
+      sumX += det.bounding_box.x + det.bounding_box.width / 2;
+      sumY += det.bounding_box.y + det.bounding_box.height / 2;
+    }
+    return {
+      fx: (sumX / dets.length) / imgW,
+      fy: (sumY / dets.length) / imgH,
+    };
+  }, [execution?.detections, execution?.imageWidth, execution?.imageHeight]);
+
+  // Scroll to keep detection (or center) in view when zoom changes
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container || !naturalSize) return;
+    if (zoomLevel <= 1) {
+      // Fit mode — no scroll needed
+      return;
+    }
+    const renderedW = naturalSize.w * zoomLevel;
+    const renderedH = naturalSize.h * zoomLevel;
+    const padding = 16; // matches p-4
+    const focusX = detectionFocus ? detectionFocus.fx * renderedW : renderedW / 2;
+    const focusY = detectionFocus ? detectionFocus.fy * renderedH : renderedH / 2;
+    container.scrollTo({
+      left: focusX + padding - container.clientWidth / 2,
+      top: focusY + padding - container.clientHeight / 2,
+      behavior: 'smooth',
+    });
+  }, [zoomLevel, naturalSize, detectionFocus]);
 
   // Handle escape key
   useEffect(() => {
@@ -256,10 +294,13 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate }: ImageModalP
             )}
 
             {/* Scrollable image container */}
-            <div className={cn(
-              "flex-1 min-h-0 p-4 overflow-auto",
-              zoomLevel <= 1 && "flex items-center justify-center"
-            )}>
+            <div
+              ref={scrollContainerRef}
+              className={cn(
+                "flex-1 min-h-0 p-4 overflow-auto",
+                zoomLevel <= 1 && "flex items-center justify-center"
+              )}
+            >
               {secureImageUrl ? (
                 <>
                   {imageLoading && (
