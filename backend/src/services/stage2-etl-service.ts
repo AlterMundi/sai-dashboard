@@ -857,16 +857,29 @@ export class Stage2ETLService extends EventEmitter {
         return null;
       }
 
-      return detectionsRaw.map((det: any) => ({
-        class: det.class || 'unknown',
-        confidence: parseFloat(det.confidence) || 0,
-        bounding_box: {
-          x: det.bbox?.x ?? det.x ?? 0,
-          y: det.bbox?.y ?? det.y ?? 0,
-          width: det.bbox?.width ?? det.w ?? 0,
-          height: det.bbox?.height ?? det.h ?? 0
+      return detectionsRaw.map((det: any) => {
+        // YOLO service returns xyxy format: {x1, y1, x2, y2}
+        // Convert to xywh for storage/rendering
+        const bbox = det.bbox ?? {};
+        let x: number, y: number, width: number, height: number;
+        if (bbox.x1 !== undefined) {
+          x = bbox.x1;
+          y = bbox.y1;
+          width = bbox.x2 - bbox.x1;
+          height = bbox.y2 - bbox.y1;
+        } else {
+          // Fallback: legacy xywh format
+          x = bbox.x ?? det.x ?? 0;
+          y = bbox.y ?? det.y ?? 0;
+          width = bbox.width ?? det.w ?? 0;
+          height = bbox.height ?? det.h ?? 0;
         }
-      }));
+        return {
+          class: det.class_name || det.class || 'unknown',
+          confidence: parseFloat(det.confidence) || 0,
+          bounding_box: { x, y, width, height }
+        };
+      });
     } catch (error) {
       logger.debug('Failed to parse detections:', error);
       return null;
