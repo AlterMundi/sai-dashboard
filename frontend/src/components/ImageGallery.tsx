@@ -237,10 +237,12 @@ export function ImageGallery({ initialFilters = {}, className, refreshTrigger, o
     const idx = executions.findIndex(e => e.id === selectedExecution.id);
     if (idx === -1) return undefined;
     return {
-      onPrev: () => { if (idx > 0) setSelectedExecution(executions[idx - 1]); },
-      onNext: () => { if (idx < executions.length - 1) setSelectedExecution(executions[idx + 1]); },
-      hasPrev: idx > 0,
-      hasNext: idx < executions.length - 1,
+      // executions are newest-first: higher idx = older.
+      // Left (Prev) → older → increase idx; Right (Next) → newer → decrease idx.
+      onPrev: () => { if (idx < executions.length - 1) setSelectedExecution(executions[idx + 1]); },
+      onNext: () => { if (idx > 0) setSelectedExecution(executions[idx - 1]); },
+      hasPrev: idx < executions.length - 1,
+      hasNext: idx > 0,
       index: idx,
       // Show DB total (after filtering) rather than just the loaded page set
       total: totalResults || executions.length,
