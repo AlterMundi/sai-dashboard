@@ -51,13 +51,10 @@ export function useNotifications() {
   }, [navigate]);
 
   // Smart notification creators for different event types
-  const notifyNewExecution = useCallback((executionData: { execution: { id: number; analysis?: { alertLevel?: string; confidenceFire?: number; confidenceSmoke?: number } } }) => {
+  const notifyNewExecution = useCallback((executionData: { execution: { id: number; analysis?: { alertLevel?: string; confidenceSmoke?: number } } }) => {
     const alertLevel = executionData.execution.analysis?.alertLevel;
     const isHighRisk = alertLevel === 'critical' || alertLevel === 'high';
-    const confidence = Math.max(
-      executionData.execution.analysis?.confidenceFire ?? 0,
-      executionData.execution.analysis?.confidenceSmoke ?? 0
-    );
+    const confidence = executionData.execution.analysis?.confidenceSmoke ?? 0;
     const executionId = String(executionData.execution.id).slice(-6);
 
     return createNotification({

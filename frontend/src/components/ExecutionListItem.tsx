@@ -5,7 +5,6 @@ import { ExecutionWithImageUrls } from '@/types';
 import { useImageCard, alertLevelColors } from '@/hooks/useImageCard';
 import {
   AlertTriangle,
-  Flame,
   Wind,
   Camera,
   MapPin,
@@ -176,20 +175,6 @@ export function ExecutionListItem({ execution, onClick, loading = false, isSelec
 
       {/* Detection Indicators */}
       <div className="flex-shrink-0 w-24 flex items-center gap-2">
-        {execution.hasFire && (
-          <div
-            className={cn(
-              'flex items-center gap-1 px-2 py-1 rounded text-xs font-medium',
-              isStage1Only ? 'bg-gray-100 text-gray-500' : 'bg-red-100 text-red-700'
-            )}
-            title={isStage1Only ? "Fire detection pending" : "Fire detected"}
-          >
-            <Flame className="h-3 w-3" aria-hidden="true" />
-            {!isStage1Only && execution.confidenceFire !== null && (
-              <span className="tabular-nums">{Math.round(execution.confidenceFire * 100)}%</span>
-            )}
-          </div>
-        )}
         {execution.hasSmoke && (
           <div
             className={cn(
@@ -204,7 +189,7 @@ export function ExecutionListItem({ execution, onClick, loading = false, isSelec
             )}
           </div>
         )}
-        {!execution.hasFire && !execution.hasSmoke && (
+        {!execution.hasSmoke && (
           <span className="text-xs text-gray-400">No detections</span>
         )}
       </div>

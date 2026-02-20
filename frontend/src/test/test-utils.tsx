@@ -55,13 +55,11 @@ export const createMockExecution = (overrides?: Partial<ExecutionWithImageUrls>)
   requestId: 'req-001',
   yoloModelVersion: 'yolov8n',
   detectionCount: 1,
-  hasFire: false,
   hasSmoke: false,
   alertLevel: 'none',
   detectionMode: null,
   activeClasses: null,
   detections: null,
-  confidenceFire: null,
   confidenceSmoke: null,
   confidenceScore: null,
 

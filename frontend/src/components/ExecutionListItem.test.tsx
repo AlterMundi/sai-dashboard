@@ -252,9 +252,8 @@ describe('ExecutionListItem', () => {
     expect(screen.getByText('95%')).toBeInTheDocument();
   });
 
-  it('shows "No detections" when neither fire nor smoke', () => {
+  it('shows "No detections" when no smoke', () => {
     const clean = createMockYoloExecution({
-      hasFire: false,
       hasSmoke: false,
       detectionCount: 0,
       alertLevel: 'none',

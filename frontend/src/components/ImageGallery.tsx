@@ -130,17 +130,15 @@ export function ImageGallery({ initialFilters = {}, className, refreshTrigger, o
 
   const handleExportCsv = useCallback(() => {
     const selected = executions.filter(e => selectedIds.has(e.id));
-    const headers = ['id', 'timestamp', 'camera', 'location', 'alertLevel', 'hasFire', 'hasSmoke', 'detectionCount', 'confidenceFire', 'confidenceSmoke', 'isFalsePositive'];
+    const headers = ['id', 'timestamp', 'camera', 'location', 'alertLevel', 'hasSmoke', 'detectionCount', 'confidenceSmoke', 'isFalsePositive'];
     const rows = selected.map(e => [
       e.id,
       e.executionTimestamp,
       e.cameraId ?? '',
       e.location ?? '',
       e.alertLevel ?? '',
-      e.hasFire ?? false,
       e.hasSmoke ?? false,
       e.detectionCount ?? 0,
-      e.confidenceFire ?? '',
       e.confidenceSmoke ?? '',
       e.isFalsePositive ?? false,
     ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(','));

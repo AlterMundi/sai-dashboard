@@ -104,8 +104,8 @@ export interface ExecutionFilters extends PaginationQuery {
   detectionCount?: number;  // Filter by minimum number of detections
   confidenceSmoke?: number;  // Smoke-specific confidence (0.0-1.0)
   detectionMode?: string;   // e.g., 'smoke-only'
-  minConfidence?: number;   // DEPRECATED: Use confidenceFire/confidenceSmoke instead
-  maxConfidence?: number;   // DEPRECATED: Use confidenceFire/confidenceSmoke instead
+  minConfidence?: number;   // DEPRECATED: Use confidenceSmoke instead
+  maxConfidence?: number;   // DEPRECATED: Use confidenceSmoke instead
 
   // Device/Camera filters (executions table)
   cameraId?: string;

@@ -15,7 +15,7 @@ import toast from 'react-hot-toast';
 // Types matching backend DetectionFilterCriteria
 export interface SearchCondition {
   id: string;
-  field: 'class' | 'confidence' | 'detectionCount' | 'boundingBoxSize' | 'position' | 'alertLevel' | 'hasFire' | 'hasSmoke';
+  field: 'class' | 'confidence' | 'detectionCount' | 'boundingBoxSize' | 'position' | 'alertLevel' | 'hasSmoke';
   operator: 'equals' | 'contains' | 'greaterThan' | 'lessThan' | 'between' | 'in';
   value: string | number | boolean | string[];
   secondValue?: number; // For 'between' operator
@@ -39,7 +39,6 @@ const FIELD_OPTIONS = [
   { value: 'confidence', labelKey: 'advancedSearch.confidence', type: 'number' },
   { value: 'detectionCount', labelKey: 'advancedSearch.detectionCount', type: 'number' },
   { value: 'alertLevel', labelKey: 'advancedSearch.alertLevel', type: 'select' },
-  { value: 'hasFire', labelKey: 'advancedSearch.hasFire', type: 'boolean' },
   { value: 'hasSmoke', labelKey: 'advancedSearch.hasSmoke', type: 'boolean' },
   { value: 'position', labelKey: 'advancedSearch.position', type: 'select' },
   { value: 'boundingBoxSize', labelKey: 'advancedSearch.boundingBoxSize', type: 'number' },
@@ -63,7 +62,6 @@ const OPERATOR_OPTIONS: Record<string, { value: string; labelKey: string }[]> = 
 
 const VALUE_OPTIONS: Record<string, { value: string; labelKey: string }[]> = {
   class: [
-    { value: 'fire', labelKey: 'advancedSearch.fire' },
     { value: 'smoke', labelKey: 'advancedSearch.smokeVal' },
   ],
   alertLevel: [
@@ -101,7 +99,7 @@ export function AdvancedSearchPanel({
       id: generateId(),
       field: 'class',
       operator: 'equals',
-      value: 'fire',
+      value: 'smoke',
     },
   ]);
 

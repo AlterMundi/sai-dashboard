@@ -65,8 +65,8 @@ export interface ExecutionFilters {
   detectionCount?: number;  // Filter by number of detections
   confidenceSmoke?: number;  // Smoke-specific confidence (0.0-1.0)
   detectionMode?: string;   // e.g., 'smoke-only'
-  minConfidence?: number;   // DEPRECATED: Use confidenceFire/confidenceSmoke instead
-  maxConfidence?: number;   // DEPRECATED: Use confidenceFire/confidenceSmoke instead
+  minConfidence?: number;   // DEPRECATED: Use confidenceSmoke instead
+  maxConfidence?: number;   // DEPRECATED: Use confidenceSmoke instead
 
   // Device/Camera filters (available after Stage 2, but can be partially available)
   cameraId?: string;
