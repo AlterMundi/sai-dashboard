@@ -296,3 +296,16 @@ export interface FilterOptions {
   deviceId:         string[];
   yoloModelVersion: string[];
 }
+
+export interface StatsRankingItem {
+  id: string;
+  smokeDetections: number;
+  criticalAlerts: number;
+  totalExecutions: number;
+}
+
+export interface StatsRanking {
+  cameras: StatsRankingItem[];
+  locations: StatsRankingItem[];
+  nodes: StatsRankingItem[];
+}

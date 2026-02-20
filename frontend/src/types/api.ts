@@ -249,3 +249,27 @@ export interface FilterOptions {
   deviceId:         string[];
   yoloModelVersion: string[];
 }
+
+/**
+ * Stats page filters: period + granularity + optional dimension filter
+ */
+export interface StatsFilters {
+  startDate: string;   // ISO date "YYYY-MM-DD"
+  endDate: string;     // ISO date "YYYY-MM-DD"
+  granularity: 'day' | 'week' | 'month';
+  dimensionKey?: 'cameraId' | 'location' | 'nodeId' | 'yoloModelVersion';
+  dimensionValue?: string;
+}
+
+export interface StatsRankingItem {
+  id: string;
+  smokeDetections: number;
+  criticalAlerts: number;
+  totalExecutions: number;
+}
+
+export interface StatsRanking {
+  cameras: StatsRankingItem[];
+  locations: StatsRankingItem[];
+  nodes: StatsRankingItem[];
+}

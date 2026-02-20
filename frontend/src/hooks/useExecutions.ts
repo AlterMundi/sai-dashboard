@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { executionsApi } from '@/services/api';
-import { ExecutionWithImageUrls, ExecutionFilters, UseExecutionsReturn, ExecutionStats, DailySummary, ProcessingStage } from '@/types';
+import { ExecutionWithImageUrls, ExecutionFilters, UseExecutionsReturn, ExecutionStats, DailySummary, StatsFilters, StatsRanking, ProcessingStage } from '@/types';
 
 export function useExecutions(
   initialFilters: ExecutionFilters = {},
@@ -241,26 +241,29 @@ export function useExecutionStats() {
   };
 }
 
-// Hook for daily summary
-export function useDailySummary(days = 30) {
+// Hook for daily summary — accepts either a number (days) or StatsFilters object
+export function useDailySummary(params: StatsFilters | number = 30) {
   const [summary, setSummary] = useState<DailySummary[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Stable key so useCallback only re-runs when params actually change
+  const paramsKey = JSON.stringify(params);
 
   const fetchSummary = useCallback(async () => {
     setIsLoading(true);
     setError(null);
 
     try {
-      const dailySummary = await executionsApi.getDailySummary(days);
+      const dailySummary = await executionsApi.getDailySummary(params);
       setSummary(dailySummary);
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to fetch daily summary';
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch daily summary';
       setError(errorMessage);
     } finally {
       setIsLoading(false);
     }
-  }, [days]);
+  }, [paramsKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     fetchSummary();
@@ -272,4 +275,32 @@ export function useDailySummary(days = 30) {
     error,
     refresh: fetchSummary,
   };
+}
+
+// Hook for stats ranking (top cameras/locations/nodes)
+export function useStatsRanking(startDate: string, endDate: string) {
+  const [ranking, setRanking] = useState<StatsRanking | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchRanking = useCallback(async () => {
+    if (!startDate || !endDate) return;
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const result = await executionsApi.getStatsRanking(startDate, endDate);
+      setRanking(result);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch ranking');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [startDate, endDate]);
+
+  useEffect(() => {
+    fetchRanking();
+  }, [fetchRanking]);
+
+  return { ranking, isLoading, error };
 }

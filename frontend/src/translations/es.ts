@@ -305,6 +305,38 @@ const es: TranslationKeys = {
     alertsByLevel: 'Alertas por Nivel',
     avgConfidencePerDay: 'Confianza Promedio',
     noDetections: 'Sin detecciones esta semana',
+    period: {
+      from: 'Desde',
+      to: 'Hasta',
+      clear: 'Limpiar',
+      presets: {
+        '7d': '7d',
+        '14d': '14d',
+        '30d': '30d',
+        '90d': '90d',
+        '6m': '6m',
+        '1y': '1y',
+      },
+    },
+    granularity: {
+      day: 'Diario',
+      week: 'Semanal',
+      month: 'Mensual',
+    },
+    dimension: {
+      all: 'Todas las dimensiones',
+      cameraId: 'Cámara',
+      location: 'Ubicación',
+      nodeId: 'Nodo',
+      yoloModel: 'Modelo',
+    },
+    ranking: {
+      title: 'Top del período',
+      cameras: 'Top cámaras',
+      locations: 'Top ubicaciones',
+      nodes: 'Top nodos',
+      noData: 'Sin datos para este período',
+    },
   },
   notFound: {
     title: '404',

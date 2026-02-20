@@ -16,6 +16,7 @@ interface SimpleBarChartProps {
   unit?: string;
   emptyMessage?: string;
   className?: string;
+  granularity?: 'day' | 'week' | 'month';
 }
 
 interface StackedBarChartProps {
@@ -24,6 +25,7 @@ interface StackedBarChartProps {
   series: BarSeries[];
   emptyMessage?: string;
   className?: string;
+  granularity?: 'day' | 'week' | 'month';
 }
 
 function formatDay(dateStr: string): string {
@@ -35,9 +37,15 @@ function formatDay(dateStr: string): string {
   }
 }
 
-function formatDayShort(dateStr: string): string {
+function formatDayShort(dateStr: string, granularity: 'day' | 'week' | 'month' = 'day'): string {
   try {
     const d = new Date(dateStr);
+    if (granularity === 'month') {
+      return d.toLocaleDateString(undefined, { month: 'short', timeZone: 'UTC' });
+    }
+    if (granularity === 'week') {
+      return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', timeZone: 'UTC' });
+    }
     return String(d.getUTCDate());
   } catch {
     return dateStr;
@@ -55,6 +63,7 @@ export function SimpleBarChart({
   unit = '',
   emptyMessage = 'No data',
   className,
+  granularity = 'day',
 }: SimpleBarChartProps) {
   const maxValue = useMemo(() => Math.max(...data.map(d => d.value), 1), [data]);
   const hasData = data.some(d => d.value > 0);
@@ -123,7 +132,7 @@ export function SimpleBarChart({
           {data.map((point) => (
             <div key={point.date} className="flex-1 text-center">
               <span className="text-[9px] text-gray-300 font-medium tabular-nums">
-                {formatDayShort(point.date)}
+                {formatDayShort(point.date, granularity)}
               </span>
             </div>
           ))}
@@ -139,6 +148,7 @@ export function StackedBarChart({
   series,
   emptyMessage = 'No data',
   className,
+  granularity = 'day',
 }: StackedBarChartProps) {
   const maxValue = useMemo(
     () => Math.max(...data.map(d => series.reduce((s, { key }) => s + ((d[key] as number) || 0), 0)), 1),
@@ -241,7 +251,7 @@ export function StackedBarChart({
           {data.map((point) => (
             <div key={point.date as string} className="flex-1 text-center">
               <span className="text-[9px] text-gray-300 font-medium tabular-nums">
-                {formatDayShort(point.date as string)}
+                {formatDayShort(point.date as string, granularity)}
               </span>
             </div>
           ))}

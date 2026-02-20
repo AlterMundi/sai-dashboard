@@ -312,14 +312,96 @@ export const getExecutionData = asyncHandler(async (req: Request, res: Response)
   });
 });
 
+// ISO date pattern: YYYY-MM-DD
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
 export const getDailySummary = asyncHandler(async (req: Request, res: Response): Promise<void> => {
-  const days = parseIntSafe(req.query.days as string, 7);
+  const {
+    days: daysRaw,
+    startDate,
+    endDate,
+    granularity,
+    cameraId,
+    location,
+    nodeId,
+    yoloModelVersion
+  } = req.query;
 
-  const summary = await newExecutionService.getDailySummary(days);
+  // Validate granularity whitelist
+  const validGranularities = ['day', 'week', 'month'];
+  const safeGranularity = validGranularities.includes(granularity as string)
+    ? (granularity as 'day' | 'week' | 'month')
+    : 'day';
 
-  res.json({
-    data: summary
+  // Dimension filters forwarded in both branches
+  const dimFilters = {
+    cameraId: cameraId as string | undefined,
+    location: location as string | undefined,
+    nodeId: nodeId as string | undefined,
+    yoloModelVersion: yoloModelVersion as string | undefined,
+  };
+
+  // Range mode: require BOTH startDate and endDate
+  if (startDate || endDate) {
+    if (!startDate || !endDate) {
+      res.status(400).json({
+        error: { message: 'Both startDate and endDate are required for range mode', code: 'MISSING_PARAMS' }
+      });
+      return;
+    }
+    if (!DATE_RE.test(startDate as string) || !DATE_RE.test(endDate as string)) {
+      res.status(400).json({
+        error: { message: 'startDate and endDate must be in YYYY-MM-DD format', code: 'INVALID_DATE_FORMAT' }
+      });
+      return;
+    }
+    const summary = await newExecutionService.getDailySummary({
+      startDate: startDate as string,
+      endDate: endDate as string,
+      granularity: safeGranularity,
+      ...dimFilters,
+    });
+    res.json({ data: summary });
+    return;
+  }
+
+  // Days mode: clamp to [1, 365] and forward dimension filters
+  const days = Math.min(365, Math.max(1, parseIntSafe(daysRaw as string, 7)));
+  const summary = await newExecutionService.getDailySummary({
+    days,
+    granularity: safeGranularity,
+    ...dimFilters,
   });
+  res.json({ data: summary });
+});
+
+export const getStatsRanking = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+  const { startDate, endDate, limit } = req.query;
+
+  if (!startDate || !endDate) {
+    res.status(400).json({
+      error: { message: 'startDate and endDate are required', code: 'MISSING_PARAMS' }
+    });
+    return;
+  }
+
+  if (!DATE_RE.test(startDate as string) || !DATE_RE.test(endDate as string)) {
+    res.status(400).json({
+      error: { message: 'startDate and endDate must be in YYYY-MM-DD format', code: 'INVALID_DATE_FORMAT' }
+    });
+    return;
+  }
+
+  // Clamp limit to [1, 50]
+  const safeLimit = Math.min(50, Math.max(1, parseIntSafe(limit as string, 5)));
+
+  const ranking = await newExecutionService.getTopByDimension({
+    startDate: startDate as string,
+    endDate: endDate as string,
+    limit: safeLimit,
+  });
+
+  res.json({ data: ranking });
 });
 
 export const getExecutionStats = asyncHandler(async (req: Request, res: Response): Promise<void> => {
