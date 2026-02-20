@@ -78,7 +78,7 @@ export function ExecutionListItem({ execution, onClick, loading = false, isSelec
       )}
 
       {/* Thumbnail */}
-      <div className="flex-shrink-0 w-16 h-16 rounded-md overflow-hidden bg-gray-100 relative">
+      <div className="flex-shrink-0 w-24 aspect-video rounded-md overflow-hidden bg-gray-100 relative">
         {thumbnailUrl ? (
           <>
             {imageLoading && (
@@ -191,17 +191,6 @@ export function ExecutionListItem({ execution, onClick, loading = false, isSelec
         )}
         {!execution.hasSmoke && (
           <span className="text-xs text-gray-400">No detections</span>
-        )}
-      </div>
-
-      {/* Detection Count */}
-      <div className="flex-shrink-0 w-16 text-center">
-        {execution.detectionCount > 0 && !isStage1Only ? (
-          <span className="inline-block bg-gray-100 text-gray-700 px-2 py-1 rounded text-xs font-medium">
-            {execution.detectionCount} det.
-          </span>
-        ) : (
-          <span className="text-xs text-gray-400">-</span>
         )}
       </div>
 

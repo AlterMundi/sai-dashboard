@@ -196,7 +196,7 @@ const es: TranslationKeys = {
     idTime: 'ID / Hora',
     cameraLocation: 'C\u00e1mara / Ubicaci\u00f3n',
     alert: 'Alerta',
-    listDetections: 'Detecciones',
+    listDetections: 'Confianza',
     count: 'Cantidad',
     listStatus: 'Estado',
     selectAll: 'Seleccionar todas las ejecuciones',

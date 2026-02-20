@@ -194,7 +194,7 @@ const en = {
     idTime: 'ID / Time',
     cameraLocation: 'Camera / Location',
     alert: 'Alert',
-    listDetections: 'Detections',
+    listDetections: 'Confidence',
     count: 'Count',
     listStatus: 'Status',
     selectAll: 'Select all executions',
