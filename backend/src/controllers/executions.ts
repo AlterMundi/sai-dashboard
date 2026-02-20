@@ -375,3 +375,9 @@ export const triggerAnalysisProcessing = asyncHandler(async (req: Request, res: 
     }
   });
 });
+
+export const getFilterOptions = asyncHandler(async (_req: Request, res: Response) => {
+  const options = await newExecutionService.getFilterOptions();
+  res.set('Cache-Control', 'private, max-age=60');
+  res.json({ data: options });
+});
