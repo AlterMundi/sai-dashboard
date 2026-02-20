@@ -100,16 +100,6 @@ export function AlertFilterComponent({
           )}
         </div>
         <div className="flex items-center space-x-2">
-          <button
-            onClick={() => setShowAdvanced(!showAdvanced)}
-            className="hidden sm:flex text-sm text-gray-600 hover:text-gray-900 items-center"
-          >
-            {showAdvanced ? t('filters.basic') : t('filters.advanced')}
-            <ChevronDown className={cn(
-              "h-4 w-4 ml-1 transition-transform",
-              showAdvanced && "rotate-180"
-            )} />
-          </button>
           {activeCount > 0 && (
             <Button
               variant="outline"
@@ -456,16 +446,28 @@ export function AlertFilterComponent({
           <div className="font-medium">
             {t('filters.results')}: {t('filters.executionsFound', { count: totalResults.toLocaleString() })}
           </div>
-          <button
-            onClick={() => setShowAdvanced(!showAdvanced)}
-            className="sm:hidden text-gray-600 hover:text-gray-900 flex items-center"
-            aria-label={showAdvanced ? t('filters.basic') : t('filters.advanced')}
-          >
-            <ChevronDown className={cn(
-              "h-4 w-4 transition-transform",
-              showAdvanced && "rotate-180"
-            )} />
-          </button>
+          <div className="flex items-center">
+            <button
+              onClick={() => setShowAdvanced(!showAdvanced)}
+              className="sm:hidden text-gray-600 hover:text-gray-900 flex items-center"
+              aria-label={showAdvanced ? t('filters.basic') : t('filters.advanced')}
+            >
+              <ChevronDown className={cn(
+                "h-4 w-4 transition-transform",
+                showAdvanced && "rotate-180"
+              )} />
+            </button>
+            <button
+              onClick={() => setShowAdvanced(!showAdvanced)}
+              className="hidden sm:flex text-sm text-gray-600 hover:text-gray-900 items-center"
+            >
+              {showAdvanced ? t('filters.basic') : t('filters.advanced')}
+              <ChevronDown className={cn(
+                "h-4 w-4 ml-1 transition-transform",
+                showAdvanced && "rotate-180"
+              )} />
+            </button>
+          </div>
         </div>
       </div>
     </div>
