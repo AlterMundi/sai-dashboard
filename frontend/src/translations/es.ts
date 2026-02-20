@@ -219,7 +219,8 @@ const es: TranslationKeys = {
     clearSelection: 'Limpiar selecci\u00f3n',
   },
   modal: {
-    executionDetails: 'Detalles de Ejecuci\u00f3n',
+    executionDetails: 'Detalles de Ejecución',
+    execution: 'Ejecución',
     copyId: 'Copiar ID',
     downloadImage: 'Descargar Imagen',
     share: 'Compartir',

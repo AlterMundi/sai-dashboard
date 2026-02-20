@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { LoadingSpinner } from './ui/LoadingSpinner';
 import { useSecureImage } from './ui/SecureImage';
@@ -59,29 +59,81 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate }: ImageModalP
     isOpen ? secureImageUrl : undefined // Only fetch when modal is open
   );
 
-  // Reset zoom when execution changes
+  // Reset all zoom/pan state when execution changes
   useEffect(() => {
-    if (execution) {
-      setZoomLevel(1);
-    }
+    setZoomLevel(1);
+    setTranslate({ x: 0, y: 0 });
+    setDragging(false);
+    dragStart.current = null;
   }, [execution?.id]);
 
-  // Compute the centroid of all detections in normalized [0..1] coords.
-  // Used as the CSS transform-origin for zoom, so zoom expands from the detection.
-  const zoomOrigin = useMemo(() => {
-    const dets = execution?.detections;
-    const imgW = execution?.imageWidth;
-    const imgH = execution?.imageHeight;
-    if (!dets?.length || !imgW || !imgH) return '50% 50%';
-    let sumX = 0, sumY = 0;
-    for (const det of dets) {
-      sumX += det.bounding_box.x + det.bounding_box.width / 2;
-      sumY += det.bounding_box.y + det.bounding_box.height / 2;
+  // Track shift key for zoom-out cursor hint.
+  const [shiftHeld, setShiftHeld] = useState(false);
+  useEffect(() => {
+    const down = (e: KeyboardEvent) => { if (e.key === 'Shift') setShiftHeld(true); };
+    const up   = (e: KeyboardEvent) => { if (e.key === 'Shift') setShiftHeld(false); };
+    window.addEventListener('keydown', down);
+    window.addEventListener('keyup', up);
+    return () => { window.removeEventListener('keydown', down); window.removeEventListener('keyup', up); };
+  }, []);
+
+  // Pan translate + drag state.
+  const [translate, setTranslate] = useState({ x: 0, y: 0 });
+  const [dragging, setDragging] = useState(false);
+  const dragStart = useRef<{ cx: number; cy: number; tx: number; ty: number } | null>(null);
+  // Ref for the image container (needed to compute click-to-center math).
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (zoomLevel > 1) e.preventDefault();
+    dragStart.current = { cx: e.clientX, cy: e.clientY, tx: translate.x, ty: translate.y };
+    if (zoomLevel > 1) setDragging(true);
+  };
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    // Gate on the ref (synchronous), not the dragging state (async), to avoid jump at drag start.
+    if (!dragStart.current || zoomLevel <= 1) return;
+    const dx = e.clientX - dragStart.current.cx;
+    const dy = e.clientY - dragStart.current.cy;
+    if (!dragging && (Math.abs(dx) > 2 || Math.abs(dy) > 2)) setDragging(true);
+    setTranslate({ x: dragStart.current.tx + dx, y: dragStart.current.ty + dy });
+  };
+
+  const handleMouseUp = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!dragStart.current) return;
+    const dx = Math.abs(e.clientX - dragStart.current.cx);
+    const dy = Math.abs(e.clientY - dragStart.current.cy);
+    const savedStart = dragStart.current;
+    dragStart.current = null;
+    setDragging(false);
+
+    if (dx < 5 && dy < 5) {
+      // Treat as click: step zoom and re-center on clicked point.
+      const newZoom = e.shiftKey
+        ? Math.max(zoomLevel - 2, 1)
+        : zoomLevel === 1 ? 2 : Math.min(zoomLevel + 2, 10);
+
+      if (newZoom <= 1) {
+        setZoomLevel(1);
+        setTranslate({ x: 0, y: 0 });
+        return;
+      }
+
+      // Math: transformOrigin is always 50% 50% (element center).
+      // The clicked point's offset from the container center in screen space is (ox, oy).
+      // In original element coords that offset is (ox - savedStart.tx) / zoomLevel.
+      // New translate that puts this point at container center: -origOffset * newZoom.
+      if (containerRef.current) {
+        const r = containerRef.current.getBoundingClientRect();
+        const cx = r.left + r.width / 2;
+        const cy = r.top + r.height / 2;
+        const origOx = (e.clientX - cx - savedStart.tx) / zoomLevel;
+        const origOy = (e.clientY - cy - savedStart.ty) / zoomLevel;
+        setTranslate({ x: -origOx * newZoom, y: -origOy * newZoom });
+      }
+      setZoomLevel(newZoom);
     }
-    const fx = ((sumX / dets.length) / imgW * 100).toFixed(2);
-    const fy = ((sumY / dets.length) / imgH * 100).toFixed(2);
-    return `${fx}% ${fy}%`;
-  }, [execution?.detections, execution?.imageWidth, execution?.imageHeight]);
+  };
 
   // Handle escape key
   useEffect(() => {
@@ -209,11 +261,8 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate }: ImageModalP
           <div className="flex items-center space-x-3">
             <div>
               <h2 className="text-lg font-semibold text-gray-900">
-                {t('modal.executionDetails')}
+                {t('modal.execution')} <span className="font-mono">#{execution.id}</span>
               </h2>
-              <p className="text-sm text-gray-500 font-mono">
-                ID: {execution.id}
-              </p>
             </div>
           </div>
 
@@ -271,7 +320,7 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate }: ImageModalP
             )}
 
             {/* Image container — overflow-hidden so scaled image clips cleanly */}
-            <div className="flex-1 min-h-0 p-4 overflow-hidden flex items-center justify-center">
+            <div ref={containerRef} className="flex-1 min-h-0 p-4 overflow-hidden flex items-center justify-center">
               {secureImageUrl ? (
                 <>
                   {imageLoading && (
@@ -288,10 +337,18 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate }: ImageModalP
                     <div
                       className="relative inline-block"
                       style={{
-                        transform: zoomLevel > 1 ? `scale(${zoomLevel})` : undefined,
-                        transformOrigin: zoomOrigin,
-                        transition: 'transform 0.2s ease-out',
+                        transform: zoomLevel > 1
+                          ? `translate(${translate.x}px, ${translate.y}px) scale(${zoomLevel})`
+                          : undefined,
+                        transformOrigin: '50% 50%',
+                        transition: dragging ? 'none' : 'transform 0.2s ease-out',
+                        cursor: dragging ? 'grabbing' : shiftHeld ? 'zoom-out' : 'zoom-in',
+                        userSelect: 'none',
                       }}
+                      onMouseDown={handleMouseDown}
+                      onMouseMove={handleMouseMove}
+                      onMouseUp={handleMouseUp}
+                      onMouseLeave={() => { dragStart.current = null; setDragging(false); }}
                     >
                       <img
                         src={imageUrl}
@@ -319,21 +376,32 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate }: ImageModalP
             {imageUrl && !imageError && (
               <div className="absolute bottom-4 right-4 flex items-center gap-1 bg-black/70 rounded-lg p-1 z-10">
                 <button
-                  onClick={() => setZoomLevel(z => Math.max(z - 1, 1))}
+                  onClick={() => {
+                    const newZoom = Math.max(zoomLevel - 2, 1);
+                    if (newZoom <= 1) { setZoomLevel(1); setTranslate({ x: 0, y: 0 }); return; }
+                    const f = newZoom / zoomLevel;
+                    setTranslate(p => ({ x: p.x * f, y: p.y * f }));
+                    setZoomLevel(newZoom);
+                  }}
                   disabled={zoomLevel <= 1}
-                  className="p-1.5 text-white hover:bg-white/20 rounded disabled:opacity-30 disabled:cursor-not-allowed"
+                  className="p-2.5 text-white hover:bg-white/20 rounded disabled:opacity-30 disabled:cursor-not-allowed"
                 >
-                  <ZoomOut className="h-4 w-4" />
+                  <ZoomOut className="h-6 w-6" />
                 </button>
-                <span className="text-white text-xs font-mono px-1.5 min-w-[3ch] text-center">
+                <span className="text-white text-sm font-mono px-2 min-w-[4ch] text-center">
                   {zoomLevel === 1 ? 'Fit' : `${zoomLevel}x`}
                 </span>
                 <button
-                  onClick={() => setZoomLevel(z => Math.min(z + 1, 10))}
-                  disabled={zoomLevel >= 4}
-                  className="p-1.5 text-white hover:bg-white/20 rounded disabled:opacity-30 disabled:cursor-not-allowed"
+                  onClick={() => {
+                    const newZoom = zoomLevel === 1 ? 2 : Math.min(zoomLevel + 2, 10);
+                    const f = newZoom / zoomLevel;
+                    setTranslate(p => ({ x: p.x * f, y: p.y * f }));
+                    setZoomLevel(newZoom);
+                  }}
+                  disabled={zoomLevel >= 10}
+                  className="p-2.5 text-white hover:bg-white/20 rounded disabled:opacity-30 disabled:cursor-not-allowed"
                 >
-                  <ZoomIn className="h-4 w-4" />
+                  <ZoomIn className="h-6 w-6" />
                 </button>
               </div>
             )}

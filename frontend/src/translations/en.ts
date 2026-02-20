@@ -218,6 +218,7 @@ const en = {
   },
   modal: {
     executionDetails: 'Execution Details',
+    execution: 'Execution',
     copyId: 'Copy ID',
     downloadImage: 'Download Image',
     share: 'Share',
