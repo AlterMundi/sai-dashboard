@@ -303,6 +303,38 @@ const en = {
     alertsByLevel: 'Alerts by Level',
     avgConfidencePerDay: 'Avg Confidence',
     noDetections: 'No detections this week',
+    period: {
+      from: 'From',
+      to: 'To',
+      clear: 'Clear',
+      presets: {
+        '7d': '7d',
+        '14d': '14d',
+        '30d': '30d',
+        '90d': '90d',
+        '6m': '6m',
+        '1y': '1y',
+      },
+    },
+    granularity: {
+      day: 'Daily',
+      week: 'Weekly',
+      month: 'Monthly',
+    },
+    dimension: {
+      all: 'All dimensions',
+      cameraId: 'Camera',
+      location: 'Location',
+      nodeId: 'Node',
+      yoloModel: 'Model',
+    },
+    ranking: {
+      title: 'Top by period',
+      cameras: 'Top cameras',
+      locations: 'Top locations',
+      nodes: 'Top nodes',
+      noData: 'No data for this period',
+    },
   },
   notFound: {
     title: '404',

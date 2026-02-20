@@ -9,7 +9,8 @@ import {
   ExecutionWithImage,
   ExecutionFilters,
   DailySummary,
-  FilterOptions
+  FilterOptions,
+  StatsRanking
 } from '@/types';
 import { logger } from '@/utils/logger';
 
@@ -437,13 +438,76 @@ export class NewExecutionService {
   }
 
   /**
-   * Get daily summary statistics
+   * Get daily/weekly/monthly summary statistics
    * SINGLE SOURCE: sai_dashboard database only
    */
-  async getDailySummary(days: number = 7): Promise<DailySummary[]> {
+  async getDailySummary(params: {
+    days?: number;
+    startDate?: string;
+    endDate?: string;
+    granularity?: 'day' | 'week' | 'month';
+    cameraId?: string;
+    location?: string;
+    nodeId?: string;
+    yoloModelVersion?: string;
+  } | number = 7): Promise<DailySummary[]> {
+    // Normalize params (backward compat: accept plain number)
+    const p = typeof params === 'number' ? { days: params } : params;
+    const granularity = p.granularity ?? 'day';
+    // Granularity whitelist — invariant: only these three values ever reach SQL interpolation
+    const safeGranularity = ['day', 'week', 'month'].includes(granularity) ? granularity : 'day';
+    // Clamp days at service boundary (controller also clamps, but belt-and-suspenders)
+    const safeDays = p.days !== undefined ? Math.min(Math.max(p.days, 1), 365) : undefined;
+
+    const queryParams: (string | number)[] = [];
+    const conditions: string[] = [];
+    let paramCount = 0;
+
+    if (p.startDate) {
+      paramCount++;
+      conditions.push(`e.execution_timestamp >= $${paramCount}::date`);
+      queryParams.push(p.startDate);
+    } else if (safeDays !== undefined) {
+      paramCount++;
+      conditions.push(`e.execution_timestamp >= CURRENT_DATE - make_interval(days => $${paramCount})`);
+      queryParams.push(safeDays);
+    }
+
+    if (p.endDate) {
+      paramCount++;
+      conditions.push(`e.execution_timestamp < ($${paramCount}::date + INTERVAL '1 day')`);
+      queryParams.push(p.endDate);
+    }
+
+    if (p.cameraId) {
+      paramCount++;
+      conditions.push(`e.camera_id = $${paramCount}`);
+      queryParams.push(p.cameraId);
+    }
+
+    if (p.location) {
+      paramCount++;
+      conditions.push(`e.location = $${paramCount}`);
+      queryParams.push(p.location);
+    }
+
+    if (p.nodeId) {
+      paramCount++;
+      conditions.push(`e.node_id = $${paramCount}`);
+      queryParams.push(p.nodeId);
+    }
+
+    if (p.yoloModelVersion) {
+      paramCount++;
+      conditions.push(`ea.yolo_model_version = $${paramCount}`);
+      queryParams.push(p.yoloModelVersion);
+    }
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
     const query = `
       SELECT
-        DATE(e.execution_timestamp) as date,
+        DATE_TRUNC('${safeGranularity}', e.execution_timestamp)::date as date,
         COUNT(*) as total_executions,
         COUNT(CASE WHEN e.status = 'success' THEN 1 END) as successful_executions,
         COUNT(CASE WHEN ea.alert_level = 'high' THEN 1 END) as high_alert_detections,
@@ -459,12 +523,12 @@ export class NewExecutionService {
       LEFT JOIN execution_analysis ea ON e.id = ea.execution_id
       LEFT JOIN execution_images ei ON e.id = ei.execution_id
       LEFT JOIN execution_notifications en ON e.id = en.execution_id
-      WHERE e.execution_timestamp >= CURRENT_DATE - make_interval(days => $1)
-      GROUP BY DATE(e.execution_timestamp)
+      ${whereClause}
+      GROUP BY DATE_TRUNC('${safeGranularity}', e.execution_timestamp)
       ORDER BY date DESC
     `;
 
-    const results = await dualDb.query(query, [days]);
+    const results = await dualDb.query(query, queryParams);
 
     return results.map((row: any) => {
       const totalExecutions = parseInt(row.total_executions);
@@ -488,6 +552,54 @@ export class NewExecutionService {
         avgConfidenceScore: parseFloat(row.avg_confidence_score) || 0
       };
     });
+  }
+
+  /**
+   * Get top cameras, locations, and nodes by detection metrics for a period
+   */
+  async getTopByDimension(params: {
+    startDate: string;
+    endDate: string;
+    limit?: number;
+  }): Promise<StatsRanking> {
+    const { startDate, endDate } = params;
+    // Clamp limit at service boundary (controller also clamps)
+    const limit = Math.min(Math.max(params.limit ?? 5, 1), 50);
+
+    // Granularity whitelist prevents SQL injection; dimension columns are hardcoded below
+    const buildQuery = (dimensionCol: string) => `
+      SELECT ${dimensionCol}::text as id,
+        COUNT(CASE WHEN ea.has_smoke = true THEN 1 END)::int as smoke_detections,
+        COUNT(CASE WHEN ea.alert_level = 'critical' THEN 1 END)::int as critical_alerts,
+        COUNT(*)::int as total_executions
+      FROM executions e
+      LEFT JOIN execution_analysis ea ON e.id = ea.execution_id
+      WHERE e.execution_timestamp >= $1::date
+        AND e.execution_timestamp < ($2::date + INTERVAL '1 day')
+        AND ${dimensionCol} IS NOT NULL
+      GROUP BY ${dimensionCol}
+      ORDER BY smoke_detections DESC, critical_alerts DESC, total_executions DESC, ${dimensionCol}
+      LIMIT $3
+    `;
+
+    const [cameraRows, locationRows, nodeRows] = await Promise.all([
+      dualDb.query(buildQuery('e.camera_id'), [startDate, endDate, limit]),
+      dualDb.query(buildQuery('e.location'), [startDate, endDate, limit]),
+      dualDb.query(buildQuery('e.node_id'), [startDate, endDate, limit]),
+    ]);
+
+    const mapRows = (rows: any[]) => rows.map((r: any) => ({
+      id: r.id,
+      smokeDetections: parseInt(r.smoke_detections) || 0,
+      criticalAlerts: parseInt(r.critical_alerts) || 0,
+      totalExecutions: parseInt(r.total_executions) || 0,
+    }));
+
+    return {
+      cameras: mapRows(cameraRows),
+      locations: mapRows(locationRows),
+      nodes: mapRows(nodeRows),
+    };
   }
 
   /**

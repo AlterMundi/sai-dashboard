@@ -10,7 +10,9 @@ import {
   TokenValidation,
   HealthStatus,
   SSEStatus,
-  FilterOptions
+  FilterOptions,
+  StatsFilters,
+  StatsRanking,
 } from '@/types';
 import { getStorageItem, setStorageItem, removeStorageItem } from '@/utils';
 
@@ -179,10 +181,35 @@ export const executionsApi = {
     }
   },
 
-  async getDailySummary(days?: number): Promise<DailySummary[]> {
+  async getDailySummary(params?: number | StatsFilters): Promise<DailySummary[]> {
     try {
+      const queryParams: Record<string, any> = {};
+      if (typeof params === 'number') {
+        queryParams.days = params;
+      } else if (params) {
+        queryParams.startDate = params.startDate;
+        queryParams.endDate = params.endDate;
+        queryParams.granularity = params.granularity;
+        if (params.dimensionKey && params.dimensionValue) {
+          if (params.dimensionKey === 'cameraId') queryParams.cameraId = params.dimensionValue;
+          else if (params.dimensionKey === 'location') queryParams.location = params.dimensionValue;
+          else if (params.dimensionKey === 'nodeId') queryParams.nodeId = params.dimensionValue;
+          else if (params.dimensionKey === 'yoloModelVersion') queryParams.yoloModelVersion = params.dimensionValue;
+        }
+      }
       const response: AxiosResponse<ApiResponse<DailySummary[]>> = await api.get('/executions/summary/daily', {
-        params: { days }
+        params: queryParams
+      });
+      return response.data.data;
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  },
+
+  async getStatsRanking(startDate: string, endDate: string, limit = 5): Promise<StatsRanking> {
+    try {
+      const response: AxiosResponse<ApiResponse<StatsRanking>> = await api.get('/executions/stats/ranking', {
+        params: { startDate, endDate, limit }
       });
       return response.data.data;
     } catch (error) {

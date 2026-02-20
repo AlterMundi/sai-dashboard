@@ -1,15 +1,11 @@
+import { useState } from 'react';
 import { Wind, AlertTriangle, AlertOctagon, MessageCircle, AlertCircle, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { useTranslation } from '@/contexts/LanguageContext';
 import { useDailySummary } from '@/hooks/useExecutions';
 import { SimpleBarChart, StackedBarChart } from '@/components/charts/SmallBarChart';
-
-function formatDateRange(summary: { date: string }[]): string {
-  if (!summary.length) return '';
-  const oldest = new Date(summary[summary.length - 1].date);
-  const newest = new Date(summary[0].date);
-  const fmt = (d: Date) => d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-  return `${fmt(oldest)} – ${fmt(newest)}`;
-}
+import { StatsControls, defaultStatsFilters } from '@/components/StatsControls';
+import { RankingPanel } from '@/components/RankingPanel';
+import { StatsFilters } from '@/types';
 
 function Trend({ current, previous }: { current: number; previous: number }) {
   if (previous === 0 && current === 0) return null;
@@ -20,9 +16,22 @@ function Trend({ current, previous }: { current: number; previous: number }) {
   return <TrendingDown className="h-4 w-4 text-emerald-500" />;
 }
 
+function periodLabel(filters: StatsFilters): string {
+  try {
+    const start = new Date(filters.startDate);
+    const end = new Date(filters.endDate);
+    const fmt = (d: Date) => d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    return `${fmt(start)} – ${fmt(end)}`;
+  } catch {
+    return '';
+  }
+}
+
 export function StatsDashboard() {
   const { t } = useTranslation();
-  const { summary, isLoading, error } = useDailySummary(7);
+  const [filters, setFilters] = useState<StatsFilters>(defaultStatsFilters);
+
+  const { summary, isLoading, error } = useDailySummary(filters);
 
   if (isLoading && summary.length === 0) {
     return (
@@ -54,7 +63,7 @@ export function StatsDashboard() {
     { smoke: 0, critical: 0, high: 0, telegram: 0 }
   );
 
-  // Half-window split for trend comparison (recent 3–4 vs earlier 3–4 days)
+  // Half-window split for trend comparison
   const half = Math.floor(summary.length / 2);
   const recent = summary.slice(0, half);
   const earlier = summary.slice(half);
@@ -76,7 +85,9 @@ export function StatsDashboard() {
     value: Math.round((d.avgConfidenceScore ?? 0) * 100),
   }));
 
-  const dateRange = formatDateRange(summary);
+  const rangeLabel = periodLabel(filters);
+  const gran = filters.granularity;
+  const showRanking = !filters.dimensionValue;
 
   const kpis = [
     {
@@ -123,10 +134,13 @@ export function StatsDashboard() {
 
   return (
     <div className="space-y-6">
-      {/* Week range label */}
-      {dateRange && (
+      {/* Period selector + dimension filter */}
+      <StatsControls value={filters} onChange={setFilters} />
+
+      {/* Period range label */}
+      {rangeLabel && (
         <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">
-          {dateRange}
+          {rangeLabel}
         </p>
       )}
 
@@ -155,7 +169,7 @@ export function StatsDashboard() {
                 {trend && <div className="mb-1">{trend}</div>}
               </div>
               <p className="text-[10px] text-gray-300 mt-2 uppercase tracking-wide font-medium">
-                {t('stats.weeklyLabel')}
+                {rangeLabel}
               </p>
             </div>
           </div>
@@ -170,6 +184,7 @@ export function StatsDashboard() {
           color="#64748b"
           bgClass="bg-slate-400"
           emptyMessage={t('stats.noDetections')}
+          granularity={gran}
         />
         <StackedBarChart
           title={t('stats.alertsByLevel')}
@@ -180,6 +195,7 @@ export function StatsDashboard() {
             { key: 'low',      label: t('filters.low'),      color: '#fbbf24', bgClass: 'bg-amber-300' },
           ]}
           emptyMessage={t('stats.noDetections')}
+          granularity={gran}
         />
         <SimpleBarChart
           title={t('stats.avgConfidencePerDay')}
@@ -188,8 +204,17 @@ export function StatsDashboard() {
           bgClass="bg-teal-500"
           unit="%"
           emptyMessage={t('stats.noDetections')}
+          granularity={gran}
         />
       </div>
+
+      {/* Ranking Panel (hidden when a specific dimension value is selected) */}
+      {showRanking && (
+        <RankingPanel
+          startDate={filters.startDate}
+          endDate={filters.endDate}
+        />
+      )}
     </div>
   );
 }

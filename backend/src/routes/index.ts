@@ -21,6 +21,7 @@ import {
   getExecutionData,
   getDailySummary,
   getExecutionStats,
+  getStatsRanking,
   searchExecutions,
   getEnhancedStatistics,
   triggerAnalysisProcessing,
@@ -163,6 +164,9 @@ executionRouter.get('/stats', getExecutionStats);
 
 // Enhanced execution statistics with detailed metrics
 executionRouter.get('/stats/enhanced', getEnhancedStatistics);
+
+// Rankings: top cameras/locations/nodes by detection metrics
+executionRouter.get('/stats/ranking', getStatsRanking);
 
 // Dynamic filter options (distinct values for dropdown population)
 executionRouter.get('/filter-options', getFilterOptions);
