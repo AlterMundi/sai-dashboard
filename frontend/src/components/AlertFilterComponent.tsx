@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { ExecutionFilters } from '@/types';
+import { useFilterOptions } from '@/hooks/useFilterOptions';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
@@ -37,6 +38,14 @@ export function AlertFilterComponent({
 }: AlertFilterComponentProps) {
   const { t } = useTranslation();
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const { options, isLoading: optionsLoading, triggerFetch } = useFilterOptions();
+
+  const handleToggleAdvanced = useCallback(() => {
+    setShowAdvanced(prev => {
+      if (!prev) triggerFetch();
+      return !prev;
+    });
+  }, [triggerFetch]);
 
   const handleFilterChange = useCallback((key: keyof ExecutionFilters, value: any) => {
     const newFilters = { ...filters, [key]: value, page: 0 };
@@ -100,16 +109,6 @@ export function AlertFilterComponent({
           )}
         </div>
         <div className="flex items-center space-x-2">
-          <button
-            onClick={() => setShowAdvanced(!showAdvanced)}
-            className="hidden sm:flex text-sm text-gray-600 hover:text-gray-900 items-center"
-          >
-            {showAdvanced ? t('filters.basic') : t('filters.advanced')}
-            <ChevronDown className={cn(
-              "h-4 w-4 ml-1 transition-transform",
-              showAdvanced && "rotate-180"
-            )} />
-          </button>
           {activeCount > 0 && (
             <Button
               variant="outline"
@@ -139,11 +138,9 @@ export function AlertFilterComponent({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="">{t('filters.allLocations')}</SelectItem>
-              <SelectItem value="La Rancherita">La Rancherita</SelectItem>
-              <SelectItem value="Molinari">Molinari</SelectItem>
-              <SelectItem value="Quintana">Quintana</SelectItem>
-              <SelectItem value="La Paisanita">La Paisanita</SelectItem>
-              <SelectItem value="La Serranita">La Serranita</SelectItem>
+              {options.location.map((loc) => (
+                <SelectItem key={loc} value={loc}>{loc}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
 
@@ -157,11 +154,9 @@ export function AlertFilterComponent({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="">{t('filters.allCameras')}</SelectItem>
-              <SelectItem value="cam1">cam1</SelectItem>
-              <SelectItem value="cam2">cam2</SelectItem>
-              <SelectItem value="cam3">cam3</SelectItem>
-              <SelectItem value="cam4">cam4</SelectItem>
-              <SelectItem value="cam5">cam5</SelectItem>
+              {options.cameraId.map((id) => (
+                <SelectItem key={id} value={id}>{id}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
 
@@ -309,12 +304,21 @@ export function AlertFilterComponent({
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 {t('filters.saiModel')}
               </label>
-              <Input
-                type="text"
-                placeholder={t('filters.saiModelPlaceholder')}
+              <Select
                 value={filters.yoloModelVersion || ''}
-                onChange={(e) => handleFilterChange('yoloModelVersion', e.target.value || undefined)}
-              />
+                onValueChange={(value) => handleFilterChange('yoloModelVersion', value || undefined)}
+                disabled={optionsLoading}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={t('filters.anySaiModel')} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">{t('filters.anySaiModel')}</SelectItem>
+                  {options.yoloModelVersion.map((v) => (
+                    <SelectItem key={v} value={v}>{v}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
@@ -324,12 +328,21 @@ export function AlertFilterComponent({
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 {t('filters.cameraId')}
               </label>
-              <Input
-                type="text"
-                placeholder="e.g., cam-01"
+              <Select
                 value={filters.cameraId || ''}
-                onChange={(e) => handleFilterChange('cameraId', e.target.value || undefined)}
-              />
+                onValueChange={(value) => handleFilterChange('cameraId', value || undefined)}
+                disabled={optionsLoading}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={t('filters.allCameras')} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">{t('filters.allCameras')}</SelectItem>
+                  {options.cameraId.map((id) => (
+                    <SelectItem key={id} value={id}>{id}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div>
@@ -355,24 +368,42 @@ export function AlertFilterComponent({
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 {t('filters.nodeId')}
               </label>
-              <Input
-                type="text"
-                placeholder="e.g., node-01"
+              <Select
                 value={filters.nodeId || ''}
-                onChange={(e) => handleFilterChange('nodeId', e.target.value || undefined)}
-              />
+                onValueChange={(value) => handleFilterChange('nodeId', value || undefined)}
+                disabled={optionsLoading}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={t('filters.allNodes')} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">{t('filters.allNodes')}</SelectItem>
+                  {options.nodeId.map((n) => (
+                    <SelectItem key={n} value={n}>{n}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 {t('filters.deviceId')}
               </label>
-              <Input
-                type="text"
-                placeholder="e.g., device-01"
+              <Select
                 value={filters.deviceId || ''}
-                onChange={(e) => handleFilterChange('deviceId', e.target.value || undefined)}
-              />
+                onValueChange={(value) => handleFilterChange('deviceId', value || undefined)}
+                disabled={optionsLoading}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={t('filters.allDevices')} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">{t('filters.allDevices')}</SelectItem>
+                  {options.deviceId.map((d) => (
+                    <SelectItem key={d} value={d}>{d}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div>
@@ -456,16 +487,28 @@ export function AlertFilterComponent({
           <div className="font-medium">
             {t('filters.results')}: {t('filters.executionsFound', { count: totalResults.toLocaleString() })}
           </div>
-          <button
-            onClick={() => setShowAdvanced(!showAdvanced)}
-            className="sm:hidden text-gray-600 hover:text-gray-900 flex items-center"
-            aria-label={showAdvanced ? t('filters.basic') : t('filters.advanced')}
-          >
-            <ChevronDown className={cn(
-              "h-4 w-4 transition-transform",
-              showAdvanced && "rotate-180"
-            )} />
-          </button>
+          <div className="flex items-center">
+            <button
+              onClick={handleToggleAdvanced}
+              className="sm:hidden text-gray-600 hover:text-gray-900 flex items-center"
+              aria-label={showAdvanced ? t('filters.basic') : t('filters.advanced')}
+            >
+              <ChevronDown className={cn(
+                "h-4 w-4 transition-transform",
+                showAdvanced && "rotate-180"
+              )} />
+            </button>
+            <button
+              onClick={handleToggleAdvanced}
+              className="hidden sm:flex text-sm text-gray-600 hover:text-gray-900 items-center"
+            >
+              {showAdvanced ? t('filters.basic') : t('filters.advanced')}
+              <ChevronDown className={cn(
+                "h-4 w-4 ml-1 transition-transform",
+                showAdvanced && "rotate-180"
+              )} />
+            </button>
+          </div>
         </div>
       </div>
     </div>

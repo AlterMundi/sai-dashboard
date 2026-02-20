@@ -23,7 +23,8 @@ import {
   getExecutionStats,
   searchExecutions,
   getEnhancedStatistics,
-  triggerAnalysisProcessing
+  triggerAnalysisProcessing,
+  getFilterOptions
 } from '@/controllers/executions';
 import {
   connectSSE,
@@ -162,6 +163,9 @@ executionRouter.get('/stats', getExecutionStats);
 
 // Enhanced execution statistics with detailed metrics
 executionRouter.get('/stats/enhanced', getEnhancedStatistics);
+
+// Dynamic filter options (distinct values for dropdown population)
+executionRouter.get('/filter-options', getFilterOptions);
 
 // Specific execution details
 executionRouter.get('/:executionId', getExecutionById);

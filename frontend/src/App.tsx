@@ -1,4 +1,5 @@
-import { BrowserRouter as Router, Routes, Route, Navigate, Link, Outlet } from 'react-router-dom';
+import { useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate, Link, Outlet, useLocation } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { HelmetProvider } from 'react-helmet-async';
 import { useAuth } from '@/hooks/useAuth';
@@ -51,11 +52,34 @@ function NotFoundPage() {
   );
 }
 
+function RouteTitleManager() {
+  const { pathname } = useLocation();
+  const { t } = useTranslation();
+
+  useEffect(() => {
+    const appTitle = 'SAI Dashboard';
+    let pageTitle = t('nav.gallery');
+
+    if (pathname === '/login') {
+      pageTitle = t('login.title');
+    } else if (pathname === '/stats') {
+      pageTitle = t('stats.title');
+    } else if (pathname !== '/') {
+      pageTitle = t('notFound.title');
+    }
+
+    document.title = `${pageTitle} | ${appTitle}`;
+  }, [pathname, t]);
+
+  return null;
+}
+
 function App() {
   return (
     <HelmetProvider>
       <LanguageProvider>
       <Router basename={import.meta.env.VITE_BASE_PATH || '/'}>
+        <RouteTitleManager />
         <div className="App">
           <Routes>
             {/* Public Routes */}

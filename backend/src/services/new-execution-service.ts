@@ -5,10 +5,11 @@
  */
 
 import { dualDb } from '@/database/dual-pool';
-import { 
-  ExecutionWithImage, 
-  ExecutionFilters, 
-  DailySummary
+import {
+  ExecutionWithImage,
+  ExecutionFilters,
+  DailySummary,
+  FilterOptions
 } from '@/types';
 import { logger } from '@/utils/logger';
 
@@ -1061,6 +1062,60 @@ export class NewExecutionService {
         etlHealth: false
       };
     }
+  }
+
+  // -----------------------------------------------------------------------
+  // Filter Options (dynamic dropdown values)
+  // -----------------------------------------------------------------------
+
+  private filterOptionsCache: {
+    data: FilterOptions | null;
+    expiresAt: number;
+  } = { data: null, expiresAt: 0 };
+
+  async getFilterOptions(): Promise<FilterOptions> {
+    const now = Date.now();
+    if (this.filterOptionsCache.data && now < this.filterOptionsCache.expiresAt) {
+      return this.filterOptionsCache.data;
+    }
+
+    const pool = dualDb.getSaiPool();
+
+    const [
+      cameraResult,
+      locationResult,
+      nodeResult,
+      deviceResult,
+      modelResult,
+    ] = await Promise.all([
+      pool.query<{ camera_id: string }>(
+        'SELECT DISTINCT camera_id FROM executions WHERE camera_id IS NOT NULL ORDER BY 1'
+      ),
+      pool.query<{ location: string }>(
+        'SELECT DISTINCT location FROM executions WHERE location IS NOT NULL ORDER BY 1'
+      ),
+      pool.query<{ node_id: string }>(
+        'SELECT DISTINCT node_id FROM executions WHERE node_id IS NOT NULL ORDER BY 1'
+      ),
+      pool.query<{ device_id: string }>(
+        'SELECT DISTINCT device_id FROM executions WHERE device_id IS NOT NULL ORDER BY 1'
+      ),
+      pool.query<{ yolo_model_version: string }>(
+        'SELECT DISTINCT yolo_model_version FROM execution_analysis WHERE yolo_model_version IS NOT NULL ORDER BY 1'
+      ),
+    ]);
+
+    const options: FilterOptions = {
+      cameraId:         cameraResult.rows.map(r => r.camera_id),
+      location:         locationResult.rows.map(r => r.location),
+      nodeId:           nodeResult.rows.map(r => r.node_id),
+      deviceId:         deviceResult.rows.map(r => r.device_id),
+      yoloModelVersion: modelResult.rows.map(r => r.yolo_model_version),
+    };
+
+    this.filterOptionsCache = { data: options, expiresAt: now + 60_000 };
+    logger.debug('filter-options: cache miss, fetched from DB');
+    return options;
   }
 }
 
