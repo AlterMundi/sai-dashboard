@@ -113,6 +113,9 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate, cameraNav, ga
     setTranslate({ x: 0, y: 0 });
   }, []);
 
+  // Throttle for held-arrow navigation in Fit mode (1 image per 300ms)
+  const lastNavTimeRef = useRef<number>(0);
+
   const containerRef   = useRef<HTMLDivElement>(null);
   const dialogRef      = useRef<HTMLDivElement>(null);
   const sheetRef       = useRef<HTMLDivElement>(null);
@@ -319,18 +322,52 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate, cameraNav, ga
 
   // ── Escape / Arrow keys + body scroll lock ───────────────────────────────
   useEffect(() => {
+    const PAN_STEP = 80; // px per keydown event when zoomed (repeat allowed)
+
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') { onClose(); return; }
-      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
-        if (e.repeat) return;
-        if (e.shiftKey || e.ctrlKey || e.metaKey || e.altKey) return;
-        const tag = (e.target as HTMLElement).tagName;
-        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
-        if (zoomRef.current > 1) return;  // don't hijack when image is zoomed
+
+      const isArrow = e.key === 'ArrowLeft' || e.key === 'ArrowRight'
+                   || e.key === 'ArrowUp'   || e.key === 'ArrowDown';
+      if (!isArrow) return;
+      if (e.shiftKey || e.ctrlKey || e.metaKey || e.altKey) return;
+      const tag = (e.target as HTMLElement).tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
+      if (zoomRef.current > 1) {
+        // ── ZOOM MODE: all 4 arrows pan the image ──────────────────────────
+        // e.repeat allowed → smooth continuous pan while key held
+        e.preventDefault();
+        setTranslate(prev => {
+          switch (e.key) {
+            case 'ArrowLeft':  return { x: prev.x + PAN_STEP, y: prev.y };
+            case 'ArrowRight': return { x: prev.x - PAN_STEP, y: prev.y };
+            case 'ArrowUp':    return { x: prev.x, y: prev.y + PAN_STEP };
+            case 'ArrowDown':  return { x: prev.x, y: prev.y - PAN_STEP };
+            default:           return prev;
+          }
+        });
+      } else {
+        // ── FIT MODE ────────────────────────────────────────────────────────
+        e.preventDefault();
+
+        if (e.key === 'ArrowUp') {
+          if (e.repeat) return;
+          // Zoom to 2x centered
+          setZoomLevel(2);
+          setTranslate({ x: 0, y: 0 });
+          return;
+        }
+        if (e.key === 'ArrowDown') return; // no-op in fit mode
+
+        // Left/Right: navigate, with slow-scroll on hold (1 image per 300ms)
+        const now = Date.now();
+        if (e.repeat && now - lastNavTimeRef.current < 300) return;
+        lastNavTimeRef.current = now;
+
         const nav = navMode === 'camera' ? cameraNav : galleryNav;
         if (!nav) return;
-        e.preventDefault();
-        if (e.key === 'ArrowLeft' && nav.hasPrev) { setPressedBtn('prev'); nav.onPrev(); }
+        if (e.key === 'ArrowLeft'  && nav.hasPrev) { setPressedBtn('prev'); nav.onPrev(); }
         if (e.key === 'ArrowRight' && nav.hasNext) { setPressedBtn('next'); nav.onNext(); }
       }
     };
