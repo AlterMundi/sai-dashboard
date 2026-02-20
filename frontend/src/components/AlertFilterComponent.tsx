@@ -313,21 +313,14 @@ export function AlertFilterComponent({
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                {t('filters.detectionMode')}
+                {t('filters.saiModel')}
               </label>
-              <Select
-                value={filters.detectionMode || ''}
-                onValueChange={(value) => handleFilterChange('detectionMode', value || undefined)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder={t('filters.anyMode')} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">{t('filters.anyMode')}</SelectItem>
-                  <SelectItem value="smoke-only">{t('filters.smokeOnly')}</SelectItem>
-                  <SelectItem value="both">{t('filters.both')}</SelectItem>
-                </SelectContent>
-              </Select>
+              <Input
+                type="text"
+                placeholder={t('filters.saiModelPlaceholder')}
+                value={filters.yoloModelVersion || ''}
+                onChange={(e) => handleFilterChange('yoloModelVersion', e.target.value || undefined)}
+              />
             </div>
           </div>
 

@@ -50,6 +50,7 @@ export class NewExecutionService {
       detectionCount,
       confidenceSmoke,
       detectionMode,
+      yoloModelVersion,
       detectionClasses,
       minDetectionConfidence
     } = filters;
@@ -217,6 +218,13 @@ export class NewExecutionService {
       paramCount++;
       whereConditions.push(`ea.detection_mode = $${paramCount}`);
       queryParams.push(detectionMode);
+    }
+
+    // YOLO model version filter
+    if (yoloModelVersion) {
+      paramCount++;
+      whereConditions.push(`ea.yolo_model_version ILIKE $${paramCount}`);
+      queryParams.push(`%${yoloModelVersion}%`);
     }
 
     // Advanced detection filters (JSONB)

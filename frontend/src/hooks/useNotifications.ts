@@ -93,7 +93,7 @@ export function useNotifications() {
     const hasRisk = (batchData.highRisk ?? 0) > 0;
     return createNotification({
       type: 'execution:batch',
-      icon: '📊',
+      icon: '',
       title: t('notifications.batchTitle', { count: batchData.count }),
       body: hasRisk
         ? t('notifications.batchBodyWithRisk', { highRisk: batchData.highRisk! })

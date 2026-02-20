@@ -104,6 +104,7 @@ export interface ExecutionFilters extends PaginationQuery {
   detectionCount?: number;  // Filter by minimum number of detections
   confidenceSmoke?: number;  // Smoke-specific confidence (0.0-1.0)
   detectionMode?: string;   // e.g., 'smoke-only'
+  yoloModelVersion?: string; // e.g., 'saiNET-v1'
   minConfidence?: number;   // DEPRECATED: Use confidenceSmoke instead
   maxConfidence?: number;   // DEPRECATED: Use confidenceSmoke instead
 
