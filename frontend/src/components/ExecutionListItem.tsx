@@ -1,4 +1,3 @@
-import { StatusBadge } from './ui/StatusBadge';
 import { LoadingSpinner } from './ui/LoadingSpinner';
 import { DynamicTimeAgo } from './ui/DynamicTimeAgo';
 import { cn } from '@/utils';
@@ -221,8 +220,8 @@ export function ExecutionListItem({ execution, onClick, loading = false, isSelec
         )}
       </div>
 
-      {/* Status & Indicators */}
-      <div className="flex-shrink-0 w-24 flex items-center justify-end gap-2">
+      {/* Indicators */}
+      <div className="flex-shrink-0 w-8 flex items-center justify-end">
         {execution.telegramSent && (
           <div
             className="text-success-600"
@@ -231,7 +230,6 @@ export function ExecutionListItem({ execution, onClick, loading = false, isSelec
             <MessageCircle className="h-4 w-4" aria-hidden="true" />
           </div>
         )}
-        <StatusBadge status={execution.status} size="sm" />
       </div>
 
       {/* View Button */}

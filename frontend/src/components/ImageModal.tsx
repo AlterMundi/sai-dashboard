@@ -21,7 +21,6 @@ import {
   MessageCircle,
   AlertTriangle,
   CheckCircle,
-  Flame,
   Wind,
   MapPin,
   Camera,
@@ -479,52 +478,27 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate }: ImageModalP
                 )}
 
                 {/* Detection Summary */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div
-                    className={cn(
-                      "p-3 rounded-lg border",
-                      execution.hasFire ? 'bg-red-50 border-red-300' : 'bg-gray-50 border-gray-200'
-                    )}
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <Flame className={cn("h-4 w-4", execution.hasFire ? 'text-red-600' : 'text-gray-400')} />
-                      <span className={cn(
-                        "text-xs font-bold uppercase",
-                        execution.hasFire ? 'text-red-700' : 'text-gray-500'
-                      )}>
-                        {execution.hasFire ? t('modal.detected') : t('modal.clear')}
-                      </span>
-                    </div>
-                    <p className="text-sm font-medium text-gray-700">{t('modal.fireLabel')}</p>
-                    {execution.confidenceFire !== null && execution.confidenceFire > 0 && (
-                      <p className="text-xs text-gray-600 mt-1">
-                        {t('modal.confidence', { value: String(Math.round(execution.confidenceFire * 100)) })}
-                      </p>
-                    )}
+                <div
+                  className={cn(
+                    "p-3 rounded-lg border",
+                    execution.hasSmoke ? 'bg-gray-100 border-gray-400' : 'bg-gray-50 border-gray-200'
+                  )}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <Wind className={cn("h-4 w-4", execution.hasSmoke ? 'text-gray-700' : 'text-gray-400')} />
+                    <span className={cn(
+                      "text-xs font-bold uppercase",
+                      execution.hasSmoke ? 'text-gray-800' : 'text-gray-500'
+                    )}>
+                      {execution.hasSmoke ? t('modal.detected') : t('modal.clear')}
+                    </span>
                   </div>
-
-                  <div
-                    className={cn(
-                      "p-3 rounded-lg border",
-                      execution.hasSmoke ? 'bg-gray-100 border-gray-400' : 'bg-gray-50 border-gray-200'
-                    )}
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <Wind className={cn("h-4 w-4", execution.hasSmoke ? 'text-gray-700' : 'text-gray-400')} />
-                      <span className={cn(
-                        "text-xs font-bold uppercase",
-                        execution.hasSmoke ? 'text-gray-800' : 'text-gray-500'
-                      )}>
-                        {execution.hasSmoke ? t('modal.detected') : t('modal.clear')}
-                      </span>
-                    </div>
-                    <p className="text-sm font-medium text-gray-700">{t('modal.smokeLabel')}</p>
-                    {execution.confidenceSmoke !== null && execution.confidenceSmoke > 0 && (
-                      <p className="text-xs text-gray-600 mt-1">
-                        {t('modal.confidence', { value: String(Math.round(execution.confidenceSmoke * 100)) })}
-                      </p>
-                    )}
-                  </div>
+                  <p className="text-sm font-medium text-gray-700">{t('modal.smokeLabel')}</p>
+                  {execution.confidenceSmoke !== null && execution.confidenceSmoke > 0 && (
+                    <p className="text-xs text-gray-600 mt-1">
+                      {t('modal.confidence', { value: String(Math.round(execution.confidenceSmoke * 100)) })}
+                    </p>
+                  )}
                 </div>
 
                 {/* Detection Count */}

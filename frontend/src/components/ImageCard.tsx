@@ -3,7 +3,7 @@ import { cn } from '@/utils';
 import { ImageCardProps } from '@/types';
 import { useImageCard } from '@/hooks/useImageCard';
 import { useTranslation } from '@/contexts/LanguageContext';
-import { AlertTriangle, MessageCircle, Flame, Wind, Camera, MapPin, RefreshCw, X } from 'lucide-react';
+import { AlertTriangle, MessageCircle, Wind, Camera, MapPin, RefreshCw, X } from 'lucide-react';
 
 export function ImageCard({ execution, onClick, loading = false }: ImageCardProps) {
   const { t } = useTranslation();
@@ -120,20 +120,6 @@ export function ImageCard({ execution, onClick, loading = false }: ImageCardProp
 
         {/* Bottom Left - Detection Icons */}
         <div className="absolute bottom-2 left-2 flex items-center gap-1.5">
-          {execution.hasFire && (
-            <div
-              className={cn(
-                "flex items-center gap-1 px-2 py-1 rounded-full text-white text-xs font-medium shadow-lg backdrop-blur-sm",
-                isStage1Only ? "bg-gray-500/80" : "bg-red-600/90"
-              )}
-              title={isStage1Only ? t('imageCard.fireDetectionPending') : t('imageCard.fireConfidence', { value: execution.confidenceFire ? Math.round(execution.confidenceFire * 100) + '%' : t('modal.detected') })}
-            >
-              <Flame className="h-3 w-3" aria-hidden="true" />
-              {!isStage1Only && execution.confidenceFire !== null && (
-                <span className="tabular-nums">{Math.round(execution.confidenceFire * 100)}%</span>
-              )}
-            </div>
-          )}
           {execution.hasSmoke && (
             <div
               className={cn(

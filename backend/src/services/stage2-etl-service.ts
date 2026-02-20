@@ -68,7 +68,6 @@ interface Stage2ExtractionResult {
   request_id: string | null;
   yolo_model_version: string | null;
   detection_count: number;
-  has_fire: boolean;
   has_smoke: boolean;
   alert_level: string | null;  // none/low/medium/high/critical
   detection_mode: string | null;
@@ -76,7 +75,6 @@ interface Stage2ExtractionResult {
   detections: YoloDetection[] | null;
 
   // Confidence scores
-  confidence_fire: number | null;
   confidence_smoke: number | null;
   confidence_score: number | null;  // Max confidence
 
@@ -432,7 +430,6 @@ export class Stage2ETLService extends EventEmitter {
         processingTimeMs: processingTime,
         hasOriginalImage: !!imageResult,
         hasImageRef: !!extracted.image_hash,
-        hasFire: extracted.has_fire,
         hasSmoke: extracted.has_smoke,
         detectionCount: extracted.detection_count,
         alertLevel: extracted.alert_level
@@ -674,7 +671,6 @@ export class Stage2ETLService extends EventEmitter {
       request_id: yoloData?.request_id || null,
       yolo_model_version: yoloData?.version || null,
       detection_count: yoloData?.detection_count ?? 0,
-      has_fire: yoloData?.has_fire ?? false,
       has_smoke: yoloData?.has_smoke ?? false,
       alert_level: yoloData?.alert_level || null,
       detection_mode: yoloData?.detection_mode || null,
@@ -682,7 +678,6 @@ export class Stage2ETLService extends EventEmitter {
       detections: detections,
 
       // Confidence scores
-      confidence_fire: yoloData?.confidence_scores?.fire ?? null,
       confidence_smoke: yoloData?.confidence_scores?.smoke ?? null,
       confidence_score: maxConfidence,
 
@@ -948,33 +943,29 @@ export class Stage2ETLService extends EventEmitter {
         request_id,
         yolo_model_version,
         detection_count,
-        has_fire,
         has_smoke,
         alert_level,
         detection_mode,
         active_classes,
         detections,
-        confidence_fire,
         confidence_smoke,
         confidence_score,
         image_width,
         image_height,
         yolo_processing_time_ms
       ) VALUES (
-        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
-        $11, $12, $13, $14, $15, $16
+        $1, $2, $3, $4, $5, $6, $7, $8, $9,
+        $10, $11, $12, $13, $14
       )
       ON CONFLICT (execution_id) DO UPDATE SET
         request_id = EXCLUDED.request_id,
         yolo_model_version = EXCLUDED.yolo_model_version,
         detection_count = EXCLUDED.detection_count,
-        has_fire = EXCLUDED.has_fire,
         has_smoke = EXCLUDED.has_smoke,
         alert_level = EXCLUDED.alert_level,
         detection_mode = EXCLUDED.detection_mode,
         active_classes = EXCLUDED.active_classes,
         detections = EXCLUDED.detections,
-        confidence_fire = EXCLUDED.confidence_fire,
         confidence_smoke = EXCLUDED.confidence_smoke,
         confidence_score = EXCLUDED.confidence_score,
         image_width = EXCLUDED.image_width,
@@ -986,13 +977,11 @@ export class Stage2ETLService extends EventEmitter {
       extracted.request_id,
       extracted.yolo_model_version,
       extracted.detection_count,
-      extracted.has_fire,
       extracted.has_smoke,
       extracted.alert_level,
       extracted.detection_mode,
       extracted.active_classes,
       extracted.detections ? JSON.stringify(extracted.detections) : null,
-      extracted.confidence_fire,
       extracted.confidence_smoke,
       extracted.confidence_score,
       extracted.image_width,
