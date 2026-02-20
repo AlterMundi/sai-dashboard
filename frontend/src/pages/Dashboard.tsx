@@ -212,9 +212,6 @@ export function Dashboard() {
             onFiltersChange={setFilters}
             onReset={clearAllFilters}
             totalResults={totalResults}
-            currentPage={1}
-            totalPages={Math.ceil(totalResults / 50)}
-            pageSize={50}
             isLoading={false}
           />
 

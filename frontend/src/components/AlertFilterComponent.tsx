@@ -24,9 +24,6 @@ interface AlertFilterComponentProps {
   onReset: () => void;
   isLoading?: boolean;
   totalResults?: number;
-  currentPage?: number;
-  totalPages?: number;
-  pageSize?: number;
   className?: string;
 }
 
@@ -36,9 +33,6 @@ export function AlertFilterComponent({
   onReset,
   isLoading = false,
   totalResults = 0,
-  currentPage = 1,
-  totalPages = 1,
-  pageSize = 50,
   className
 }: AlertFilterComponentProps) {
   const { t } = useTranslation();
@@ -108,7 +102,7 @@ export function AlertFilterComponent({
         <div className="flex items-center space-x-2">
           <button
             onClick={() => setShowAdvanced(!showAdvanced)}
-            className="text-sm text-gray-600 hover:text-gray-900 flex items-center"
+            className="hidden sm:flex text-sm text-gray-600 hover:text-gray-900 items-center"
           >
             {showAdvanced ? t('filters.basic') : t('filters.advanced')}
             <ChevronDown className={cn(
@@ -458,13 +452,20 @@ export function AlertFilterComponent({
 
       {/* Results Summary */}
       <div className="pt-4 border-t border-gray-200">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-sm text-gray-600">
+        <div className="flex items-center justify-between gap-3 text-sm text-gray-600">
           <div className="font-medium">
             {t('filters.results')}: {t('filters.executionsFound', { count: totalResults.toLocaleString() })}
           </div>
-          <div className="text-gray-500">
-            {t('filters.page', { current: String(currentPage), total: String(totalPages), size: String(pageSize) })}
-          </div>
+          <button
+            onClick={() => setShowAdvanced(!showAdvanced)}
+            className="sm:hidden text-gray-600 hover:text-gray-900 flex items-center"
+            aria-label={showAdvanced ? t('filters.basic') : t('filters.advanced')}
+          >
+            <ChevronDown className={cn(
+              "h-4 w-4 transition-transform",
+              showAdvanced && "rotate-180"
+            )} />
+          </button>
         </div>
       </div>
     </div>

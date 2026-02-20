@@ -89,6 +89,10 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate }: ImageModalP
   const [translate, setTranslate] = useState({ x: 0, y: 0 });
   const [dragging, setDragging] = useState(false);
   const dragStart = useRef<{ cx: number; cy: number; tx: number; ty: number } | null>(null);
+  const resetZoomToFit = useCallback(() => {
+    setZoomLevel(1);
+    setTranslate({ x: 0, y: 0 });
+  }, []);
 
   const containerRef   = useRef<HTMLDivElement>(null);
   const dialogRef      = useRef<HTMLDivElement>(null);
@@ -135,7 +139,7 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate }: ImageModalP
         ? Math.max(zoomLevel - 2, 1)
         : zoomLevel === 1 ? 2 : Math.min(zoomLevel + 2, 10);
 
-      if (newZoom <= 1) { setZoomLevel(1); setTranslate({ x: 0, y: 0 }); return; }
+      if (newZoom <= 1) { resetZoomToFit(); return; }
 
       if (containerRef.current) {
         const r = containerRef.current.getBoundingClientRect();
@@ -200,7 +204,7 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate }: ImageModalP
         const newDist = Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
         const newZoom = Math.min(Math.max(gesture.initZoom * (newDist / gesture.initDist!), 1), 10);
         if (newZoom <= 1) {
-          setZoomLevel(1); setTranslate({ x: 0, y: 0 });
+          resetZoomToFit();
         } else {
           const rect = el.getBoundingClientRect();
           const cx = rect.left + rect.width / 2;
@@ -243,7 +247,7 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate }: ImageModalP
       el.removeEventListener('touchend',   onEnd);
       el.removeEventListener('touchcancel',onEnd);
     };
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, resetZoomToFit]);
 
   // ── Bottom sheet drag (handle area) ──────────────────────────────────────
   useEffect(() => {
@@ -723,7 +727,7 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate }: ImageModalP
                   <button
                     onClick={() => {
                       const nz = Math.max(zoomLevel - 2, 1);
-                      if (nz <= 1) { setZoomLevel(1); setTranslate({ x: 0, y: 0 }); return; }
+                      if (nz <= 1) { resetZoomToFit(); return; }
                       const f = nz / zoomLevel;
                       setTranslate(p => ({ x: p.x * f, y: p.y * f }));
                       setZoomLevel(nz);
@@ -733,9 +737,14 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate }: ImageModalP
                   >
                     <ZoomOut className="h-6 w-6" />
                   </button>
-                  <span className="text-white text-sm font-mono px-2 min-w-[4ch] text-center">
+                  <button
+                    type="button"
+                    onClick={resetZoomToFit}
+                    className="text-white text-sm font-mono px-2 min-w-[4ch] text-center hover:bg-white/20 rounded min-h-[44px]"
+                    title="Reset zoom to fit"
+                  >
                     {zoomLevel === 1 ? 'Fit' : `${Math.round(zoomLevel * 10) / 10}x`}
-                  </span>
+                  </button>
                   <button
                     onClick={() => {
                       const nz = zoomLevel === 1 ? 2 : Math.min(zoomLevel + 2, 10);
