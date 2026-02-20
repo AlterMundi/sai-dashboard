@@ -18,11 +18,22 @@ export interface ImageCardProps {
   loading?: boolean;
 }
 
+export interface NavContext {
+  onPrev: () => void;
+  onNext: () => void;
+  hasPrev: boolean;
+  hasNext: boolean;
+  index: number;   // 0-based current position
+  total: number;
+}
+
 export interface ImageModalProps {
   execution: ExecutionWithImageUrls | null;
   isOpen: boolean;
   onClose: () => void;
   onUpdate?: (execution: ExecutionWithImageUrls) => void;
+  cameraNav?: NavContext;   // same nodeId+cameraId, sorted by executionTimestamp ASC
+  galleryNav?: NavContext;  // all loaded executions in current gallery order
 }
 
 export interface ImageGalleryProps {

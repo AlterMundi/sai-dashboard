@@ -50,6 +50,7 @@ export type {
 // Component Prop Types
 // ============================================================================
 export type {
+  NavContext,
   ImageCardProps,
   ImageModalProps,
   ImageGalleryProps,
