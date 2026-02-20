@@ -63,6 +63,11 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate, cameraNav, ga
     if (navMode === 'camera' && !cameraNav) setNavMode('gallery');
   }, [cameraNav, navMode]);
 
+  // Held-arrow FPS (images/second while arrow key is held)
+  const [navFps, setNavFps] = useState<3 | 10 | 30>(10);
+  const navIntervalRef = useRef<number>(100); // ms between nav steps
+  useEffect(() => { navIntervalRef.current = Math.round(1000 / navFps); }, [navFps]);
+
   const activeNav = navMode === 'camera' ? cameraNav : galleryNav;
 
   const [pressedBtn, setPressedBtn] = useState<'prev' | 'next' | null>(null);
@@ -380,9 +385,9 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate, cameraNav, ga
         }
         if (e.key === 'ArrowDown') return; // no-op in fit mode
 
-        // Left/Right: navigate, with slow-scroll on hold (10 fps = 1 image per 100ms)
+        // Left/Right: navigate on hold at navFps rate
         const now = Date.now();
-        if (e.repeat && now - lastNavTimeRef.current < 100) return;
+        if (e.repeat && now - lastNavTimeRef.current < navIntervalRef.current) return;
         lastNavTimeRef.current = now;
 
         const nav = navMode === 'camera' ? cameraNav : galleryNav;
@@ -884,20 +889,57 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate, cameraNav, ga
                 </button>
               )}
 
-              {/* Counter + mode toggle */}
+              {/* Counter + mode selector + FPS selector */}
               {activeNav && activeNav.total > 1 && (
-                <div className="absolute bottom-14 sm:bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-black/60 rounded-lg px-3 py-1 z-10">
-                  <span className="text-white text-xs font-mono tabular-nums">
+                <div className="absolute bottom-14 sm:bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 bg-black/60 rounded-lg px-2.5 py-1.5 z-10 select-none">
+                  {/* Position counter */}
+                  <span className="text-white text-xs font-mono tabular-nums pr-1">
                     {activeNav.index + 1} / {activeNav.total}
                   </span>
+
+                  {/* Gallery / Camera mode selector */}
                   {cameraNav && galleryNav && (
-                    <button
-                      onClick={() => setNavMode(m => m === 'camera' ? 'gallery' : 'camera')}
-                      className="text-white/70 hover:text-white text-xs px-2 py-0.5 rounded border border-white/30 hover:border-white/60 transition-colors"
-                    >
-                      {navMode === 'camera' ? t('modal.navCamera') : t('modal.navGallery')}
-                    </button>
+                    <>
+                      <div className="w-px h-3 bg-white/30 mx-0.5" />
+                      <div className="flex rounded overflow-hidden border border-white/20">
+                        {(['gallery', 'camera'] as const).map(mode => (
+                          <button
+                            key={mode}
+                            onClick={() => setNavMode(mode)}
+                            className={cn(
+                              'text-xs px-2 py-0.5 transition-colors',
+                              navMode === mode
+                                ? 'bg-white/25 text-white'
+                                : 'text-white/50 hover:text-white/80'
+                            )}
+                          >
+                            {mode === 'gallery'
+                              ? t('modal.navModeGalleryLabel')
+                              : t('modal.navModeCameraLabel')}
+                          </button>
+                        ))}
+                      </div>
+                    </>
                   )}
+
+                  {/* FPS selector for held-arrow navigation */}
+                  <div className="w-px h-3 bg-white/30 mx-0.5" />
+                  <div className="flex rounded overflow-hidden border border-white/20">
+                    {([3, 10, 30] as const).map(fps => (
+                      <button
+                        key={fps}
+                        onClick={() => setNavFps(fps)}
+                        className={cn(
+                          'text-xs px-1.5 py-0.5 transition-colors',
+                          navFps === fps
+                            ? 'bg-white/25 text-white'
+                            : 'text-white/50 hover:text-white/80'
+                        )}
+                      >
+                        {fps}fps
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
