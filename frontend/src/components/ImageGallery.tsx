@@ -348,13 +348,13 @@ export function ImageGallery({ initialFilters = {}, className, refreshTrigger, o
                     aria-label={t('gallery.selectAll')}
                   />
                 </div>
-                <div className="w-24">{t('gallery.image')}</div>
-                <div className="w-32">{t('gallery.idTime')}</div>
+                <div className="w-24 text-center">{t('gallery.image')}</div>
+                <div className="w-20 text-center">{t('gallery.id')}</div>
+                <div className="w-28 text-center">{t('gallery.time')}</div>
                 <div className="flex-1">{t('gallery.cameraLocation')}</div>
-                <div className="w-20">{t('gallery.alert')}</div>
-                <div className="w-24">{t('gallery.listDetections')}</div>
+                <div className="w-24 text-center">{t('gallery.alert')}</div>
+                <div className="w-20 text-center">{t('gallery.listDetections')}</div>
                 <div className="w-8"></div>
-                <div className="w-10"></div>
               </div>
               {/* List Items */}
               {executions.map((execution) => (

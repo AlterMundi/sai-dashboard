@@ -73,6 +73,7 @@ const es: TranslationKeys = {
     thisMonth: 'Este mes',
     lastMonth: 'Mes pasado',
     smoke: 'Humo',
+    smokeDetections: 'Detecciones de Humo',
     critical: 'Cr\u00edtico',
     high: 'Alto',
     low: 'Bajo',
@@ -194,6 +195,8 @@ const es: TranslationKeys = {
     // List headers
     image: 'Imagen',
     idTime: 'ID / Hora',
+    id: 'ID',
+    time: 'Hora',
     cameraLocation: 'C\u00e1mara / Ubicaci\u00f3n',
     alert: 'Alerta',
     listDetections: 'Confianza',

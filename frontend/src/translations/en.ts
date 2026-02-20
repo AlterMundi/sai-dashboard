@@ -71,6 +71,7 @@ const en = {
     thisMonth: 'This month',
     lastMonth: 'Last month',
     smoke: 'Smoke',
+    smokeDetections: 'Smoke Detections',
     critical: 'Critical',
     high: 'High',
     low: 'Low',
@@ -192,6 +193,8 @@ const en = {
     // List headers
     image: 'Image',
     idTime: 'ID / Time',
+    id: 'ID',
+    time: 'Time',
     cameraLocation: 'Camera / Location',
     alert: 'Alert',
     listDetections: 'Confidence',
