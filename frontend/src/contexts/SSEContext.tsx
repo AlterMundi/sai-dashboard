@@ -151,174 +151,130 @@ export function SSEProvider({ children }: SSEProviderProps) {
         }
       };
 
+      // Helper: defer processing so the EventSource message handler returns
+      // immediately, preventing main-thread violations and input lag.
+      const defer = (fn: () => void) => setTimeout(fn, 0);
+
       // Connection event
       eventSource.addEventListener('connection', (event) => {
-        try {
-          const data: SSEConnectionEvent = JSON.parse(event.data);
+        const raw = event.data;
+        defer(() => { try {
+          const data: SSEConnectionEvent = JSON.parse(raw);
           setLastEvent({ type: 'connection', data, timestamp: new Date() });
-          
-          // Set connected state when we receive the connection event
           if (data.message === 'Connected to SAI Dashboard real-time updates') {
             setIsConnected(true);
             setConnectionStatus('connected');
             reconnectAttempts.current = 0;
           }
-        } catch (error) {
-          console.warn('SSE Context: Failed to parse connection event:', error);
-        }
+        } catch (e) { console.warn('SSE Context: Failed to parse connection event:', e); } });
       });
 
       // New execution event
       eventSource.addEventListener('execution:new', (event) => {
-        try {
-          const data: SSEExecutionEvent = JSON.parse(event.data);
-          const newEvent = { type: 'execution:new', data, timestamp: new Date() };
-          setLastEvent(newEvent);
-          
-          // Events are handled through useSSEHandler hook
-          
-          // Use smart notification system instead of basic toast
+        const raw = event.data;
+        defer(() => { try {
+          const data: SSEExecutionEvent = JSON.parse(raw);
+          setLastEvent({ type: 'execution:new', data, timestamp: new Date() });
           notifyNewExecutionRef.current(data);
-        } catch (error) {
-          console.warn('SSE Context: Failed to parse execution:new event:', error);
-        }
+        } catch (e) { console.warn('SSE Context: Failed to parse execution:new event:', e); } });
       });
 
       // Execution error event
       eventSource.addEventListener('execution:error', (event) => {
-        try {
-          const data = JSON.parse(event.data);
+        const raw = event.data;
+        defer(() => { try {
+          const data = JSON.parse(raw);
           setLastEvent({ type: 'execution:error', data, timestamp: new Date() });
-          
-          // Use smart notification system
           notifyExecutionErrorRef.current(data);
-        } catch (error) {
-          console.warn('SSE Context: Failed to parse execution:error event:', error);
-        }
+        } catch (e) { console.warn('SSE Context: Failed to parse execution:error event:', e); } });
       });
 
       // Heartbeat event
       eventSource.addEventListener('heartbeat', (event) => {
-        try {
-          const data: SSEHeartbeatEvent = JSON.parse(event.data);
+        const raw = event.data;
+        defer(() => { try {
+          const data: SSEHeartbeatEvent = JSON.parse(raw);
           setClientCount(data.clients);
           setLastEvent({ type: 'heartbeat', data, timestamp: new Date() });
-        } catch (error) {
-          console.warn('SSE Context: Failed to parse heartbeat event:', error);
-        }
+        } catch (e) { console.warn('SSE Context: Failed to parse heartbeat event:', e); } });
       });
 
       // System statistics event
       eventSource.addEventListener('system:stats', (event) => {
-        try {
-          const data = JSON.parse(event.data);
+        const raw = event.data;
+        defer(() => { try {
+          const data = JSON.parse(raw);
           setLastEvent({ type: 'system:stats', data, timestamp: new Date() });
           setLiveStats(data);
-          
-          // Events are captured directly via lastEvent state
-          
-          // Smart notification for significant stats changes
           notifySystemStatsRef.current(data);
-        } catch (error) {
-          console.warn('SSE Context: Failed to parse system:stats event:', error);
-        }
+        } catch (e) { console.warn('SSE Context: Failed to parse system:stats event:', e); } });
       });
 
       // System health event
       eventSource.addEventListener('system:health', (event) => {
-        try {
-          const data = JSON.parse(event.data);
+        const raw = event.data;
+        defer(() => { try {
+          const data = JSON.parse(raw);
           setLastEvent({ type: 'system:health', data, timestamp: new Date() });
           setSystemHealth(data);
-          
-          // Events are captured directly via lastEvent state
-          
-          // Smart notification for health issues
           notifySystemHealthRef.current(data);
-        } catch (error) {
-          console.warn('SSE Context: Failed to parse system:health event:', error);
-        }
+        } catch (e) { console.warn('SSE Context: Failed to parse system:health event:', e); } });
       });
 
       // Batch completion event
       eventSource.addEventListener('execution:batch', (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          const batchEvent = { type: 'execution:batch', data, timestamp: new Date() };
-          setLastEvent(batchEvent);
-          
-          // Events are handled through useSSEHandler hook
-          
-          // Smart notification for batch completion
+        const raw = event.data;
+        defer(() => { try {
+          const data = JSON.parse(raw);
+          setLastEvent({ type: 'execution:batch', data, timestamp: new Date() });
           notifyBatchCompleteRef.current(data);
-        } catch (error) {
-          console.warn('❌ SSE Context: Failed to parse execution:batch event:', error);
-        }
+        } catch (e) { console.warn('❌ SSE Context: Failed to parse execution:batch event:', e); } });
       });
 
       // Execution progress event
       eventSource.addEventListener('execution:progress', (event) => {
-        try {
-          const data = JSON.parse(event.data);
+        const raw = event.data;
+        defer(() => { try {
+          const data = JSON.parse(raw);
           setLastEvent({ type: 'execution:progress', data, timestamp: new Date() });
-
-          // Could trigger progress UI updates here
-        } catch (error) {
-          console.warn('SSE Context: Failed to parse execution:progress event:', error);
-        }
+        } catch (e) { console.warn('SSE Context: Failed to parse execution:progress event:', e); } });
       });
 
       // Stage 2 completion event
       eventSource.addEventListener('etl:stage2:complete', (event) => {
-        try {
-          const data: SSEStage2CompletionEvent = JSON.parse(event.data);
+        const raw = event.data;
+        defer(() => { try {
+          const data: SSEStage2CompletionEvent = JSON.parse(raw);
           setLastEvent({ type: 'etl:stage2:complete', data, timestamp: new Date() });
-
-          // Events are handled through useSSEHandler hook
-        } catch (error) {
-          console.warn('SSE Context: Failed to parse etl:stage2:complete event:', error);
-        }
+        } catch (e) { console.warn('SSE Context: Failed to parse etl:stage2:complete event:', e); } });
       });
 
       // Stage 2 failure event
       eventSource.addEventListener('etl:stage2:failed', (event) => {
-        try {
-          const data: SSEStage2FailureEvent = JSON.parse(event.data);
+        const raw = event.data;
+        defer(() => { try {
+          const data: SSEStage2FailureEvent = JSON.parse(raw);
           setLastEvent({ type: 'etl:stage2:failed', data, timestamp: new Date() });
-
-          // Events are handled through useSSEHandler hook
-        } catch (error) {
-          console.warn('SSE Context: Failed to parse etl:stage2:failed event:', error);
-        }
+        } catch (e) { console.warn('SSE Context: Failed to parse etl:stage2:failed event:', e); } });
       });
 
       // ETL status event
       eventSource.addEventListener('etl:status', (event) => {
-        try {
-          const data: SSEEtlStatusEvent = JSON.parse(event.data);
+        const raw = event.data;
+        defer(() => { try {
+          const data: SSEEtlStatusEvent = JSON.parse(raw);
           setLastEvent({ type: 'etl:status', data, timestamp: new Date() });
-
-          // Events are handled through useSSEHandler hook
-        } catch (error) {
-          console.warn('SSE Context: Failed to parse etl:status event:', error);
-        }
+        } catch (e) { console.warn('SSE Context: Failed to parse etl:status event:', e); } });
       });
 
       // Generic message handler (fallback)
       eventSource.onmessage = (event) => {
-        try {
-          // Skip empty data messages (connection keepalive)
-          if (!event.data || event.data.trim() === '') {
-            return;
-          }
-          
-          const data = JSON.parse(event.data);
+        const raw = event.data;
+        if (!raw || raw.trim() === '') return;
+        defer(() => { try {
+          const data = JSON.parse(raw);
           setLastEvent({ type: 'message', data, timestamp: new Date() });
-          
-          // Generic messages handled through lastEvent state
-        } catch (error) {
-          console.warn('SSE Context: Failed to parse message:', error);
-        }
+        } catch (e) { console.warn('SSE Context: Failed to parse message:', e); } });
       };
 
     } catch (error) {

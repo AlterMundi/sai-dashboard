@@ -254,16 +254,18 @@ export function ImageGallery({ initialFilters = {}, className, refreshTrigger, o
     };
   }, [executions, selectedExecution?.id, totalResults]);
 
-  // Preemptively load the next page when the selected execution is
-  // within 10 positions of the end of the loaded list.
+  // Preemptively load the next page when approaching the end of loaded data,
+  // either in gallery order OR in camera-sibling order.
   useEffect(() => {
-    if (!selectedExecution) return;
-    const idx = executions.findIndex(e => e.id === selectedExecution.id);
-    if (idx === -1) return;
-    if (idx >= executions.length - 10 && hasNext && !isLoading) {
-      loadMore();
-    }
-  }, [selectedExecution?.id, executions.length, hasNext, isLoading, loadMore]);
+    if (!selectedExecution || !hasNext || isLoading) return;
+    // Gallery boundary: within 10 of end of loaded executions
+    const galleryIdx = executions.findIndex(e => e.id === selectedExecution.id);
+    if (galleryIdx !== -1 && galleryIdx >= executions.length - 10) { loadMore(); return; }
+    // Camera boundary: within 5 of either end of loaded siblings.
+    // Going right (newer) hits total-1; going left (older) hits 0.
+    // Both ends need more gallery pages to expand the sibling set.
+    if (cameraNav && (cameraNav.index >= cameraNav.total - 5 || cameraNav.index <= 4)) { loadMore(); }
+  }, [selectedExecution?.id, executions.length, cameraNav?.index, cameraNav?.total, hasNext, isLoading, loadMore]);
 
   const handleRefresh = useCallback(() => {
     refresh();
