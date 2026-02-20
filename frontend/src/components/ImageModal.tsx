@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { LoadingSpinner } from './ui/LoadingSpinner';
-import { useSecureImage } from './ui/SecureImage';
 import { BoundingBoxOverlay, BoundingBoxToggle } from './BoundingBoxOverlay';
+import { usePrefetchBuffer } from '@/hooks/usePrefetchBuffer';
 import { executionsApi, tokenManager } from '@/services/api';
 import {
   formatDate,
@@ -80,13 +80,33 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate, cameraNav, ga
     setSheetExpanded(false); // collapse sheet on new execution
   }, [execution?.id, execution?.isFalsePositive]);
 
+  // Keep secureImageUrl for the download button handler
   const secureImageUrl = execution?.hasImage
     ? executionsApi.getImageUrl(execution.id, false)
     : undefined;
 
-  const { blobUrl: imageUrl, loading: imageLoading, error: imageError } = useSecureImage(
-    isOpen ? secureImageUrl : undefined
+  const prefetchBuffer = usePrefetchBuffer(
+    useCallback((id: number) => executionsApi.getImageUrl(id, false), [])
   );
+
+  useEffect(() => {
+    if (!isOpen || !execution) {
+      prefetchBuffer.prefetch([]); // clear buffer on close
+      return;
+    }
+    prefetchBuffer.setCurrent(execution.id);
+    const nav = (navMode === 'camera' ? cameraNav : galleryNav) ?? galleryNav ?? cameraNav;
+    const neighbors = nav?.getNeighbors(5, 5) ?? [execution];
+    prefetchBuffer.prefetch(
+      neighbors.filter(e => e.hasImage).map(e => e.id)
+    );
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [execution?.id, isOpen, navMode, cameraNav, galleryNav]);
+
+  const { blobUrl: imageUrl, loading: imageLoading, error: imageError } =
+    execution?.hasImage
+      ? prefetchBuffer.getEntry(execution.id)
+      : { blobUrl: null, loading: false, error: false };
 
   // Reset zoom/pan when execution changes
   useEffect(() => {
