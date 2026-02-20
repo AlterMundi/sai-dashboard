@@ -65,6 +65,13 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate, cameraNav, ga
 
   const activeNav = navMode === 'camera' ? cameraNav : galleryNav;
 
+  const [pressedBtn, setPressedBtn] = useState<'prev' | 'next' | null>(null);
+  useEffect(() => {
+    if (!pressedBtn) return;
+    const t = setTimeout(() => setPressedBtn(null), 150);
+    return () => clearTimeout(t);
+  }, [pressedBtn]);
+
   // Sync local state when execution changes
   useEffect(() => {
     if (execution) {
@@ -315,6 +322,7 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate, cameraNav, ga
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') { onClose(); return; }
       if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        if (e.repeat) return;
         if (e.shiftKey || e.ctrlKey || e.metaKey || e.altKey) return;
         const tag = (e.target as HTMLElement).tagName;
         if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
@@ -322,8 +330,8 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate, cameraNav, ga
         const nav = navMode === 'camera' ? cameraNav : galleryNav;
         if (!nav) return;
         e.preventDefault();
-        if (e.key === 'ArrowLeft' && nav.hasPrev) nav.onPrev();
-        if (e.key === 'ArrowRight' && nav.hasNext) nav.onNext();
+        if (e.key === 'ArrowLeft' && nav.hasPrev) { setPressedBtn('prev'); nav.onPrev(); }
+        if (e.key === 'ArrowRight' && nav.hasNext) { setPressedBtn('next'); nav.onNext(); }
       }
     };
     if (isOpen) {
@@ -681,7 +689,7 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate, cameraNav, ga
           {/* Image section — fills ALL remaining height on mobile (sheet overlays it) */}
           <div className="flex-1 bg-gray-900 flex flex-col min-h-0 min-w-0 relative overflow-hidden">
             {/* Bounding Box Toggle */}
-            {execution.detections && execution.detections.length > 0 && !imageLoading && !imageError && imageUrl && (
+            {execution.detections && execution.detections.length > 0 && !imageError && !!imageUrl && (
               <div className="flex justify-center p-2 bg-gray-800 shrink-0">
                 <BoundingBoxToggle
                   visible={showBoundingBoxes}
@@ -698,7 +706,7 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate, cameraNav, ga
             >
               {secureImageUrl ? (
                 <>
-                  {imageLoading && (
+                  {imageLoading && !imageUrl && (
                     <div className="flex items-center justify-center h-full">
                       <LoadingSpinner size="lg" color="white" />
                     </div>
@@ -710,7 +718,7 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate, cameraNav, ga
                     </div>
                   ) : imageUrl ? (
                     <div
-                      className="relative inline-block"
+                      className="relative w-full h-full bg-gray-900"
                       style={{
                         transform: zoomLevel > 1
                           ? `translate(${translate.x}px, ${translate.y}px) scale(${zoomLevel})`
@@ -728,7 +736,7 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate, cameraNav, ga
                       <img
                         src={imageUrl}
                         alt={`Execution ${execution.id}`}
-                        className="max-w-full max-h-full object-contain"
+                        className="w-full h-full object-contain"
                       />
                       <BoundingBoxOverlay
                         detections={execution.detections}
@@ -788,10 +796,15 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate, cameraNav, ga
               {/* ← Prev navigation button */}
               {activeNav && activeNav.total > 1 && (
                 <button
-                  onClick={() => activeNav.hasPrev && activeNav.onPrev()}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => { if (activeNav.hasPrev) { setPressedBtn('prev'); activeNav.onPrev(); } }}
                   disabled={!activeNav.hasPrev}
-                  className="absolute left-2 top-1/2 -translate-y-1/2 flex items-center justify-center w-10 h-10 bg-black/50 hover:bg-black/70 text-white rounded-full transition-colors disabled:opacity-20 disabled:cursor-not-allowed z-10"
+                  className={cn(
+                    'absolute left-2 top-1/2 -translate-y-1/2 flex items-center justify-center w-10 h-10 bg-black/50 hover:bg-black/70 active:bg-white/20 text-white rounded-full transition-all duration-150 disabled:opacity-20 disabled:cursor-not-allowed z-10 focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:outline-none',
+                    pressedBtn === 'prev' && 'bg-white/20',
+                  )}
                   aria-label={t('modal.navPrev')}
+                  title={t('modal.navPrev')}
                 >
                   <ChevronLeft className="h-6 w-6" />
                 </button>
@@ -800,10 +813,15 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate, cameraNav, ga
               {/* → Next navigation button */}
               {activeNav && activeNav.total > 1 && (
                 <button
-                  onClick={() => activeNav.hasNext && activeNav.onNext()}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => { if (activeNav.hasNext) { setPressedBtn('next'); activeNav.onNext(); } }}
                   disabled={!activeNav.hasNext}
-                  className="absolute right-14 top-1/2 -translate-y-1/2 flex items-center justify-center w-10 h-10 bg-black/50 hover:bg-black/70 text-white rounded-full transition-colors disabled:opacity-20 disabled:cursor-not-allowed z-10"
+                  className={cn(
+                    'absolute right-2 top-1/2 -translate-y-1/2 flex items-center justify-center w-10 h-10 bg-black/50 hover:bg-black/70 active:bg-white/20 text-white rounded-full transition-all duration-150 disabled:opacity-20 disabled:cursor-not-allowed z-10 focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:outline-none',
+                    pressedBtn === 'next' && 'bg-white/20',
+                  )}
                   aria-label={t('modal.navNext')}
+                  title={t('modal.navNext')}
                 >
                   <ChevronRight className="h-6 w-6" />
                 </button>
