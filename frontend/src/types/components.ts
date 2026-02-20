@@ -48,7 +48,6 @@ export interface AlertLevelBadgeProps {
 }
 
 export interface DetectionBadgeProps {
-  hasFire: boolean;
   hasSmoke: boolean;
   detectionCount: number;
   size?: 'sm' | 'md' | 'lg';

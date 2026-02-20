@@ -17,8 +17,6 @@ function parseFiltersFromURL(searchParams: URLSearchParams): ExecutionFilters {
   if (status === 'success' || status === 'error') filters.status = status;
   const alertLevels = searchParams.get('alertLevels');
   if (alertLevels) filters.alertLevels = alertLevels.split(',') as ExecutionFilters['alertLevels'];
-  const hasFire = searchParams.get('hasFire');
-  if (hasFire !== null) filters.hasFire = hasFire === 'true';
   const hasSmoke = searchParams.get('hasSmoke');
   if (hasSmoke !== null) filters.hasSmoke = hasSmoke === 'true';
   const search = searchParams.get('search');
@@ -36,7 +34,6 @@ function filtersToSearchParams(filters: ExecutionFilters): URLSearchParams {
   const params = new URLSearchParams();
   if (filters.status) params.set('status', filters.status);
   if (filters.alertLevels?.length) params.set('alertLevels', filters.alertLevels.join(','));
-  if (filters.hasFire !== undefined) params.set('hasFire', String(filters.hasFire));
   if (filters.hasSmoke !== undefined) params.set('hasSmoke', String(filters.hasSmoke));
   if (filters.search) params.set('search', filters.search);
   if (filters.datePreset) params.set('datePreset', filters.datePreset);
@@ -93,7 +90,6 @@ export function Dashboard() {
     // Update the specific execution with new Stage 2 data
     if (updateExecutionStage && data.execution_id) {
       updateExecutionStage(data.execution_id, 'stage2', {
-        has_fire: data.extracted_data?.has_fire,
         has_smoke: data.extracted_data?.has_smoke,
         alert_level: data.extracted_data?.alert_level,
         detection_count: data.extracted_data?.detection_count,
@@ -170,9 +166,6 @@ export function Dashboard() {
           case 'position':
             detectionCriteria.position = condition.value as DetectionFilterCriteria['position'];
             break;
-          case 'hasFire':
-            setFilters({ ...filters, hasFire: condition.value === true });
-            break;
           case 'hasSmoke':
             setFilters({ ...filters, hasSmoke: condition.value === true });
             break;
@@ -189,10 +182,7 @@ export function Dashboard() {
         toast.success(`Found ${results.length} matching executions`);
 
         // Update filters to show these specific execution IDs (if supported)
-        // For now, we'll just trigger a refresh with the class/smoke/fire filters
-        if (detectionCriteria.hasClass?.includes('fire')) {
-          setFilters({ ...filters, hasFire: true });
-        }
+        // For now, we'll just trigger a refresh with the smoke filter
         if (detectionCriteria.hasClass?.includes('smoke')) {
           setFilters({ ...filters, hasSmoke: true });
         }

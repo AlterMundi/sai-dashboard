@@ -46,12 +46,11 @@ export class NewExecutionService {
       datePreset,
       hasImage,
       telegramSent,
-      hasFire,
       hasSmoke,
       detectionCount,
-      confidenceFire,
       confidenceSmoke,
       detectionMode,
+      yoloModelVersion,
       detectionClasses,
       minDetectionConfidence
     } = filters;
@@ -193,13 +192,6 @@ export class NewExecutionService {
 
     // YOLO-specific filters (execution_analysis table)
 
-    // Fire detection filter (NEW - was missing!)
-    if (hasFire !== undefined) {
-      paramCount++;
-      whereConditions.push(`ea.has_fire = $${paramCount}`);
-      queryParams.push(hasFire);
-    }
-
     // Smoke detection filter (NEW - was missing!)
     if (hasSmoke !== undefined) {
       paramCount++;
@@ -214,13 +206,6 @@ export class NewExecutionService {
       queryParams.push(detectionCount);
     }
 
-    // Fire confidence filter (NEW)
-    if (confidenceFire !== undefined) {
-      paramCount++;
-      whereConditions.push(`ea.confidence_fire >= $${paramCount}`);
-      queryParams.push(confidenceFire);
-    }
-
     // Smoke confidence filter (NEW)
     if (confidenceSmoke !== undefined) {
       paramCount++;
@@ -233,6 +218,13 @@ export class NewExecutionService {
       paramCount++;
       whereConditions.push(`ea.detection_mode = $${paramCount}`);
       queryParams.push(detectionMode);
+    }
+
+    // YOLO model version filter
+    if (yoloModelVersion) {
+      paramCount++;
+      whereConditions.push(`ea.yolo_model_version ILIKE $${paramCount}`);
+      queryParams.push(`%${yoloModelVersion}%`);
     }
 
     // Advanced detection filters (JSONB)
@@ -312,13 +304,11 @@ export class NewExecutionService {
         ea.request_id,
         ea.yolo_model_version,
         ea.detection_count,
-        ea.has_fire,
         ea.has_smoke,
         ea.alert_level,
         ea.detection_mode,
         ea.active_classes,
         ea.detections,
-        ea.confidence_fire,
         ea.confidence_smoke,
         ea.yolo_processing_time_ms,
 
@@ -396,13 +386,11 @@ export class NewExecutionService {
         ea.request_id,
         ea.yolo_model_version,
         ea.detection_count,
-        ea.has_fire,
         ea.has_smoke,
         ea.alert_level,
         ea.detection_mode,
         ea.active_classes,
         ea.detections,
-        ea.confidence_fire,
         ea.confidence_smoke,
         ea.yolo_processing_time_ms,
 
@@ -459,7 +447,7 @@ export class NewExecutionService {
         COUNT(CASE WHEN e.status = 'success' THEN 1 END) as successful_executions,
         COUNT(CASE WHEN ea.alert_level = 'high' THEN 1 END) as high_alert_detections,
         COUNT(CASE WHEN ea.alert_level = 'critical' THEN 1 END) as critical_detections,
-        COUNT(CASE WHEN ea.has_fire = true THEN 1 END) as fire_detections,
+        COUNT(CASE WHEN ea.alert_level = 'low' THEN 1 END) as low_alert_detections,
         COUNT(CASE WHEN ea.has_smoke = true THEN 1 END) as smoke_detections,
         COUNT(CASE WHEN ei.execution_id IS NOT NULL THEN 1 END) as executions_with_images,
         COUNT(CASE WHEN en.telegram_sent = true THEN 1 END) as telegram_notifications_sent,
@@ -491,7 +479,7 @@ export class NewExecutionService {
         avgExecutionTime: parseFloat(row.avg_processing_time_ms) / 1000 || null, // Convert to seconds
         highRiskDetections: parseInt(row.high_alert_detections),
         criticalDetections: parseInt(row.critical_detections),
-        fireDetections: parseInt(row.fire_detections) || 0,
+        lowAlertDetections: parseInt(row.low_alert_detections) || 0,
         smokeDetections: parseInt(row.smoke_detections) || 0,
         executionsWithImages: parseInt(row.executions_with_images),
         telegramNotificationsSent: parseInt(row.telegram_notifications_sent),
@@ -607,13 +595,11 @@ export class NewExecutionService {
         ea.request_id,
         ea.yolo_model_version,
         ea.detection_count,
-        ea.has_fire,
         ea.has_smoke,
         ea.alert_level,
         ea.detection_mode,
         ea.active_classes,
         ea.detections,
-        ea.confidence_fire,
         ea.confidence_smoke,
         ea.yolo_processing_time_ms,
 
@@ -684,7 +670,6 @@ export class NewExecutionService {
       requestId: row.request_id || null,
       yoloModelVersion: row.yolo_model_version || null,
       detectionCount: row.detection_count || 0,
-      hasFire: row.has_fire || false,
       hasSmoke: row.has_smoke || false,
       alertLevel: row.alert_level || null,
       detectionMode: row.detection_mode || null,
@@ -694,7 +679,6 @@ export class NewExecutionService {
         : null,
 
       // Confidence scores
-      confidenceFire: parseFloat(row.confidence_fire) || null,
       confidenceSmoke: parseFloat(row.confidence_smoke) || null,
       confidenceScore: parseFloat(row.confidence_score) || null,
 

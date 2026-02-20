@@ -114,7 +114,6 @@ export function useExecutions(
 
         // If Stage 2 completed, update the execution data with new information
         if (stage === 'stage2' && additionalData) {
-          updatedExec.hasFire = additionalData.has_fire ?? exec.hasFire;
           updatedExec.hasSmoke = additionalData.has_smoke ?? exec.hasSmoke;
           updatedExec.alertLevel = additionalData.alert_level ?? exec.alertLevel;
           updatedExec.detectionCount = additionalData.detection_count ?? exec.detectionCount;

@@ -14,7 +14,7 @@
  * YOLO Detection object - individual fire/smoke detection with bounding box
  */
 export interface YoloDetection {
-  class: string;  // 'fire' | 'smoke' | 'unknown'
+  class: string;  // 'smoke' | 'unknown'
   confidence: number;  // 0.0 - 1.0
   bounding_box: {
     x: number;        // Pixels from left
@@ -56,7 +56,6 @@ export interface Execution {
   requestId: string | null;
   yoloModelVersion: string | null;
   detectionCount: number;
-  hasFire: boolean;
   hasSmoke: boolean;
   alertLevel: 'none' | 'low' | 'medium' | 'high' | 'critical' | null;
   detectionMode: string | null;
@@ -66,7 +65,6 @@ export interface Execution {
   // ============================================================================
   // Confidence Scores
   // ============================================================================
-  confidenceFire: number | null;     // 0.0 - 1.0
   confidenceSmoke: number | null;    // 0.0 - 1.0
   confidenceScore: number | null;    // Max confidence across all detections
 
@@ -142,4 +140,4 @@ export type AlertLevel = NonNullable<Execution['alertLevel']>;
 /**
  * Detection mode union type
  */
-export type DetectionMode = 'smoke-only' | 'fire-only' | 'both' | null;
+export type DetectionMode = 'smoke-only' | null;

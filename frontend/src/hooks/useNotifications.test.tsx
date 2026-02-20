@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
+import { LanguageProvider } from '@/contexts/LanguageContext';
 import { useNotifications } from './useNotifications';
 
 const mockNavigate = vi.fn();
@@ -16,7 +17,11 @@ vi.mock('react-router-dom', async () => {
 });
 
 function wrapper({ children }: { children: React.ReactNode }) {
-  return <BrowserRouter>{children}</BrowserRouter>;
+  return (
+    <LanguageProvider>
+      <BrowserRouter>{children}</BrowserRouter>
+    </LanguageProvider>
+  );
 }
 
 describe('useNotifications', () => {
@@ -87,7 +92,7 @@ describe('useNotifications', () => {
       result.current.notifyNewExecution({
         execution: {
           id: 180001,
-          analysis: { alertLevel: 'critical', confidenceFire: 0.95, confidenceSmoke: 0 },
+          analysis: { alertLevel: 'critical', confidenceSmoke: 0.95 },
         },
       });
     });
@@ -107,7 +112,7 @@ describe('useNotifications', () => {
       result.current.notifyNewExecution({
         execution: {
           id: 180002,
-          analysis: { alertLevel: 'low', confidenceFire: 0.2, confidenceSmoke: 0.1 },
+          analysis: { alertLevel: 'low', confidenceSmoke: 0.1 },
         },
       });
     });

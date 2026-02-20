@@ -1,19 +1,15 @@
-import { StatusBadge } from './ui/StatusBadge';
 import { LoadingSpinner } from './ui/LoadingSpinner';
-import { DynamicTimeAgo } from './ui/DynamicTimeAgo';
 import { cn } from '@/utils';
 import { ExecutionWithImageUrls } from '@/types';
 import { useImageCard, alertLevelColors } from '@/hooks/useImageCard';
 import {
   AlertTriangle,
-  Flame,
   Wind,
   Camera,
   MapPin,
   MessageCircle,
   RefreshCw,
   X,
-  Eye
 } from 'lucide-react';
 
 interface ExecutionListItemProps {
@@ -80,7 +76,7 @@ export function ExecutionListItem({ execution, onClick, loading = false, isSelec
       )}
 
       {/* Thumbnail */}
-      <div className="flex-shrink-0 w-16 h-16 rounded-md overflow-hidden bg-gray-100 relative">
+      <div className="flex-shrink-0 w-20 sm:w-24 aspect-video rounded-md overflow-hidden bg-gray-100 relative">
         {thumbnailUrl ? (
           <>
             {imageLoading && (
@@ -121,18 +117,78 @@ export function ExecutionListItem({ execution, onClick, loading = false, isSelec
         )}
       </div>
 
-      {/* ID & Time */}
-      <div className="flex-shrink-0 w-32">
-        <div className="font-mono text-sm font-medium text-gray-900">
-          #{String(execution.id).padStart(6, '0')}
+      {/* Mobile info panel — hidden on sm+ */}
+      <div className="flex-1 min-w-0 sm:hidden">
+        <div className="flex items-center justify-between gap-2">
+          <span className="font-mono text-sm font-medium text-gray-900 truncate">
+            #{String(execution.id).padStart(6, '0')}
+          </span>
+          {execution.alertLevel && execution.alertLevel !== 'none' && (
+            <span className={cn(
+              'flex-shrink-0 px-1.5 py-0.5 rounded text-xs font-bold uppercase',
+              alertLevelColors[execution.alertLevel] || alertLevelColors.none
+            )}>
+              {execution.alertLevel}
+            </span>
+          )}
         </div>
-        <div className="text-xs text-gray-500">
-          <DynamicTimeAgo date={execution.executionTimestamp} />
+        <div className="text-xs text-gray-500 tabular-nums mt-0.5">
+          {new Date(execution.executionTimestamp).toLocaleString('en-GB', {
+            day: '2-digit', month: '2-digit',
+            hour: '2-digit', minute: '2-digit',
+            hour12: false
+          })}
+        </div>
+        <div className="flex items-center gap-2 mt-1 flex-wrap">
+          {execution.cameraId && (
+            <div className="flex items-center text-xs text-gray-600">
+              <Camera className="h-3 w-3 mr-0.5 text-gray-400" aria-hidden="true" />
+              <span className="truncate max-w-[80px]">{execution.cameraId}</span>
+            </div>
+          )}
+          {execution.location && (
+            <div className="flex items-center text-xs text-gray-500">
+              <MapPin className="h-3 w-3 mr-0.5 text-gray-400" aria-hidden="true" />
+              <span className="truncate max-w-[100px]">{execution.location}</span>
+            </div>
+          )}
+          {execution.hasSmoke && !isStage1Only && (
+            <div className="flex items-center gap-0.5 px-1.5 py-0.5 rounded text-xs font-medium bg-gray-200 text-gray-700">
+              <Wind className="h-3 w-3" aria-hidden="true" />
+              {execution.confidenceSmoke !== null && (
+                <span className="tabular-nums">{Math.round(execution.confidenceSmoke * 100)}%</span>
+              )}
+            </div>
+          )}
+          {isStage1Only && (
+            <div className="flex items-center text-xs text-blue-600">
+              <RefreshCw className="h-3 w-3 mr-0.5 animate-spin" aria-hidden="true" />
+              Processing…
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Camera & Location */}
-      <div className="flex-1 min-w-0">
+      {/* ID — desktop only */}
+      <div className="hidden sm:flex flex-shrink-0 w-20 justify-center">
+        <div className="font-mono text-sm font-medium text-gray-900">
+          #{String(execution.id).padStart(6, '0')}
+        </div>
+      </div>
+
+      {/* Time — desktop only */}
+      <div className="hidden sm:flex flex-shrink-0 w-28 justify-center">
+        <div className="text-xs text-gray-500 tabular-nums">
+          {new Date(execution.executionTimestamp).toLocaleString('en-GB', {
+            day: '2-digit', month: '2-digit',
+            hour: '2-digit', minute: '2-digit',
+            hour12: false
+          })}
+        </div>
+      </div>
+
+      {/* Camera & Location — desktop only */}
+      <div className="hidden sm:flex flex-1 min-w-0">
         <div className="flex items-center gap-3 text-sm">
           {execution.cameraId && (
             <div className="flex items-center text-gray-700" title={`Camera: ${execution.cameraId}`}>
@@ -161,8 +217,8 @@ export function ExecutionListItem({ execution, onClick, loading = false, isSelec
         )}
       </div>
 
-      {/* Alert Level */}
-      <div className="flex-shrink-0 w-20">
+      {/* Alert Level — desktop only */}
+      <div className="hidden sm:flex flex-shrink-0 w-24 justify-center">
         {execution.alertLevel && execution.alertLevel !== 'none' ? (
           <span className={cn(
             'inline-block px-2 py-1 rounded text-xs font-bold uppercase',
@@ -175,22 +231,8 @@ export function ExecutionListItem({ execution, onClick, loading = false, isSelec
         )}
       </div>
 
-      {/* Detection Indicators */}
-      <div className="flex-shrink-0 w-24 flex items-center gap-2">
-        {execution.hasFire && (
-          <div
-            className={cn(
-              'flex items-center gap-1 px-2 py-1 rounded text-xs font-medium',
-              isStage1Only ? 'bg-gray-100 text-gray-500' : 'bg-red-100 text-red-700'
-            )}
-            title={isStage1Only ? "Fire detection pending" : "Fire detected"}
-          >
-            <Flame className="h-3 w-3" aria-hidden="true" />
-            {!isStage1Only && execution.confidenceFire !== null && (
-              <span className="tabular-nums">{Math.round(execution.confidenceFire * 100)}%</span>
-            )}
-          </div>
-        )}
+      {/* Detection Indicators — desktop only */}
+      <div className="hidden sm:flex flex-shrink-0 w-20 items-center justify-center gap-2">
         {execution.hasSmoke && (
           <div
             className={cn(
@@ -205,47 +247,22 @@ export function ExecutionListItem({ execution, onClick, loading = false, isSelec
             )}
           </div>
         )}
-        {!execution.hasFire && !execution.hasSmoke && (
+        {!execution.hasSmoke && (
           <span className="text-xs text-gray-400">No detections</span>
         )}
       </div>
 
-      {/* Detection Count */}
-      <div className="flex-shrink-0 w-16 text-center">
-        {execution.detectionCount > 0 && !isStage1Only ? (
-          <span className="inline-block bg-gray-100 text-gray-700 px-2 py-1 rounded text-xs font-medium">
-            {execution.detectionCount} det.
-          </span>
-        ) : (
-          <span className="text-xs text-gray-400">-</span>
-        )}
-      </div>
-
-      {/* Status & Indicators */}
-      <div className="flex-shrink-0 w-24 flex items-center justify-end gap-2">
+      {/* Indicators — desktop only */}
+      <div className="hidden sm:flex flex-shrink-0 w-8 items-center justify-end">
         {execution.telegramSent && (
-          <div
-            className="text-success-600"
-            title="Telegram notification sent"
-          >
+          <div className="text-success-600" title="Telegram notification sent">
             <MessageCircle className="h-4 w-4" aria-hidden="true" />
           </div>
         )}
-        <StatusBadge status={execution.status} size="sm" />
       </div>
 
-      {/* View Button */}
-      <div className="flex-shrink-0 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
-        <button
-          className="p-2 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
-          title="View details"
-          aria-label="View execution details"
-        >
-          <Eye className="h-4 w-4" aria-hidden="true" />
-        </button>
-      </div>
 
-      {/* Loading overlay */}
+{/* Loading overlay */}
       {loading && (
         <div className="absolute inset-0 bg-white bg-opacity-50 flex items-center justify-center rounded-lg">
           <LoadingSpinner size="sm" />

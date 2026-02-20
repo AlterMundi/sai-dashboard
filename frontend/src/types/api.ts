@@ -61,14 +61,13 @@ export interface ExecutionFilters {
 
   // YOLO-specific filters (require Stage 2 completion)
   alertLevels?: ('none' | 'low' | 'medium' | 'high' | 'critical')[];  // Multi-select array (consolidated)
-  hasFire?: boolean;
   hasSmoke?: boolean;
   detectionCount?: number;  // Filter by number of detections
-  confidenceFire?: number;  // Fire-specific confidence (0.0-1.0)
   confidenceSmoke?: number;  // Smoke-specific confidence (0.0-1.0)
   detectionMode?: string;   // e.g., 'smoke-only'
-  minConfidence?: number;   // DEPRECATED: Use confidenceFire/confidenceSmoke instead
-  maxConfidence?: number;   // DEPRECATED: Use confidenceFire/confidenceSmoke instead
+  yoloModelVersion?: string; // e.g., 'saiNET-v1'
+  minConfidence?: number;   // DEPRECATED: Use confidenceSmoke instead
+  maxConfidence?: number;   // DEPRECATED: Use confidenceSmoke instead
 
   // Device/Camera filters (available after Stage 2, but can be partially available)
   cameraId?: string;
@@ -106,8 +105,14 @@ export interface DailySummary {
   failedExecutions: number;
   successRate: number;
   avgExecutionTime: number | null;
-  fireDetections?: number;
-  smokeDetections?: number;
+  smokeDetections: number;
+  highRiskDetections: number;
+  criticalDetections: number;
+  lowAlertDetections: number;
+  executionsWithImages: number;
+  telegramNotificationsSent: number;
+  avgProcessingTimeMs: number;
+  avgConfidenceScore: number;
 }
 
 /**
@@ -121,9 +126,7 @@ export interface ExecutionStats {
   avgProcessingTime: number;
 
   // Detection breakdown
-  fireDetections: number;
   smokeDetections: number;
-  bothDetections: number;
 
   // Alert distribution
   critical: number;
@@ -204,7 +207,6 @@ export interface SSEStage2CompletionEvent {
   stage: 'stage2';
   processing_time_ms: number;
   extracted_data: {
-    has_fire: boolean;
     has_smoke: boolean;
     alert_level: string | null;
     detection_count: number;

@@ -32,7 +32,6 @@ export interface ExecutionWithImage {
   requestId: string | null;
   yoloModelVersion: string | null;
   detectionCount: number;
-  hasFire: boolean;
   hasSmoke: boolean;
   alertLevel: 'none' | 'low' | 'medium' | 'high' | 'critical' | null;
   detectionMode: string | null;
@@ -40,7 +39,6 @@ export interface ExecutionWithImage {
   detections: YoloDetection[] | null;
 
   // Confidence scores
-  confidenceFire: number | null;
   confidenceSmoke: number | null;
   confidenceScore: number | null;
 
@@ -102,14 +100,13 @@ export interface ExecutionFilters extends PaginationQuery {
   // YOLO-specific filters (execution_analysis table)
   alertLevel?: 'none' | 'low' | 'medium' | 'high' | 'critical';  // Single selection (legacy)
   alertLevels?: ('none' | 'low' | 'medium' | 'high' | 'critical')[];  // Multi-select array
-  hasFire?: boolean;
   hasSmoke?: boolean;
   detectionCount?: number;  // Filter by minimum number of detections
-  confidenceFire?: number;  // Fire-specific confidence (0.0-1.0)
   confidenceSmoke?: number;  // Smoke-specific confidence (0.0-1.0)
-  detectionMode?: string;   // e.g., 'smoke-only', 'fire-only', 'both'
-  minConfidence?: number;   // DEPRECATED: Use confidenceFire/confidenceSmoke instead
-  maxConfidence?: number;   // DEPRECATED: Use confidenceFire/confidenceSmoke instead
+  detectionMode?: string;   // e.g., 'smoke-only'
+  yoloModelVersion?: string; // e.g., 'saiNET-v1'
+  minConfidence?: number;   // DEPRECATED: Use confidenceSmoke instead
+  maxConfidence?: number;   // DEPRECATED: Use confidenceSmoke instead
 
   // Device/Camera filters (executions table)
   cameraId?: string;
@@ -201,11 +198,11 @@ export interface DailySummary {
   successRate: number;
   avgExecutionTime: number | null;
   // Detection counts
-  fireDetections: number;
   smokeDetections: number;
   // New fields for enhanced daily summary
   highRiskDetections: number;
   criticalDetections: number;
+  lowAlertDetections: number;
   executionsWithImages: number;
   telegramNotificationsSent: number;
   avgProcessingTimeMs: number;
@@ -263,15 +260,12 @@ export interface ExecutionStatistics {
 
   // YOLO detection statistics
   detectionBreakdown?: {
-    hasFire: number;
     hasSmoke: number;
-    bothDetected: number;
   };
   cameraPerformance?: Array<{
     cameraId: string;
     location?: string;
     totalDetections: number;
-    fireDetections: number;
     smokeDetections: number;
   }>;
 }
