@@ -43,6 +43,7 @@ export type {
   SSEStage2CompletionEvent,
   SSEStage2FailureEvent,
   SSEEtlStatusEvent,
+  FilterOptions,
 } from './api';
 
 // ============================================================================
