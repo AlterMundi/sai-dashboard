@@ -254,8 +254,9 @@ export function AdvancedSearchPanel({
               return (
                 <div
                   key={condition.id}
-                  className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg"
+                  className="overflow-x-auto [&::-webkit-scrollbar]:hidden [scrollbar-width:none] rounded-lg"
                 >
+                <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg min-w-max">
                   {/* Condition number */}
                   <span className="w-6 h-6 flex items-center justify-center bg-gray-200 text-gray-600 text-xs font-medium rounded-full">
                     {index + 1}
@@ -367,6 +368,7 @@ export function AdvancedSearchPanel({
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
+                </div>
                 </div>
               );
             })}

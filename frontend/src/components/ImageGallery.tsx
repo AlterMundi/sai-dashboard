@@ -24,7 +24,9 @@ export function ImageGallery({ initialFilters = {}, className, refreshTrigger, o
   const { t } = useTranslation();
   const [selectedExecution, setSelectedExecution] = useState<ExecutionWithImageUrls | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>(() =>
+    typeof window !== 'undefined' && window.innerWidth < 640 ? 'list' : 'grid'
+  );
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const galleryRef = useRef<HTMLDivElement>(null);
