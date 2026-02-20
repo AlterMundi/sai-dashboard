@@ -1,10 +1,9 @@
-import { StatusBadge } from './ui/StatusBadge';
 import { LoadingSpinner } from './ui/LoadingSpinner';
 import { cn } from '@/utils';
 import { ImageCardProps } from '@/types';
 import { useImageCard } from '@/hooks/useImageCard';
 import { useTranslation } from '@/contexts/LanguageContext';
-import { AlertTriangle, MessageCircle, Flame, Wind, Camera, MapPin, RefreshCw, X } from 'lucide-react';
+import { AlertTriangle, MessageCircle, Wind, Camera, MapPin, RefreshCw, X } from 'lucide-react';
 
 export function ImageCard({ execution, onClick, loading = false }: ImageCardProps) {
   const { t } = useTranslation();
@@ -118,27 +117,9 @@ export function ImageCard({ execution, onClick, loading = false }: ImageCardProp
           </div>
         )}
 
-        {/* Status Badge - Top Right */}
-        <div className="absolute top-2 right-2">
-          <StatusBadge status={execution.status} size="sm" />
-        </div>
 
         {/* Bottom Left - Detection Icons */}
         <div className="absolute bottom-2 left-2 flex items-center gap-1.5">
-          {execution.hasFire && (
-            <div
-              className={cn(
-                "flex items-center gap-1 px-2 py-1 rounded-full text-white text-xs font-medium shadow-lg backdrop-blur-sm",
-                isStage1Only ? "bg-gray-500/80" : "bg-red-600/90"
-              )}
-              title={isStage1Only ? t('imageCard.fireDetectionPending') : t('imageCard.fireConfidence', { value: execution.confidenceFire ? Math.round(execution.confidenceFire * 100) + '%' : t('modal.detected') })}
-            >
-              <Flame className="h-3 w-3" aria-hidden="true" />
-              {!isStage1Only && execution.confidenceFire !== null && (
-                <span className="tabular-nums">{Math.round(execution.confidenceFire * 100)}%</span>
-              )}
-            </div>
-          )}
           {execution.hasSmoke && (
             <div
               className={cn(
@@ -194,22 +175,23 @@ export function ImageCard({ execution, onClick, loading = false }: ImageCardProp
         </div>
 
         {/* Bottom row: Camera and Location */}
-        <div className="flex items-center gap-3 text-xs text-gray-500">
-          {execution.cameraId && (
-            <div className="flex items-center truncate" title={`Camera: ${execution.cameraId}`}>
+        <div className="flex items-center justify-between text-xs text-gray-500">
+          {execution.cameraId ? (
+            <div className="flex items-center min-w-0" title={`Camera: ${execution.cameraId}`}>
               <Camera className="h-3 w-3 mr-1 flex-shrink-0 text-gray-400" aria-hidden="true" />
               <span className="truncate">{execution.cameraId}</span>
             </div>
+          ) : (
+            <span />
           )}
-          {execution.location && (
-            <div className="flex items-center truncate" title={`Location: ${execution.location}`}>
+          {execution.location ? (
+            <div className="flex items-center min-w-0 ml-2" title={`Location: ${execution.location}`}>
               <MapPin className="h-3 w-3 mr-1 flex-shrink-0 text-gray-400" aria-hidden="true" />
               <span className="truncate">{execution.location}</span>
             </div>
-          )}
-          {!execution.cameraId && !execution.location && (
+          ) : !execution.cameraId ? (
             <span className="text-gray-400 italic">{t('imageCard.noLocationData')}</span>
-          )}
+          ) : null}
         </div>
 
         {/* Detection count badge - only if detections exist */}

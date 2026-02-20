@@ -162,7 +162,6 @@ export function SSEProvider({ children }: SSEProviderProps) {
             setIsConnected(true);
             setConnectionStatus('connected');
             reconnectAttempts.current = 0;
-            toast.success('Real-time updates connected', { duration: 2000 });
           }
         } catch (error) {
           console.warn('SSE Context: Failed to parse connection event:', error);

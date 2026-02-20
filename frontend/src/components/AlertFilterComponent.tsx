@@ -70,59 +70,27 @@ export function AlertFilterComponent({
 
   const activeCount = getActiveFilterCount();
 
-  // Quick filter definitions
-  const quickFilters = [
-    {
-      id: 'smoke_detected',
-      labelKey: 'filters.smoke',
-      icon: Wind,
-      color: 'neutral',
-      isActive: filters.hasSmoke === true,
-      onClick: () => handleFilterChange('hasSmoke', filters.hasSmoke === true ? undefined : true)
-    },
-    {
-      id: 'critical_alerts',
-      labelKey: 'filters.critical',
-      icon: AlertTriangle,
-      color: 'danger',
-      isActive: filters.alertLevels?.includes('critical'),
-      onClick: () => {
-        const currentLevels = filters.alertLevels || [];
-        const newLevels = currentLevels.includes('critical')
-          ? currentLevels.filter(l => l !== 'critical')
-          : [...currentLevels, 'critical'];
-        handleFilterChange('alertLevels', newLevels.length > 0 ? newLevels : undefined);
-      }
-    },
-    {
-      id: 'high_alerts',
-      labelKey: 'filters.high',
-      icon: AlertTriangle,
-      color: 'warning',
-      isActive: filters.alertLevels?.includes('high'),
-      onClick: () => {
-        const currentLevels = filters.alertLevels || [];
-        const newLevels = currentLevels.includes('high')
-          ? currentLevels.filter(l => l !== 'high')
-          : [...currentLevels, 'high'];
-        handleFilterChange('alertLevels', newLevels.length > 0 ? newLevels : undefined);
-      }
-    },
-    {
-      id: 'low_alerts',
-      labelKey: 'filters.low',
-      icon: AlertTriangle,
-      color: 'info',
-      isActive: filters.alertLevels?.includes('low'),
-      onClick: () => {
-        const currentLevels = filters.alertLevels || [];
-        const newLevels = currentLevels.includes('low')
-          ? currentLevels.filter(l => l !== 'low')
-          : [...currentLevels, 'low'];
-        handleFilterChange('alertLevels', newLevels.length > 0 ? newLevels : undefined);
-      }
+  // Smoke master toggle: active only when all three alert levels are on
+  const SMOKE_ALERT_LEVELS = ['critical', 'high', 'low'] as const;
+  const smokeAllActive = SMOKE_ALERT_LEVELS.every(l => filters.alertLevels?.includes(l));
+
+  const handleSmokeToggle = () => {
+    if (smokeAllActive) {
+      onFiltersChange({ ...filters, alertLevels: undefined, hasSmoke: undefined, page: 0 });
+    } else {
+      onFiltersChange({ ...filters, alertLevels: ['critical', 'high', 'low'], hasSmoke: true, page: 0 });
     }
-  ];
+  };
+
+  const handleAlertLevelToggle = (level: 'critical' | 'high' | 'low') => {
+    const currentLevels = filters.alertLevels || [];
+    const newLevels = currentLevels.includes(level)
+      ? currentLevels.filter(l => l !== level)
+      : [...currentLevels, level];
+    // If deselecting a level while smoke master was fully on, also clear hasSmoke
+    const newHasSmoke = newLevels.length === 3 ? filters.hasSmoke : undefined;
+    onFiltersChange({ ...filters, alertLevels: newLevels.length > 0 ? newLevels : undefined, hasSmoke: newHasSmoke, page: 0 });
+  };
 
   return (
     <div className={cn("bg-white border border-gray-200 rounded-lg p-6 space-y-6", className)}>
@@ -133,7 +101,7 @@ export function AlertFilterComponent({
           <h2 className="text-lg font-semibold text-gray-900">{t('filters.title')}</h2>
           {activeCount > 0 && (
             <Badge variant="secondary" className="bg-blue-50 text-blue-700 border-blue-200">
-              {activeCount} {t('common.active')}
+              {activeCount}
             </Badge>
           )}
         </div>
@@ -162,19 +130,17 @@ export function AlertFilterComponent({
         </div>
       </div>
 
-      {/* Basic Filters: Location, Camera, Date Preset + Alert Quick Filters */}
-      <div className="flex flex-wrap items-end gap-4">
-        {/* Location Filter */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
-            <MapPin className="h-3.5 w-3.5 mr-1" />
-            {t('filters.location')}
-          </label>
+      {/* Basic Filters — mobile: 3 stacked rows, desktop: single flex row */}
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-4">
+
+        {/* Row 1 (mobile) / first (desktop): Location | Camera | All Time */}
+        <div className="order-1 flex items-center divide-x divide-gray-200 rounded-lg border border-gray-200 bg-white overflow-hidden w-full sm:w-auto">
           <Select
             value={filters.location || ''}
             onValueChange={(value) => handleFilterChange('location', value || undefined)}
           >
-            <SelectTrigger>
+            <SelectTrigger className="border-0 rounded-none shadow-none h-9 px-3 gap-1.5 text-sm text-gray-700 focus:ring-0 flex-1 sm:min-w-[150px] sm:flex-none">
+              <MapPin className="h-3.5 w-3.5 text-gray-400 shrink-0" />
               <SelectValue placeholder={t('filters.allLocations')} />
             </SelectTrigger>
             <SelectContent>
@@ -186,19 +152,13 @@ export function AlertFilterComponent({
               <SelectItem value="La Serranita">La Serranita</SelectItem>
             </SelectContent>
           </Select>
-        </div>
 
-        {/* Camera / Cardinal Direction Filter */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
-            <Camera className="h-3.5 w-3.5 mr-1" />
-            {t('filters.camera')}
-          </label>
           <Select
             value={filters.cameraId || ''}
             onValueChange={(value) => handleFilterChange('cameraId', value || undefined)}
           >
-            <SelectTrigger>
+            <SelectTrigger className="border-0 rounded-none shadow-none h-9 px-3 gap-1.5 text-sm text-gray-700 focus:ring-0 flex-1 sm:min-w-[140px] sm:flex-none">
+              <Camera className="h-3.5 w-3.5 text-gray-400 shrink-0" />
               <SelectValue placeholder={t('filters.allCameras')} />
             </SelectTrigger>
             <SelectContent>
@@ -210,19 +170,13 @@ export function AlertFilterComponent({
               <SelectItem value="cam5">cam5</SelectItem>
             </SelectContent>
           </Select>
-        </div>
 
-        {/* Date Preset Filter */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
-            <Calendar className="h-3.5 w-3.5 mr-1" />
-            {t('filters.datePreset')}
-          </label>
           <Select
             value={filters.datePreset || ''}
             onValueChange={(value) => handleFilterChange('datePreset', value || undefined)}
           >
-            <SelectTrigger>
+            <SelectTrigger className="border-0 rounded-none shadow-none h-9 px-3 gap-1.5 text-sm text-gray-700 focus:ring-0 flex-1 sm:min-w-[120px] sm:flex-none">
+              <Calendar className="h-3.5 w-3.5 text-gray-400 shrink-0" />
               <SelectValue placeholder={t('filters.allTime')} />
             </SelectTrigger>
             <SelectContent>
@@ -237,28 +191,51 @@ export function AlertFilterComponent({
           </Select>
         </div>
 
-        {/* Alert Quick Filters */}
-        <div className="flex flex-wrap items-center gap-2 pb-0.5">
-          {quickFilters.map((filter) => {
-            const Icon = filter.icon;
-            return (
-              <Button
-                key={filter.id}
-                variant={filter.isActive ? "default" : "outline"}
-                size="sm"
-                onClick={filter.onClick}
-                disabled={isLoading}
-                className={cn(
-                  "flex items-center space-x-2",
-                  filter.isActive && "bg-blue-600 hover:bg-blue-700"
-                )}
-              >
-                <Icon className="h-4 w-4" />
-                <span>{t(filter.labelKey)}</span>
-              </Button>
-            );
-          })}
+        {/* Row 2 (mobile) / last (desktop): Smoke Detections */}
+        <div className="order-2 sm:order-3 flex justify-center sm:justify-start">
+          <Button
+            variant={smokeAllActive ? 'default' : 'outline'}
+            size="sm"
+            onClick={handleSmokeToggle}
+            disabled={isLoading}
+            className={cn(
+              'flex items-center gap-1.5',
+              smokeAllActive && 'bg-gray-700 hover:bg-gray-800 text-white'
+            )}
+          >
+            <Wind className="h-3.5 w-3.5" />
+            {t('filters.smokeDetections')}
+          </Button>
         </div>
+
+        {/* Row 3 (mobile) / second (desktop): Critical | High | Low */}
+        <div className="order-3 sm:order-2 flex justify-center sm:justify-start">
+          <div className="flex items-center divide-x divide-gray-200 rounded-lg border border-gray-200 bg-white overflow-hidden">
+            {(['critical', 'high', 'low'] as const).map((level) => {
+              const isActive = !!filters.alertLevels?.includes(level);
+              const activeStyles: Record<string, string> = {
+                critical: 'bg-red-50 text-red-700',
+                high: 'bg-orange-50 text-orange-700',
+                low: 'bg-blue-50 text-blue-700',
+              };
+              return (
+                <button
+                  key={level}
+                  onClick={() => handleAlertLevelToggle(level)}
+                  disabled={isLoading}
+                  className={cn(
+                    'flex items-center gap-1.5 h-9 px-3 text-sm font-medium transition-colors',
+                    isActive ? activeStyles[level] : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                  )}
+                >
+                  <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                  {t(`filters.${level}`)}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
       </div>
 
       {/* Precise Date-Time Range Selector */}
@@ -336,21 +313,14 @@ export function AlertFilterComponent({
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                {t('filters.detectionMode')}
+                {t('filters.saiModel')}
               </label>
-              <Select
-                value={filters.detectionMode || ''}
-                onValueChange={(value) => handleFilterChange('detectionMode', value || undefined)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder={t('filters.anyMode')} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">{t('filters.anyMode')}</SelectItem>
-                  <SelectItem value="smoke-only">{t('filters.smokeOnly')}</SelectItem>
-                  <SelectItem value="both">{t('filters.both')}</SelectItem>
-                </SelectContent>
-              </Select>
+              <Input
+                type="text"
+                placeholder={t('filters.saiModelPlaceholder')}
+                value={filters.yoloModelVersion || ''}
+                onChange={(e) => handleFilterChange('yoloModelVersion', e.target.value || undefined)}
+              />
             </div>
           </div>
 

@@ -801,7 +801,6 @@ export const triggerFakeExecution = asyncHandler(async (req: Request, res: Respo
     imageUrl: '/api/test/placeholder.jpg',
     alertLevel: ['none', 'low', 'medium', 'high'][Math.floor(Math.random() * 4)],
     confidenceScore: Math.random(),
-    hasFire: Math.random() > 0.8,
     hasSmoke: Math.random() > 0.5,
     telegramSent: false
   };
@@ -904,7 +903,6 @@ export const triggerTestBatch = asyncHandler(async (req: Request, res: Response)
     imageUrl: `/api/test/placeholder-${i}.jpg`,
     alertLevel: ['none', 'low', 'medium', 'high'][Math.floor(Math.random() * 4)],
     confidenceScore: Math.random(),
-    hasFire: Math.random() > 0.8,
     hasSmoke: Math.random() > 0.5,
     telegramSent: false
   }));

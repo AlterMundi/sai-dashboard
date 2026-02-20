@@ -14,10 +14,8 @@ export function exportToCSV(executions: ExecutionWithImageUrls[], filename = 'sa
     'Timestamp',
     'Status',
     'Alert Level',
-    'Has Fire',
     'Has Smoke',
     'Detection Count',
-    'Fire Confidence',
     'Smoke Confidence',
     'Camera ID',
     'Location',
@@ -33,10 +31,8 @@ export function exportToCSV(executions: ExecutionWithImageUrls[], filename = 'sa
     exec.executionTimestamp,
     exec.status,
     exec.alertLevel || 'none',
-    exec.hasFire ? 'Yes' : 'No',
     exec.hasSmoke ? 'Yes' : 'No',
     exec.detectionCount,
-    exec.confidenceFire?.toFixed(3) || '',
     exec.confidenceSmoke?.toFixed(3) || '',
     exec.cameraId || '',
     exec.location || '',
@@ -73,11 +69,9 @@ export function exportToJSON(executions: ExecutionWithImageUrls[], filename = 's
 
     // Detection data
     alert_level: exec.alertLevel,
-    has_fire: exec.hasFire,
     has_smoke: exec.hasSmoke,
     detection_count: exec.detectionCount,
     detections: exec.detections,
-    confidence_fire: exec.confidenceFire,
     confidence_smoke: exec.confidenceSmoke,
 
     // Device info
@@ -125,7 +119,6 @@ export function exportSummary(executions: ExecutionWithImageUrls[], filename = '
     },
 
     detection_summary: {
-      with_fire: executions.filter(e => e.hasFire).length,
       with_smoke: executions.filter(e => e.hasSmoke).length,
       total_detections: executions.reduce((sum, e) => sum + e.detectionCount, 0),
     },

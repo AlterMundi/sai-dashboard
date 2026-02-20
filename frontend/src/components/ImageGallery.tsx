@@ -24,7 +24,9 @@ export function ImageGallery({ initialFilters = {}, className, refreshTrigger, o
   const { t } = useTranslation();
   const [selectedExecution, setSelectedExecution] = useState<ExecutionWithImageUrls | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>(() =>
+    typeof window !== 'undefined' && window.innerWidth < 640 ? 'list' : 'grid'
+  );
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const galleryRef = useRef<HTMLDivElement>(null);
@@ -130,17 +132,15 @@ export function ImageGallery({ initialFilters = {}, className, refreshTrigger, o
 
   const handleExportCsv = useCallback(() => {
     const selected = executions.filter(e => selectedIds.has(e.id));
-    const headers = ['id', 'timestamp', 'camera', 'location', 'alertLevel', 'hasFire', 'hasSmoke', 'detectionCount', 'confidenceFire', 'confidenceSmoke', 'isFalsePositive'];
+    const headers = ['id', 'timestamp', 'camera', 'location', 'alertLevel', 'hasSmoke', 'detectionCount', 'confidenceSmoke', 'isFalsePositive'];
     const rows = selected.map(e => [
       e.id,
       e.executionTimestamp,
       e.cameraId ?? '',
       e.location ?? '',
       e.alertLevel ?? '',
-      e.hasFire ?? false,
       e.hasSmoke ?? false,
       e.detectionCount ?? 0,
-      e.confidenceFire ?? '',
       e.confidenceSmoke ?? '',
       e.isFalsePositive ?? false,
     ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(','));
@@ -350,14 +350,13 @@ export function ImageGallery({ initialFilters = {}, className, refreshTrigger, o
                     aria-label={t('gallery.selectAll')}
                   />
                 </div>
-                <div className="w-16">{t('gallery.image')}</div>
-                <div className="w-32">{t('gallery.idTime')}</div>
+                <div className="w-24 text-center">{t('gallery.image')}</div>
+                <div className="w-20 text-center">{t('gallery.id')}</div>
+                <div className="w-28 text-center">{t('gallery.time')}</div>
                 <div className="flex-1">{t('gallery.cameraLocation')}</div>
-                <div className="w-20">{t('gallery.alert')}</div>
-                <div className="w-24">{t('gallery.listDetections')}</div>
-                <div className="w-16 text-center">{t('gallery.count')}</div>
-                <div className="w-24 text-right">{t('gallery.listStatus')}</div>
-                <div className="w-10"></div>
+                <div className="w-24 text-center">{t('gallery.alert')}</div>
+                <div className="w-20 text-center">{t('gallery.listDetections')}</div>
+                <div className="w-8"></div>
               </div>
               {/* List Items */}
               {executions.map((execution) => (

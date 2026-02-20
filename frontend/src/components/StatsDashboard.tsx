@@ -1,360 +1,195 @@
-import { useEffect, useState } from 'react';
-import {
-  Activity, Clock, AlertCircle,
-  CheckCircle, XCircle, BarChart3, Flame
-} from 'lucide-react';
-import { cn } from '@/utils';
+import { Wind, AlertTriangle, AlertOctagon, MessageCircle, AlertCircle, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { useTranslation } from '@/contexts/LanguageContext';
-import { api } from '@/services/api';
 import { useDailySummary } from '@/hooks/useExecutions';
-import { TrendChart } from '@/components/charts/TrendChart';
+import { SimpleBarChart, StackedBarChart } from '@/components/charts/SmallBarChart';
 
-interface StatisticsData {
-  overview: {
-    totalExecutions: number;
-    successRate: number;
-    errorRate: number;
-    averageExecutionTime: number;
-    activeToday: number;
-  };
-  statusBreakdown: {
-    success: number;
-    error: number;
-    running: number;
-    waiting: number;
-    canceled: number;
-  };
-  recentActivity: {
-    lastHour: number;
-    last24Hours: number;
-    last7Days: number;
-    last30Days: number;
-  };
-  performanceMetrics: {
-    avgResponseTime: number;
-    minResponseTime: number;
-    maxResponseTime: number;
-    medianResponseTime: number;
-    p95ResponseTime: number;
-    p99ResponseTime: number;
-  };
-  hourlyDistribution: Array<{ hour: number; count: number }>;
-  errorTrend: Array<{ date: string; errors: number; total: number; errorRate: number }>;
+function formatDateRange(summary: { date: string }[]): string {
+  if (!summary.length) return '';
+  const oldest = new Date(summary[summary.length - 1].date);
+  const newest = new Date(summary[0].date);
+  const fmt = (d: Date) => d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  return `${fmt(oldest)} – ${fmt(newest)}`;
+}
+
+function Trend({ current, previous }: { current: number; previous: number }) {
+  if (previous === 0 && current === 0) return null;
+  if (previous === 0) return <TrendingUp className="h-4 w-4 text-emerald-500" />;
+  const delta = current - previous;
+  if (Math.abs(delta) < 1) return <Minus className="h-4 w-4 text-gray-300" />;
+  if (delta > 0) return <TrendingUp className="h-4 w-4 text-red-400" />;
+  return <TrendingDown className="h-4 w-4 text-emerald-500" />;
 }
 
 export function StatsDashboard() {
   const { t } = useTranslation();
-  const [stats, setStats] = useState<StatisticsData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { summary, isLoading, error } = useDailySummary(7);
 
-  // Fetch daily summary for trend chart
-  const { summary: dailySummary, isLoading: summaryLoading } = useDailySummary(14);
-
-  useEffect(() => {
-    fetchStatistics();
-    const interval = setInterval(fetchStatistics, 60000); // Refresh every minute
-    return () => clearInterval(interval);
-  }, []);
-
-  const fetchStatistics = async () => {
-    try {
-      setLoading(true);
-      const response = await api.get('/executions/stats/enhanced');
-      setStats(response.data.data);
-      setError(null);
-    } catch (err) {
-      setError(t('stats.failedToLoad'));
-      console.error('Error fetching statistics:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (loading && !stats) {
+  if (isLoading && summary.length === 0) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-10 w-10 border-2 border-gray-200 border-t-blue-600" />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+      <div className="bg-red-50 border border-red-100 rounded-xl p-4">
         <div className="flex items-center gap-2">
-          <AlertCircle className="h-5 w-5 text-red-600" />
-          <span className="text-red-800">{error}</span>
+          <AlertCircle className="h-4 w-4 text-red-500 flex-shrink-0" />
+          <span className="text-sm text-red-700">{t('stats.failedToLoad')}</span>
         </div>
       </div>
     );
   }
 
-  if (!stats) return null;
+  // Totals over the full window
+  const totals = summary.reduce(
+    (acc, day) => ({
+      smoke: acc.smoke + (day.smokeDetections ?? 0),
+      critical: acc.critical + (day.criticalDetections ?? 0),
+      high: acc.high + (day.highRiskDetections ?? 0),
+      telegram: acc.telegram + (day.telegramNotificationsSent ?? 0),
+    }),
+    { smoke: 0, critical: 0, high: 0, telegram: 0 }
+  );
 
-  const formatTime = (seconds: number) => {
-    if (seconds < 1) return `${Math.round(seconds * 1000)}ms`;
-    if (seconds < 60) return `${seconds.toFixed(1)}s`;
-    return `${Math.floor(seconds / 60)}m ${Math.round(seconds % 60)}s`;
-  };
+  // Half-window split for trend comparison (recent 3–4 vs earlier 3–4 days)
+  const half = Math.floor(summary.length / 2);
+  const recent = summary.slice(0, half);
+  const earlier = summary.slice(half);
+  const recentSmoke = recent.reduce((s, d) => s + (d.smokeDetections ?? 0), 0);
+  const earlierSmoke = earlier.reduce((s, d) => s + (d.smokeDetections ?? 0), 0);
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'success': return 'text-green-600';
-      case 'error': return 'text-red-600';
-      case 'running': return 'text-blue-600';
-      case 'waiting': return 'text-yellow-600';
-      case 'canceled': return 'text-gray-600';
-      default: return 'text-gray-600';
-    }
-  };
+  // Chronological order for charts (oldest → newest, left → right)
+  const chronological = [...summary].reverse();
+
+  const smokeData = chronological.map(d => ({ date: d.date, value: d.smokeDetections ?? 0 }));
+  const alertData = chronological.map(d => ({
+    date: d.date,
+    critical: d.criticalDetections ?? 0,
+    high: d.highRiskDetections ?? 0,
+    low: d.lowAlertDetections ?? 0,
+  }));
+  const confidenceData = chronological.map(d => ({
+    date: d.date,
+    value: Math.round((d.avgConfidenceScore ?? 0) * 100),
+  }));
+
+  const dateRange = formatDateRange(summary);
+
+  const kpis = [
+    {
+      label: t('stats.smokeDetections7d'),
+      value: totals.smoke,
+      icon: Wind,
+      accent: 'border-t-[3px] border-t-slate-400',
+      numColor: 'text-slate-700',
+      iconColor: 'text-slate-300',
+      bgClass: 'bg-slate-50',
+      trend: <Trend current={recentSmoke} previous={earlierSmoke} />,
+    },
+    {
+      label: t('stats.criticalAlerts7d'),
+      value: totals.critical,
+      icon: AlertOctagon,
+      accent: 'border-t-[3px] border-t-red-600',
+      numColor: 'text-red-700',
+      iconColor: 'text-red-200',
+      bgClass: 'bg-red-50',
+      trend: null,
+    },
+    {
+      label: t('stats.highAlerts7d'),
+      value: totals.high,
+      icon: AlertTriangle,
+      accent: 'border-t-[3px] border-t-orange-400',
+      numColor: 'text-orange-600',
+      iconColor: 'text-orange-200',
+      bgClass: 'bg-orange-50',
+      trend: null,
+    },
+    {
+      label: t('stats.telegramSent7d'),
+      value: totals.telegram,
+      icon: MessageCircle,
+      accent: 'border-t-[3px] border-t-sky-500',
+      numColor: 'text-sky-700',
+      iconColor: 'text-sky-200',
+      bgClass: 'bg-sky-50',
+      trend: null,
+    },
+  ];
 
   return (
     <div className="space-y-6">
-      {/* Overview Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">{t('stats.totalExecutions')}</p>
-              <p className="text-2xl font-bold text-gray-900">
-                {stats.overview.totalExecutions.toLocaleString()}
-              </p>
-            </div>
-            <BarChart3 className="h-8 w-8 text-blue-500" />
-          </div>
-        </div>
+      {/* Week range label */}
+      {dateRange && (
+        <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">
+          {dateRange}
+        </p>
+      )}
 
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">{t('stats.successRate')}</p>
-              <p className="text-2xl font-bold text-green-600">
-                {stats.overview.successRate.toFixed(1)}%
-              </p>
-            </div>
-            <CheckCircle className="h-8 w-8 text-green-500" />
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">{t('stats.errorRate')}</p>
-              <p className="text-2xl font-bold text-red-600">
-                {stats.overview.errorRate.toFixed(1)}%
-              </p>
-            </div>
-            <XCircle className="h-8 w-8 text-red-500" />
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">{t('stats.avgExecutionTime')}</p>
-              <p className="text-2xl font-bold text-gray-900">
-                {formatTime(stats.overview.averageExecutionTime)}
-              </p>
-            </div>
-            <Clock className="h-8 w-8 text-purple-500" />
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">{t('stats.activeToday')}</p>
-              <p className="text-2xl font-bold text-gray-900">
-                {stats.overview.activeToday}
-              </p>
-            </div>
-            <Activity className="h-8 w-8 text-orange-500" />
-          </div>
-        </div>
-
-        {/* Detection Summary Card */}
-        {!summaryLoading && dailySummary.length > 0 && (() => {
-          const totalFire = dailySummary.reduce((sum, day) => sum + (day.fireDetections || 0), 0);
-          const totalSmoke = dailySummary.reduce((sum, day) => sum + (day.smokeDetections || 0), 0);
-          return (
-            <div className="bg-white rounded-lg shadow p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">{t('stats.detections14d')}</p>
-                  <div className="flex items-center gap-3 mt-1">
-                    <span className="text-lg font-bold text-red-600">{totalFire} {t('stats.fire')}</span>
-                    <span className="text-lg font-bold text-gray-500">{totalSmoke} {t('stats.smoke')}</span>
-                  </div>
-                </div>
-                <Flame className="h-8 w-8 text-red-500" />
+      {/* KPI Row */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {kpis.map(({ label, value, icon: Icon, accent, numColor, iconColor, bgClass, trend }) => (
+          <div
+            key={label}
+            className={`bg-white rounded-xl shadow-sm ${accent} relative overflow-hidden`}
+          >
+            {/* Icon badge */}
+            <div className="absolute right-3 top-3">
+              <div className={`p-2 rounded-lg ${bgClass}`}>
+                <Icon className={`h-5 w-5 ${iconColor}`} />
               </div>
             </div>
-          );
-        })()}
+
+            <div className="p-5 pr-14">
+              <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 leading-none mb-3">
+                {label}
+              </p>
+              <div className="flex items-end gap-2">
+                <p className={`text-4xl font-black tabular-nums leading-none ${numColor}`}>
+                  {value.toLocaleString()}
+                </p>
+                {trend && <div className="mb-1">{trend}</div>}
+              </div>
+              <p className="text-[10px] text-gray-300 mt-2 uppercase tracking-wide font-medium">
+                {t('stats.weeklyLabel')}
+              </p>
+            </div>
+          </div>
+        ))}
       </div>
 
-      {/* Detection Trend Chart */}
-      {!summaryLoading && dailySummary.length > 0 && (
-        <TrendChart
-          data={dailySummary.map(day => ({
-            date: day.date,
-            fire: day.fireDetections || 0,
-            smoke: day.smokeDetections || 0,
-            total: day.totalExecutions,
-          })).reverse()}
-          title={t('stats.detectionTrends')}
+      {/* Charts Row */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <SimpleBarChart
+          title={t('stats.smokePerDay')}
+          data={smokeData}
+          color="#64748b"
+          bgClass="bg-slate-400"
+          emptyMessage={t('stats.noDetections')}
         />
-      )}
-
-      {/* Status Breakdown and Recent Activity */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Status Breakdown */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-semibold mb-4">{t('stats.statusBreakdown')}</h3>
-          <div className="space-y-3">
-            {Object.entries(stats.statusBreakdown).map(([status, count]) => {
-              const total = Object.values(stats.statusBreakdown).reduce((a, b) => a + b, 0);
-              const percentage = total > 0 ? (count / total) * 100 : 0;
-              
-              return (
-                <div key={status} className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className={cn('capitalize font-medium', getStatusColor(status))}>
-                      {status}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <div className="w-32 bg-gray-200 rounded-full h-2">
-                      <div 
-                        className={cn('h-2 rounded-full', {
-                          'bg-green-500': status === 'success',
-                          'bg-red-500': status === 'error',
-                          'bg-blue-500': status === 'running',
-                          'bg-yellow-500': status === 'waiting',
-                          'bg-gray-500': status === 'canceled'
-                        })}
-                        style={{ width: `${percentage}%` }}
-                      />
-                    </div>
-                    <span className="text-sm text-gray-600 w-16 text-right">
-                      {count.toLocaleString()}
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Recent Activity */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-semibold mb-4">{t('stats.recentActivity')}</h3>
-          <div className="space-y-3">
-            <div className="flex justify-between items-center">
-              <span className="text-gray-600">{t('stats.lastHour')}</span>
-              <span className="font-semibold">{stats.recentActivity.lastHour}</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-gray-600">{t('stats.last24Hours')}</span>
-              <span className="font-semibold">{stats.recentActivity.last24Hours}</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-gray-600">{t('stats.last7Days')}</span>
-              <span className="font-semibold">{stats.recentActivity.last7Days}</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-gray-600">{t('stats.last30Days')}</span>
-              <span className="font-semibold">{stats.recentActivity.last30Days}</span>
-            </div>
-          </div>
-        </div>
+        <StackedBarChart
+          title={t('stats.alertsByLevel')}
+          data={alertData}
+          series={[
+            { key: 'critical', label: t('filters.critical'), color: '#dc2626', bgClass: 'bg-red-600' },
+            { key: 'high',     label: t('filters.high'),     color: '#f97316', bgClass: 'bg-orange-400' },
+            { key: 'low',      label: t('filters.low'),      color: '#fbbf24', bgClass: 'bg-amber-300' },
+          ]}
+          emptyMessage={t('stats.noDetections')}
+        />
+        <SimpleBarChart
+          title={t('stats.avgConfidencePerDay')}
+          data={confidenceData}
+          color="#0d9488"
+          bgClass="bg-teal-500"
+          unit="%"
+          emptyMessage={t('stats.noDetections')}
+        />
       </div>
-
-      {/* Performance Metrics */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h3 className="text-lg font-semibold mb-4">{t('stats.performanceMetrics')}</h3>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-          <div>
-            <p className="text-sm text-gray-600">{t('stats.average')}</p>
-            <p className="text-lg font-semibold">{formatTime(stats.performanceMetrics.avgResponseTime)}</p>
-          </div>
-          <div>
-            <p className="text-sm text-gray-600">{t('stats.minimum')}</p>
-            <p className="text-lg font-semibold">{formatTime(stats.performanceMetrics.minResponseTime)}</p>
-          </div>
-          <div>
-            <p className="text-sm text-gray-600">{t('stats.maximum')}</p>
-            <p className="text-lg font-semibold">{formatTime(stats.performanceMetrics.maxResponseTime)}</p>
-          </div>
-          <div>
-            <p className="text-sm text-gray-600">{t('stats.median')}</p>
-            <p className="text-lg font-semibold">{formatTime(stats.performanceMetrics.medianResponseTime)}</p>
-          </div>
-          <div>
-            <p className="text-sm text-gray-600">P95</p>
-            <p className="text-lg font-semibold">{formatTime(stats.performanceMetrics.p95ResponseTime)}</p>
-          </div>
-          <div>
-            <p className="text-sm text-gray-600">P99</p>
-            <p className="text-lg font-semibold">{formatTime(stats.performanceMetrics.p99ResponseTime)}</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Hourly Distribution */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h3 className="text-lg font-semibold mb-4">{t('stats.hourlyActivity')}</h3>
-        <div className="flex items-end gap-1 h-32">
-          {Array.from({ length: 24 }, (_, i) => {
-            const data = stats.hourlyDistribution.find(h => h.hour === i);
-            const count = data?.count || 0;
-            const maxCount = Math.max(...stats.hourlyDistribution.map(h => h.count), 1);
-            const height = (count / maxCount) * 100;
-            
-            return (
-              <div key={i} className="flex-1 flex flex-col items-center">
-                <div 
-                  className="w-full bg-blue-500 rounded-t hover:bg-blue-600 transition-colors"
-                  style={{ height: `${height}%` }}
-                  title={t('stats.executionsAt', { hour: String(i), count: String(count) })}
-                />
-                {i % 3 === 0 && (
-                  <span className="text-xs text-gray-500 mt-1">{i}</span>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Error Trend */}
-      {stats.errorTrend.length > 0 && (
-        <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-semibold mb-4">{t('stats.errorTrend')}</h3>
-          <div className="space-y-2">
-            {stats.errorTrend.map((day) => (
-              <div key={day.date} className="flex items-center justify-between">
-                <span className="text-sm text-gray-600">
-                  {new Date(day.date).toLocaleDateString()}
-                </span>
-                <div className="flex items-center gap-4">
-                  <span className="text-sm">
-                    {day.errors} / {day.total}
-                  </span>
-                  <span className={cn('text-sm font-semibold', {
-                    'text-green-600': day.errorRate < 1,
-                    'text-yellow-600': day.errorRate >= 1 && day.errorRate < 5,
-                    'text-red-600': day.errorRate >= 5
-                  })}>
-                    {day.errorRate.toFixed(1)}%
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
