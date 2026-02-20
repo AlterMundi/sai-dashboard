@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, ReactNode, HTMLAttributes, forwardRef } from 'react';
+import { createContext, useContext, useState, useRef, useEffect, ReactNode, HTMLAttributes, forwardRef } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronDown } from 'lucide-react';
 import { cn } from '@/utils';
 
@@ -7,6 +8,7 @@ interface SelectContextType {
   onValueChange: (value: string) => void;
   isOpen: boolean;
   setIsOpen: (open: boolean) => void;
+  triggerRef: React.MutableRefObject<HTMLButtonElement | null>;
 }
 
 const SelectContext = createContext<SelectContextType | undefined>(undefined);
@@ -20,9 +22,10 @@ interface SelectProps {
 
 export function Select({ children, value, onValueChange, disabled }: SelectProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
 
   return (
-    <SelectContext.Provider value={{ value, onValueChange, isOpen, setIsOpen }}>
+    <SelectContext.Provider value={{ value, onValueChange, isOpen, setIsOpen, triggerRef }}>
       <div className={cn("relative", disabled && "opacity-50 cursor-not-allowed")}>
         {children}
       </div>
@@ -41,7 +44,11 @@ export const SelectTrigger = forwardRef<HTMLButtonElement, SelectTriggerProps>(
 
     return (
       <button
-        ref={ref}
+        ref={(node) => {
+          context.triggerRef.current = node;
+          if (typeof ref === 'function') ref(node);
+          else if (ref) ref.current = node;
+        }}
         type="button"
         onClick={() => context.setIsOpen(!context.isOpen)}
         className={cn(
@@ -86,21 +93,37 @@ export function SelectContent({ children, className }: SelectContentProps) {
   const context = useContext(SelectContext);
   if (!context) throw new Error('SelectContent must be used within Select');
 
+  const [rect, setRect] = useState<DOMRect | null>(null);
+
+  useEffect(() => {
+    if (context.isOpen && context.triggerRef.current) {
+      setRect(context.triggerRef.current.getBoundingClientRect());
+    }
+  }, [context.isOpen, context.triggerRef]);
+
   if (!context.isOpen) return null;
 
-  return (
+  const style = rect
+    ? { top: rect.bottom + 4, left: rect.left, width: rect.width }
+    : { top: 0, left: 0, width: 200 };
+
+  return createPortal(
     <>
-      <div 
-        className="fixed inset-0 z-40" 
+      <div
+        className="fixed inset-0 z-40"
         onClick={() => context.setIsOpen(false)}
       />
-      <div className={cn(
-        "absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto",
-        className
-      )}>
+      <div
+        className={cn(
+          "fixed z-50 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto",
+          className
+        )}
+        style={style}
+      >
         {children}
       </div>
-    </>
+    </>,
+    document.body
   );
 }
 
