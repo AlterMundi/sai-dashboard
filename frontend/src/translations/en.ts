@@ -267,6 +267,11 @@ const en = {
     imageDownloadFailed: 'Failed to download image',
     failedToLoadImage: 'Failed to load image',
     noImageAvailable: 'No image available',
+    // Navigation
+    navPrev: 'Previous',
+    navNext: 'Next',
+    navCamera: 'Same camera',
+    navGallery: 'Gallery',
   },
   stats: {
     title: 'Statistics',
