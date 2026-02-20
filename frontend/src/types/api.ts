@@ -238,3 +238,14 @@ export interface SSEEtlStatusEvent {
   };
   timestamp: string;
 }
+
+/**
+ * Dynamic filter dropdown options (populated from DB DISTINCT queries)
+ */
+export interface FilterOptions {
+  cameraId:         string[];
+  location:         string[];
+  nodeId:           string[];
+  deviceId:         string[];
+  yoloModelVersion: string[];
+}

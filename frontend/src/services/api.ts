@@ -9,7 +9,8 @@ import {
   LoginRequest,
   TokenValidation,
   HealthStatus,
-  SSEStatus
+  SSEStatus,
+  FilterOptions
 } from '@/types';
 import { getStorageItem, setStorageItem, removeStorageItem } from '@/utils';
 
@@ -264,6 +265,11 @@ export const executionsApi = {
     } catch (error) {
       throw handleApiError(error);
     }
+  },
+
+  async getFilterOptions(): Promise<FilterOptions> {
+    const response = await api.get<{ data: FilterOptions }>('/executions/filter-options');
+    return response.data.data;
   },
 };
 
