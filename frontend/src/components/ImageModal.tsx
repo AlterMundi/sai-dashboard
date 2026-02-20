@@ -101,12 +101,15 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate, cameraNav, ga
     }
     prefetchBuffer.setCurrent(execution.id);
     const nav = (navMode === 'camera' ? cameraNav : galleryNav) ?? galleryNav ?? cameraNav;
-    const neighbors = nav?.getNeighbors(5, 5) ?? [execution];
+    // Scale lookahead with FPS so the buffer covers at least ~1s of navigation.
+    // 3fps → ±5, 10fps → ±12, 30fps → ±35
+    const lookahead = navFps >= 30 ? 35 : navFps >= 10 ? 12 : 5;
+    const neighbors = nav?.getNeighbors(lookahead, lookahead) ?? [execution];
     prefetchBuffer.prefetch(
       neighbors.filter(e => e.hasImage).map(e => e.id)
     );
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [execution?.id, isOpen, navMode, cameraNav, galleryNav]);
+  }, [execution?.id, isOpen, navMode, cameraNav, galleryNav, navFps]);
 
   const { blobUrl: imageUrl, loading: imageLoading, error: imageError } =
     execution?.hasImage
