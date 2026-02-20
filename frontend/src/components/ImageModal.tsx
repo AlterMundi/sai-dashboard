@@ -380,9 +380,9 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate, cameraNav, ga
         }
         if (e.key === 'ArrowDown') return; // no-op in fit mode
 
-        // Left/Right: navigate, with slow-scroll on hold (1 image per 300ms)
+        // Left/Right: navigate, with slow-scroll on hold (10 fps = 1 image per 100ms)
         const now = Date.now();
-        if (e.repeat && now - lastNavTimeRef.current < 300) return;
+        if (e.repeat && now - lastNavTimeRef.current < 100) return;
         lastNavTimeRef.current = now;
 
         const nav = navMode === 'camera' ? cameraNav : galleryNav;
