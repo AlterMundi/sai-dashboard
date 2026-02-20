@@ -41,6 +41,7 @@ export function ImageGallery({ initialFilters = {}, className, refreshTrigger, o
     updateFilters,
     filters,
     prependExecutions,
+    totalResults,
   } = useExecutions(initialFilters, refreshTrigger);
 
   // Intersection observer for infinite scroll
@@ -241,14 +242,15 @@ export function ImageGallery({ initialFilters = {}, className, refreshTrigger, o
       hasPrev: idx > 0,
       hasNext: idx < executions.length - 1,
       index: idx,
-      total: executions.length,
+      // Show DB total (after filtering) rather than just the loaded page set
+      total: totalResults || executions.length,
       getNeighbors: (behind, ahead) => {
         const start = Math.max(0, idx - behind);
         const end   = Math.min(executions.length - 1, idx + ahead);
         return executions.slice(start, end + 1);
       },
     };
-  }, [executions, selectedExecution?.id]);
+  }, [executions, selectedExecution?.id, totalResults]);
 
   // Preemptively load the next page when the selected execution is
   // within 10 positions of the end of the loaded list.
