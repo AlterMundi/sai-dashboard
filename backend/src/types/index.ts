@@ -288,3 +288,11 @@ export interface ExecutionStats {
   avgDailyExecutions: number;
   lastExecution: Date | null;
 }
+
+export interface FilterOptions {
+  cameraId:         string[];
+  location:         string[];
+  nodeId:           string[];
+  deviceId:         string[];
+  yoloModelVersion: string[];
+}
