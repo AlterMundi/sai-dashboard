@@ -269,6 +269,11 @@ const es: TranslationKeys = {
     imageDownloadFailed: 'Error al descargar imagen',
     failedToLoadImage: 'Error al cargar imagen',
     noImageAvailable: 'Imagen no disponible',
+    // Navigation
+    navPrev: 'Anterior',
+    navNext: 'Siguiente',
+    navCamera: 'Misma cámara',
+    navGallery: 'Galería',
   },
   stats: {
     title: 'Estad\u00edsticas',
