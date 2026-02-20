@@ -223,6 +223,11 @@ export function ImageGallery({ initialFilters = {}, className, refreshTrigger, o
       hasNext: idx < siblings.length - 1,
       index: idx,
       total: siblings.length,
+      getNeighbors: (behind, ahead) => {
+        const start = Math.max(0, idx - behind);
+        const end   = Math.min(siblings.length - 1, idx + ahead);
+        return siblings.slice(start, end + 1);
+      },
     };
   }, [executions, selectedExecution?.id, selectedExecution?.nodeId, selectedExecution?.cameraId]);
 
@@ -237,8 +242,24 @@ export function ImageGallery({ initialFilters = {}, className, refreshTrigger, o
       hasNext: idx < executions.length - 1,
       index: idx,
       total: executions.length,
+      getNeighbors: (behind, ahead) => {
+        const start = Math.max(0, idx - behind);
+        const end   = Math.min(executions.length - 1, idx + ahead);
+        return executions.slice(start, end + 1);
+      },
     };
   }, [executions, selectedExecution?.id]);
+
+  // Preemptively load the next page when the selected execution is
+  // within 10 positions of the end of the loaded list.
+  useEffect(() => {
+    if (!selectedExecution) return;
+    const idx = executions.findIndex(e => e.id === selectedExecution.id);
+    if (idx === -1) return;
+    if (idx >= executions.length - 10 && hasNext && !isLoading) {
+      loadMore();
+    }
+  }, [selectedExecution?.id, executions.length, hasNext, isLoading, loadMore]);
 
   const handleRefresh = useCallback(() => {
     refresh();

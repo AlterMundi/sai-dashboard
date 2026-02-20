@@ -25,6 +25,8 @@ export interface NavContext {
   hasNext: boolean;
   index: number;   // 0-based current position
   total: number;
+  /** Returns executions in range [index-behind .. index+ahead] (clamped to array bounds). */
+  getNeighbors: (behind: number, ahead: number) => import('./execution').ExecutionWithImageUrls[];
 }
 
 export interface ImageModalProps {
