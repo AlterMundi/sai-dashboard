@@ -64,7 +64,7 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate, cameraNav, ga
   }, [cameraNav, navMode]);
 
   // Held-arrow FPS (images/second while arrow key is held)
-  const [navFps, setNavFps] = useState<3 | 10 | 30>(10);
+  const [navFps, setNavFps] = useState<3 | 10 | 20>(10);
   const navIntervalRef = useRef<number>(100); // ms between nav steps
   useEffect(() => { navIntervalRef.current = Math.round(1000 / navFps); }, [navFps]);
 
@@ -102,8 +102,8 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate, cameraNav, ga
     prefetchBuffer.setCurrent(execution.id);
     const nav = (navMode === 'camera' ? cameraNav : galleryNav) ?? galleryNav ?? cameraNav;
     // Scale lookahead with FPS so the buffer covers at least ~1s of navigation.
-    // 3fps → ±5, 10fps → ±12, 30fps → ±35
-    const lookahead = navFps >= 30 ? 35 : navFps >= 10 ? 12 : 5;
+    // 3fps → ±5, 10fps → ±12, 20fps → ±25
+    const lookahead = navFps >= 20 ? 25 : navFps >= 10 ? 12 : 5;
     const neighbors = nav?.getNeighbors(lookahead, lookahead) ?? [execution];
     prefetchBuffer.prefetch(
       neighbors.filter(e => e.hasImage).map(e => e.id)
@@ -928,7 +928,7 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate, cameraNav, ga
                   {/* FPS selector for held-arrow navigation */}
                   <div className="w-px h-3 bg-white/30 mx-0.5" />
                   <div className="flex rounded overflow-hidden border border-white/20">
-                    {([3, 10, 30] as const).map(fps => (
+                    {([3, 10, 20] as const).map(fps => (
                       <button
                         key={fps}
                         onClick={() => setNavFps(fps)}
