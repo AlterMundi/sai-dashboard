@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { LoadingSpinner } from './ui/LoadingSpinner';
 import { cn } from '@/utils';
 import { ImageCardProps } from '@/types';
@@ -5,7 +6,7 @@ import { useImageCard } from '@/hooks/useImageCard';
 import { useTranslation } from '@/contexts/LanguageContext';
 import { AlertTriangle, MessageCircle, Wind, Camera, MapPin, RefreshCw, X } from 'lucide-react';
 
-export function ImageCard({ execution, onClick, loading = false }: ImageCardProps) {
+export const ImageCard = memo(function ImageCard({ execution, onClick, loading = false }: ImageCardProps) {
   const { t } = useTranslation();
   const {
     imageLoading,
@@ -212,4 +213,4 @@ export function ImageCard({ execution, onClick, loading = false }: ImageCardProp
       )}
     </div>
   );
-}
+});
