@@ -108,15 +108,17 @@ export function DateTimeRangeSelector({
     <div className={cn('flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-2', className)}>
 
       {/* From */}
-      <div className="flex items-center gap-2 overflow-x-auto [&::-webkit-scrollbar]:hidden [scrollbar-width:none]">
-        <label className="text-xs text-gray-500 shrink-0">{t('dateRange.from')}</label>
-        <Input
-          type="date"
-          value={fromDate}
-          onChange={(e) => setFromDate(e.target.value)}
-          disabled={disabled}
-          className="h-8 text-sm w-auto"
-        />
+      <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 overflow-x-auto [&::-webkit-scrollbar]:hidden [scrollbar-width:none]">
+          <label className="text-xs text-gray-500 shrink-0">{t('dateRange.from')}</label>
+          <Input
+            type="date"
+            value={fromDate}
+            onChange={(e) => setFromDate(e.target.value)}
+            disabled={disabled}
+            className="h-8 text-sm w-auto"
+          />
+        </div>
         <TimePicker24h value={fromTime} onChange={setFromTime} disabled={disabled} />
       </div>
 
@@ -139,15 +141,17 @@ export function DateTimeRangeSelector({
       </div>
 
       {/* To */}
-      <div className="flex items-center gap-2 overflow-x-auto [&::-webkit-scrollbar]:hidden [scrollbar-width:none]">
-        <label className="text-xs text-gray-500 shrink-0">{t('dateRange.to')}</label>
-        <Input
-          type="date"
-          value={toDate}
-          onChange={(e) => setToDate(e.target.value)}
-          disabled={disabled}
-          className="h-8 text-sm w-auto"
-        />
+      <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 overflow-x-auto [&::-webkit-scrollbar]:hidden [scrollbar-width:none]">
+          <label className="text-xs text-gray-500 shrink-0">{t('dateRange.to')}</label>
+          <Input
+            type="date"
+            value={toDate}
+            onChange={(e) => setToDate(e.target.value)}
+            disabled={disabled}
+            className="h-8 text-sm w-auto"
+          />
+        </div>
         <TimePicker24h value={toTime} onChange={setToTime} disabled={disabled} />
         {hasActiveRange && (
           <Button
