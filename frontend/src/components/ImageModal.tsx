@@ -31,6 +31,8 @@ import {
   ZoomIn,
   ZoomOut,
   ChevronUp,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -43,7 +45,7 @@ const alertColors: Record<string, string> = {
   none: 'bg-gray-200 text-gray-600',
 };
 
-export function ImageModal({ execution, isOpen, onClose, onUpdate }: ImageModalProps) {
+export function ImageModal({ execution, isOpen, onClose, onUpdate, cameraNav, galleryNav }: ImageModalProps) {
   const { t } = useTranslation();
   const [zoomLevel, setZoomLevel] = useState(1);
   const [downloading, setDownloading] = useState(false);
@@ -52,6 +54,23 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate }: ImageModalP
   const [localIsFalsePositive, setLocalIsFalsePositive] = useState(execution?.isFalsePositive ?? false);
   // Bottom sheet state (mobile only)
   const [sheetExpanded, setSheetExpanded] = useState(false);
+
+  // Navigation mode state
+  const [navMode, setNavMode] = useState<'camera' | 'gallery'>(cameraNav ? 'camera' : 'gallery');
+
+  // Auto-switch if active mode becomes unavailable
+  useEffect(() => {
+    if (navMode === 'camera' && !cameraNav) setNavMode('gallery');
+  }, [cameraNav, navMode]);
+
+  const activeNav = navMode === 'camera' ? cameraNav : galleryNav;
+
+  const [pressedBtn, setPressedBtn] = useState<'prev' | 'next' | null>(null);
+  useEffect(() => {
+    if (!pressedBtn) return;
+    const t = setTimeout(() => setPressedBtn(null), 150);
+    return () => clearTimeout(t);
+  }, [pressedBtn]);
 
   // Sync local state when execution changes
   useEffect(() => {
@@ -298,18 +317,32 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate }: ImageModalP
     };
   }, [isOpen]);
 
-  // ── Escape key + body scroll lock ────────────────────────────────────────
+  // ── Escape / Arrow keys + body scroll lock ───────────────────────────────
   useEffect(() => {
-    const onEscape = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { onClose(); return; }
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        if (e.repeat) return;
+        if (e.shiftKey || e.ctrlKey || e.metaKey || e.altKey) return;
+        const tag = (e.target as HTMLElement).tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+        if (zoomRef.current > 1) return;  // don't hijack when image is zoomed
+        const nav = navMode === 'camera' ? cameraNav : galleryNav;
+        if (!nav) return;
+        e.preventDefault();
+        if (e.key === 'ArrowLeft' && nav.hasPrev) { setPressedBtn('prev'); nav.onPrev(); }
+        if (e.key === 'ArrowRight' && nav.hasNext) { setPressedBtn('next'); nav.onNext(); }
+      }
+    };
     if (isOpen) {
-      document.addEventListener('keydown', onEscape);
+      document.addEventListener('keydown', onKeyDown);
       document.body.style.overflow = 'hidden';
     }
     return () => {
-      document.removeEventListener('keydown', onEscape);
+      document.removeEventListener('keydown', onKeyDown);
       document.body.style.overflow = '';
     };
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, navMode, cameraNav, galleryNav]);
 
   // ── Actions ───────────────────────────────────────────────────────────────
   const handleToggleFalsePositive = useCallback(async () => {
@@ -656,7 +689,7 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate }: ImageModalP
           {/* Image section — fills ALL remaining height on mobile (sheet overlays it) */}
           <div className="flex-1 bg-gray-900 flex flex-col min-h-0 min-w-0 relative overflow-hidden">
             {/* Bounding Box Toggle */}
-            {execution.detections && execution.detections.length > 0 && !imageLoading && !imageError && imageUrl && (
+            {execution.detections && execution.detections.length > 0 && !imageError && !!imageUrl && (
               <div className="flex justify-center p-2 bg-gray-800 shrink-0">
                 <BoundingBoxToggle
                   visible={showBoundingBoxes}
@@ -673,7 +706,7 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate }: ImageModalP
             >
               {secureImageUrl ? (
                 <>
-                  {imageLoading && (
+                  {imageLoading && !imageUrl && (
                     <div className="flex items-center justify-center h-full">
                       <LoadingSpinner size="lg" color="white" />
                     </div>
@@ -685,7 +718,7 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate }: ImageModalP
                     </div>
                   ) : imageUrl ? (
                     <div
-                      className="relative inline-block"
+                      className="relative w-full h-full bg-gray-900"
                       style={{
                         transform: zoomLevel > 1
                           ? `translate(${translate.x}px, ${translate.y}px) scale(${zoomLevel})`
@@ -703,7 +736,7 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate }: ImageModalP
                       <img
                         src={imageUrl}
                         alt={`Execution ${execution.id}`}
-                        className="max-w-full max-h-full object-contain"
+                        className="w-full h-full object-contain"
                       />
                       <BoundingBoxOverlay
                         detections={execution.detections}
@@ -757,6 +790,57 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate }: ImageModalP
                   >
                     <ZoomIn className="h-6 w-6" />
                   </button>
+                </div>
+              )}
+
+              {/* ← Prev navigation button */}
+              {activeNav && activeNav.total > 1 && (
+                <button
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => { if (activeNav.hasPrev) { setPressedBtn('prev'); activeNav.onPrev(); } }}
+                  disabled={!activeNav.hasPrev}
+                  className={cn(
+                    'absolute left-2 top-1/2 -translate-y-1/2 flex items-center justify-center w-10 h-10 bg-black/50 hover:bg-black/70 active:bg-white/20 text-white rounded-full transition-all duration-150 disabled:opacity-20 disabled:cursor-not-allowed z-10 focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:outline-none',
+                    pressedBtn === 'prev' && 'bg-white/20',
+                  )}
+                  aria-label={t('modal.navPrev')}
+                  title={t('modal.navPrev')}
+                >
+                  <ChevronLeft className="h-6 w-6" />
+                </button>
+              )}
+
+              {/* → Next navigation button */}
+              {activeNav && activeNav.total > 1 && (
+                <button
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => { if (activeNav.hasNext) { setPressedBtn('next'); activeNav.onNext(); } }}
+                  disabled={!activeNav.hasNext}
+                  className={cn(
+                    'absolute right-2 top-1/2 -translate-y-1/2 flex items-center justify-center w-10 h-10 bg-black/50 hover:bg-black/70 active:bg-white/20 text-white rounded-full transition-all duration-150 disabled:opacity-20 disabled:cursor-not-allowed z-10 focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:outline-none',
+                    pressedBtn === 'next' && 'bg-white/20',
+                  )}
+                  aria-label={t('modal.navNext')}
+                  title={t('modal.navNext')}
+                >
+                  <ChevronRight className="h-6 w-6" />
+                </button>
+              )}
+
+              {/* Counter + mode toggle */}
+              {activeNav && activeNav.total > 1 && (
+                <div className="absolute bottom-14 sm:bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-black/60 rounded-lg px-3 py-1 z-10">
+                  <span className="text-white text-xs font-mono tabular-nums">
+                    {activeNav.index + 1} / {activeNav.total}
+                  </span>
+                  {cameraNav && galleryNav && (
+                    <button
+                      onClick={() => setNavMode(m => m === 'camera' ? 'gallery' : 'camera')}
+                      className="text-white/70 hover:text-white text-xs px-2 py-0.5 rounded border border-white/30 hover:border-white/60 transition-colors"
+                    >
+                      {navMode === 'camera' ? t('modal.navCamera') : t('modal.navGallery')}
+                    </button>
+                  )}
                 </div>
               )}
             </div>

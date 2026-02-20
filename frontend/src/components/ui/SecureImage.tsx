@@ -129,6 +129,9 @@ export function useSecureImage(url: string | undefined) {
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [error, setError] = useState(false);
   const [loading, setLoading] = useState(true);
+  // Ref tracks the latest live blob URL so the unmount cleanup can revoke it
+  // without needing blobUrl in any dependency array.
+  const latestBlobUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!url) {
@@ -159,7 +162,19 @@ export function useSecureImage(url: string | undefined) {
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
         const blob = await response.blob();
-        setBlobUrl(URL.createObjectURL(blob));
+        const objectUrl = URL.createObjectURL(blob);
+        // Decode before setting state so the browser knows the image dimensions
+        // the instant React renders the <img>, preventing a resize flash.
+        const img = new Image();
+        img.src = objectUrl;
+        await img.decode().catch((decodeErr) => {
+          if (import.meta.env.DEV) console.debug('SecureImage: img.decode() failed (non-fatal)', decodeErr);
+        });
+        if (abortController.signal.aborted) { URL.revokeObjectURL(objectUrl); return; }
+        // Atomically revoke the previous blob URL and install the new one.
+        if (latestBlobUrlRef.current) URL.revokeObjectURL(latestBlobUrlRef.current);
+        latestBlobUrlRef.current = objectUrl;
+        setBlobUrl(objectUrl);
         setLoading(false);
       } catch (err) {
         if (err instanceof Error && err.name !== 'AbortError') {
@@ -176,12 +191,13 @@ export function useSecureImage(url: string | undefined) {
     };
   }, [url]);
 
-  // Cleanup blob URL on unmount
+  // Revoke the active blob URL only on unmount (not on every blobUrl change,
+  // which would revoke the URL that was just set and cause a blank frame).
   useEffect(() => {
     return () => {
-      if (blobUrl) URL.revokeObjectURL(blobUrl);
+      if (latestBlobUrlRef.current) URL.revokeObjectURL(latestBlobUrlRef.current);
     };
-  }, [blobUrl]);
+  }, []);
 
   return { blobUrl, loading, error };
 }

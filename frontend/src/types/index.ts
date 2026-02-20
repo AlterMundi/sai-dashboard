@@ -44,12 +44,16 @@ export type {
   SSEStage2FailureEvent,
   SSEEtlStatusEvent,
   FilterOptions,
+  StatsFilters,
+  StatsRankingItem,
+  StatsRanking,
 } from './api';
 
 // ============================================================================
 // Component Prop Types
 // ============================================================================
 export type {
+  NavContext,
   ImageCardProps,
   ImageModalProps,
   ImageGalleryProps,

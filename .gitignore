@@ -70,3 +70,4 @@ temp/
 *.7z
 # Local image cache for development
 image-cache/
+.worktrees/
