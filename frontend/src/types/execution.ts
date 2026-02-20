@@ -14,7 +14,7 @@
  * YOLO Detection object - individual fire/smoke detection with bounding box
  */
 export interface YoloDetection {
-  class: string;  // 'fire' | 'smoke' | 'unknown'
+  class: string;  // 'smoke' | 'unknown'
   confidence: number;  // 0.0 - 1.0
   bounding_box: {
     x: number;        // Pixels from left

@@ -198,12 +198,12 @@ import { config } from '@/config';        // → backend/src/config/index.ts
 - Device metadata: `node_id`, `camera_id`, `device_id`, `location`, `camera_type`, `capture_timestamp`
 
 **`execution_analysis`** (Stage 2 ETL)
-- YOLO fire/smoke detection results
-- Fields: `execution_id`, `request_id`, `alert_level`, `detection_count`, `has_fire`, `has_smoke`
-- Confidence: `confidence_fire`, `confidence_smoke`, `confidence_score`
+- YOLO smoke detection results
+- Fields: `execution_id`, `request_id`, `alert_level`, `detection_count`, `has_smoke`
+- Confidence: `confidence_smoke`, `confidence_score`
 - Detections: `detections` (JSONB array with bounding boxes), `active_classes` (string array)
-- **18 columns total** (reduced from 31 in Sept 2025)
-- **GIN Index:** Fast JSONB queries like `WHERE detections @> '[{"class": "fire"}]'`
+- **16 columns total** (fire columns removed in Migration 010)
+- **GIN Index:** Fast JSONB queries like `WHERE detections @> '[{"class": "smoke"}]'`
 
 **`execution_images`** (Stage 2 ETL)
 - Image cache metadata
@@ -276,16 +276,14 @@ interface SaiEnhancedAnalysis {
   requestId?: string;
   alertLevel?: 'none' | 'low' | 'medium' | 'high' | 'critical';
   detectionCount?: number;
-  hasFire?: boolean;
   hasSmoke?: boolean;
-  confidenceFire?: number;
   confidenceSmoke?: number;
   detections?: YoloDetection[];
-  // ... 18 fields total
+  // ... 16 fields total
 }
 
 interface YoloDetection {
-  class: string;  // 'fire' | 'smoke' | 'unknown'
+  class: string;  // 'smoke' | 'unknown'
   confidence: number;
   bounding_box: {
     x: number;
@@ -364,7 +362,7 @@ Before October 2025, this system was incorrectly built for Ollama AI analysis. T
 - Reference `enhanced-analysis.ts` or `expert-review.ts` (disabled, excluded from build)
 
 **DO:**
-- Use YOLO-specific fields: `alert_level`, `has_fire`, `has_smoke`, `detection_count`
+- Use YOLO-specific fields: `alert_level`, `has_smoke`, `detection_count`
 - Query `execution_analysis.detections` JSONB field for bounding boxes
 - Parse YOLO Inference node output (not Ollama node)
 
