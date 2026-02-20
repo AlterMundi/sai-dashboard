@@ -337,9 +337,9 @@ const es: TranslationKeys = {
     },
     ranking: {
       title: 'Top del período',
-      cameras: 'Top cámaras',
-      locations: 'Top ubicaciones',
-      nodes: 'Top nodos',
+      cameras: 'Top detecciones x cámara',
+      locations: 'Top detecciones x ubicación',
+      nodes: 'Top ejecución x nodo',
       noData: 'Sin datos para este período',
     },
   },

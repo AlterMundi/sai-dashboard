@@ -18,7 +18,8 @@ interface MiniBarListProps {
 }
 
 function MiniBarList({ title, items, getValue, bgClass, noDataLabel }: MiniBarListProps) {
-  const maxVal = Math.max(...items.map(getValue), 1);
+  const sorted = [...items].sort((a, b) => getValue(b) - getValue(a));
+  const maxVal = Math.max(...sorted.map(getValue), 1);
 
   return (
     <div>
@@ -29,7 +30,7 @@ function MiniBarList({ title, items, getValue, bgClass, noDataLabel }: MiniBarLi
         <p className="text-xs text-gray-300">{noDataLabel}</p>
       ) : (
         <div className="space-y-2">
-          {items.map((item) => {
+          {sorted.map((item) => {
             const val = getValue(item);
             const widthPct = (val / maxVal) * 100;
             return (
