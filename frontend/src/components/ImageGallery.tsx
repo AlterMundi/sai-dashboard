@@ -8,7 +8,7 @@ import { ImageModal } from './ImageModal';
 import { LoadingSpinner, LoadingState } from './ui/LoadingSpinner';
 import { useExecutions } from '@/hooks/useExecutions';
 import { executionsApi, tokenManager } from '@/services/api';
-import { ExecutionWithImageUrls, ExecutionFilters } from '@/types';
+import { ExecutionWithImageUrls, ExecutionFilters, NavContext } from '@/types';
 import { cn } from '@/utils';
 import { useTranslation } from '@/contexts/LanguageContext';
 import { Grid, List, RefreshCw, ArrowUp } from 'lucide-react';
@@ -205,6 +205,40 @@ export function ImageGallery({ initialFilters = {}, className, refreshTrigger, o
     setIsModalOpen(false);
     setSelectedExecution(null);
   }, []);
+
+  const cameraNav = useMemo((): NavContext | undefined => {
+    if (!selectedExecution || !selectedExecution.nodeId || !selectedExecution.cameraId) {
+      return undefined;
+    }
+    const { nodeId, cameraId } = selectedExecution;
+    const siblings = executions
+      .filter(e => e.nodeId === nodeId && e.cameraId === cameraId)
+      .sort((a, b) => new Date(a.executionTimestamp).getTime() - new Date(b.executionTimestamp).getTime());
+    const idx = siblings.findIndex(e => e.id === selectedExecution.id);
+    if (idx === -1) return undefined;
+    return {
+      onPrev: () => { if (idx > 0) setSelectedExecution(siblings[idx - 1]); },
+      onNext: () => { if (idx < siblings.length - 1) setSelectedExecution(siblings[idx + 1]); },
+      hasPrev: idx > 0,
+      hasNext: idx < siblings.length - 1,
+      index: idx,
+      total: siblings.length,
+    };
+  }, [executions, selectedExecution?.id, selectedExecution?.nodeId, selectedExecution?.cameraId]);
+
+  const galleryNav = useMemo((): NavContext | undefined => {
+    if (!selectedExecution) return undefined;
+    const idx = executions.findIndex(e => e.id === selectedExecution.id);
+    if (idx === -1) return undefined;
+    return {
+      onPrev: () => { if (idx > 0) setSelectedExecution(executions[idx - 1]); },
+      onNext: () => { if (idx < executions.length - 1) setSelectedExecution(executions[idx + 1]); },
+      hasPrev: idx > 0,
+      hasNext: idx < executions.length - 1,
+      index: idx,
+      total: executions.length,
+    };
+  }, [executions, selectedExecution?.id]);
 
   const handleRefresh = useCallback(() => {
     refresh();
@@ -409,6 +443,8 @@ export function ImageGallery({ initialFilters = {}, className, refreshTrigger, o
         execution={selectedExecution}
         isOpen={isModalOpen}
         onClose={handleModalClose}
+        cameraNav={cameraNav}
+        galleryNav={galleryNav}
       />
 
       {/* Back to Top Button */}
