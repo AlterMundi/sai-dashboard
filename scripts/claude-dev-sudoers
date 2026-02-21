@@ -11,11 +11,11 @@ fede ALL=(postgres) NOPASSWD: /usr/bin/pg_restore
 fede ALL=(postgres) NOPASSWD: /usr/bin/createdb
 fede ALL=(postgres) NOPASSWD: /usr/bin/dropdb
 
-# System service management (for development services only)
+# System service management
 fede ALL=(root) NOPASSWD: /usr/bin/systemctl status *
-fede ALL=(root) NOPASSWD: /usr/bin/systemctl restart sai-dashboard-api
-fede ALL=(root) NOPASSWD: /usr/bin/systemctl stop sai-dashboard-api
-fede ALL=(root) NOPASSWD: /usr/bin/systemctl start sai-dashboard-api
 
-# Journal logs
-fede ALL=(root) NOPASSWD: /usr/bin/journalctl -u sai-dashboard-api *
+# Docker container management
+fede ALL=(root) NOPASSWD: /usr/bin/docker restart sai-dashboard
+fede ALL=(root) NOPASSWD: /usr/bin/docker stop sai-dashboard
+fede ALL=(root) NOPASSWD: /usr/bin/docker start sai-dashboard
+fede ALL=(root) NOPASSWD: /usr/bin/docker logs *
