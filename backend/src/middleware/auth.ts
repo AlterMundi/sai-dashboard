@@ -1,52 +1,18 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import bcrypt from 'bcrypt';
 import rateLimit from 'express-rate-limit';
 import { appConfig } from '@/config';
 import { logger } from '@/utils/logger';
-import { SessionData } from '@/types';
+import { SessionData, DashboardRole } from '@/types';
 
 declare global {
   namespace Express {
     interface Request {
       session?: SessionData;
-      user?: { id: string; isAuthenticated: boolean };
+      user?: { id: string; email: string; role: DashboardRole; isAuthenticated: boolean };
     }
   }
 }
-
-export const loginRateLimit = rateLimit({
-  windowMs: appConfig.rateLimit.loginWindowMs,
-  max: appConfig.rateLimit.loginMaxAttempts,
-  message: {
-    error: {
-      message: 'Too many login attempts, please try again later',
-      code: 'RATE_LIMIT_EXCEEDED'
-    }
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-  keyGenerator: (req) => {
-    return req.ip || 'unknown';
-  },
-  skip: (req) => {
-    // Skip rate limiting in development and test environments
-    return (appConfig.nodeEnv === 'development' || appConfig.nodeEnv === 'test') && 
-           (req.ip === '127.0.0.1' || req.ip === '::1' || req.ip === '::ffff:127.0.0.1');
-  },
-  handler: (req, res) => {
-    logger.warn('Login rate limit exceeded', {
-      ip: req.ip,
-      userAgent: req.get('User-Agent')
-    });
-    res.status(429).json({
-      error: {
-        message: 'Too many login attempts, please try again later',
-        code: 'RATE_LIMIT_EXCEEDED'
-      }
-    });
-  }
-});
 
 export const apiRateLimit = rateLimit({
   windowMs: appConfig.rateLimit.windowMs,
@@ -63,9 +29,7 @@ export const apiRateLimit = rateLimit({
     return req.ip || 'unknown';
   },
   skip: (req) => {
-    // Skip rate limiting for health checks
     if (req.path === '/api/health') return true;
-    // Skip rate limiting in development for localhost
     if (appConfig.nodeEnv === 'development' &&
         (req.ip === '127.0.0.1' || req.ip === '::1' || req.ip === '::ffff:127.0.0.1')) {
       return true;
@@ -84,36 +48,12 @@ export const generateToken = (sessionData: Omit<SessionData, 'createdAt' | 'expi
   return jwt.sign(payload, appConfig.security.sessionSecret);
 };
 
-export const verifyPassword = async (plainPassword: string, hashedPassword?: string): Promise<boolean> => {
-  if (!hashedPassword) {
-    // For single password authentication, compare directly with configured password
-    return plainPassword === appConfig.security.dashboardPassword;
-  }
-  
-  try {
-    return await bcrypt.compare(plainPassword, hashedPassword);
-  } catch (error) {
-    logger.error('Password verification error:', error);
-    return false;
-  }
-};
-
-export const hashPassword = async (password: string): Promise<string> => {
-  try {
-    const saltRounds = 12;
-    return await bcrypt.hash(password, saltRounds);
-  } catch (error) {
-    logger.error('Password hashing error:', error);
-    throw new Error('Password hashing failed');
-  }
-};
-
 export const authenticateToken = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const authHeader = req.headers.authorization;
     let token = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : null;
 
-    // For image requests, also check query parameters to support browser img tags
+    // For image/SSE requests, also check query parameters
     if (!token && req.query.token) {
       token = req.query.token as string;
     }
@@ -129,8 +69,7 @@ export const authenticateToken = async (req: Request, res: Response, next: NextF
     }
 
     const decoded = jwt.verify(token, appConfig.security.sessionSecret) as any;
-    
-    // Check if token is expired (additional check)
+
     if (decoded.exp && decoded.exp < Math.floor(Date.now() / 1000)) {
       res.status(401).json({
         error: {
@@ -141,9 +80,10 @@ export const authenticateToken = async (req: Request, res: Response, next: NextF
       return;
     }
 
-    // Attach session data to request
     req.session = {
       userId: decoded.userId,
+      email: decoded.email || '',
+      role: decoded.role || 'VIEWER',
       isAuthenticated: decoded.isAuthenticated,
       createdAt: new Date(decoded.iat * 1000),
       expiresAt: new Date(decoded.exp * 1000)
@@ -151,16 +91,19 @@ export const authenticateToken = async (req: Request, res: Response, next: NextF
 
     req.user = {
       id: decoded.userId,
+      email: decoded.email || '',
+      role: decoded.role || 'VIEWER',
       isAuthenticated: decoded.isAuthenticated
     };
 
     logger.debug('Token authenticated successfully', {
       userId: decoded.userId,
-      expiresAt: req.session.expiresAt
+      email: decoded.email,
+      role: decoded.role
     });
 
     next();
-    
+
   } catch (error) {
     logger.warn('Token authentication failed:', {
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -207,7 +150,20 @@ export const requireAuth = (req: Request, res: Response, next: NextFunction): vo
   next();
 };
 
-// Optional authentication - adds user data if token is present but doesn't require it
+export const requireRole = (...roles: DashboardRole[]) =>
+  (req: Request, res: Response, next: NextFunction): void => {
+    if (!req.user?.role || !roles.includes(req.user.role)) {
+      res.status(403).json({
+        error: {
+          message: 'Insufficient permissions',
+          code: 'FORBIDDEN'
+        }
+      });
+      return;
+    }
+    next();
+  };
+
 export const optionalAuth = async (req: Request, _res: Response, next: NextFunction): Promise<void> => {
   const authHeader = req.headers.authorization;
   const token = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : null;
@@ -219,10 +175,12 @@ export const optionalAuth = async (req: Request, _res: Response, next: NextFunct
 
   try {
     const decoded = jwt.verify(token, appConfig.security.sessionSecret) as any;
-    
+
     if (decoded.exp && decoded.exp >= Math.floor(Date.now() / 1000)) {
       req.session = {
         userId: decoded.userId,
+        email: decoded.email || '',
+        role: decoded.role || 'VIEWER',
         isAuthenticated: decoded.isAuthenticated,
         createdAt: new Date(decoded.iat * 1000),
         expiresAt: new Date(decoded.exp * 1000)
@@ -230,11 +188,12 @@ export const optionalAuth = async (req: Request, _res: Response, next: NextFunct
 
       req.user = {
         id: decoded.userId,
+        email: decoded.email || '',
+        role: decoded.role || 'VIEWER',
         isAuthenticated: decoded.isAuthenticated
       };
     }
   } catch (error) {
-    // Silent fail for optional auth
     logger.debug('Optional auth failed:', error instanceof Error ? error.message : 'Unknown error');
   }
 

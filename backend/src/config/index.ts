@@ -7,12 +7,13 @@ config({ path: resolve(__dirname, '../../../.env') });
 
 /**
  * Validation: Required environment variables
- * These MUST be set for the application to start
- * Note: DB passwords are optional in development (local peer auth)
  */
 const requiredEnvVars = [
-  'DASHBOARD_PASSWORD',
   'SESSION_SECRET',
+  'AUTH_ZITADEL_ISSUER',
+  'AUTH_ZITADEL_ID',
+  'AUTH_REDIRECT_URI',
+  'AUTH_POST_LOGOUT_URI',
 ] as const;
 
 // DB passwords required in production only
@@ -50,13 +51,6 @@ if (process.env.DATABASE_URL) {
 
 // Check for insecure default values (production safety)
 if (process.env.NODE_ENV === 'production') {
-  if (process.env.DASHBOARD_PASSWORD === '12345') {
-    warningVars.push({
-      key: 'DASHBOARD_PASSWORD',
-      message: 'Using weak password "12345" in production! Change immediately.',
-    });
-  }
-
   if (process.env.SESSION_SECRET === 'your-super-secret-session-key-change-this-in-production') {
     warningVars.push({
       key: 'SESSION_SECRET',
@@ -113,11 +107,19 @@ export const appConfig = {
   },
 
   security: {
-    dashboardPassword: process.env.DASHBOARD_PASSWORD!,
     sessionSecret: process.env.SESSION_SECRET!,
     sessionDuration: parseInt(process.env.SESSION_DURATION || '86400', 10),
     enforceHttps: process.env.ENFORCE_HTTPS === 'true',
     trustProxy: process.env.TRUST_PROXY === 'true',
+  },
+
+  oidc: {
+    issuer: process.env.AUTH_ZITADEL_ISSUER!,
+    clientId: process.env.AUTH_ZITADEL_ID!,
+    clientSecret: process.env.AUTH_ZITADEL_SECRET || '',
+    redirectUri: process.env.AUTH_REDIRECT_URI!,
+    postLogoutUri: process.env.AUTH_POST_LOGOUT_URI!,
+    rolesClaim: process.env.ZITADEL_ROLES_CLAIM || 'urn:zitadel:iam:org:project:roles',
   },
 
   rateLimit: {
@@ -160,11 +162,7 @@ export const appConfig = {
   }
 };
 
-// LEGACY: databaseConfig removed - use n8nDatabaseConfig or saiDatabaseConfig instead
-// export const databaseConfig: DatabaseConfig = { ... }
-
 // Resolve IMAGE_BASE_PATH relative to project root (where .env is located)
-// This ensures paths like "./image-cache" work regardless of current working directory
 const projectRoot = resolve(__dirname, '../../..');
 const rawImageBasePath = process.env.IMAGE_BASE_PATH || '/mnt/raid1/n8n-backup/images';
 const resolvedImageBasePath = rawImageBasePath.startsWith('/')
@@ -184,7 +182,6 @@ export const cacheConfig: CacheConfig = {
 };
 
 // N8N Database Configuration (for ETL services)
-// Note: Empty password string is valid for local peer auth
 export const n8nDatabaseConfig = {
   host: process.env.N8N_DB_HOST || 'localhost',
   port: parseInt(process.env.N8N_DB_PORT || '5432', 10),

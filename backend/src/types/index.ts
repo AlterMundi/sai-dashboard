@@ -146,17 +146,18 @@ export interface DatabaseConfig {
   connectionTimeout: number;
 }
 
-export interface AuthPayload {
-  password: string;
-}
+export type DashboardRole = 'ADMIN' | 'OPERATOR' | 'VIEWER';
 
 export interface AuthResponse {
   token: string;
   expiresIn: number;
+  user: { id: string; email: string; role: DashboardRole };
 }
 
 export interface SessionData {
   userId: string;
+  email: string;
+  role: DashboardRole;
   isAuthenticated: boolean;
   createdAt: Date;
   expiresAt: Date;

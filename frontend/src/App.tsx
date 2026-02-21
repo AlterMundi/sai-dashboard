@@ -8,6 +8,7 @@ import { SSEProvider } from '@/contexts/SSEContext';
 import { LanguageProvider, useTranslation } from '@/contexts/LanguageContext';
 import { Dashboard } from '@/pages/Dashboard';
 import { Login } from '@/pages/Login';
+import { AuthCallback } from '@/pages/AuthCallback';
 import { Stats } from '@/pages/Stats';
 import './index.css';
 
@@ -84,6 +85,7 @@ function App() {
           <Routes>
             {/* Public Routes */}
             <Route path="/login" element={<Login />} />
+            <Route path="/auth/callback" element={<AuthCallback />} />
             
             {/* Protected Routes — SSEProvider shared across all of them via layout route */}
             <Route

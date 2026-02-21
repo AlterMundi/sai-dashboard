@@ -6,7 +6,6 @@ import {
   DailySummary,
   ExecutionStats,
   AuthResponse,
-  LoginRequest,
   TokenValidation,
   HealthStatus,
   SSEStatus,
@@ -73,8 +72,7 @@ api.interceptors.response.use(
       } catch (refreshError) {
         // Refresh failed, remove token and redirect to login  
         tokenManager.remove();
-        const basePath = import.meta.env.VITE_BASE_PATH || '/';
-        window.location.href = `${basePath}login`;
+        authApi.login();
       }
     }
 
@@ -97,26 +95,46 @@ const handleApiError = (error: unknown): never => {
 
 // Authentication API
 export const authApi = {
-  async login(credentials: LoginRequest): Promise<AuthResponse> {
-    try {
-      const response: AxiosResponse<ApiResponse<AuthResponse>> = await api.post('/auth/login', credentials);
-      const token = response.data.data.token;
-      tokenManager.set(token);
-      return response.data.data;
-    } catch (error) {
-      throw handleApiError(error);
-    }
+  /**
+   * Initiate OIDC login by redirecting to the backend's /auth/login endpoint,
+   * which in turn redirects to Zitadel.
+   */
+  login(): void {
+    const baseUrl = import.meta.env.VITE_API_URL || '/api';
+    window.location.href = `${baseUrl}/auth/login`;
   },
 
-  async logout(): Promise<void> {
-    try {
-      await api.post('/auth/logout');
-    } catch (error) {
-      // Continue with logout even if API call fails
-      console.warn('Logout API call failed:', error);
-    } finally {
-      tokenManager.remove();
+  /**
+   * Logout: clear local token then redirect to backend /auth/logout
+   * (which redirects to Zitadel end_session).
+   */
+  logout(): void {
+    tokenManager.remove();
+    const baseUrl = import.meta.env.VITE_API_URL || '/api';
+    window.location.href = `${baseUrl}/auth/logout`;
+  },
+
+  /**
+   * Called by AuthCallback page: reads ?token= from the URL, stores it, cleans URL.
+   * Returns true if a token was found and stored.
+   */
+  getTokenFromUrl(): boolean {
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('token');
+    const authError = params.get('auth_error');
+
+    if (authError) {
+      // Clean URL
+      window.history.replaceState({}, '', window.location.pathname);
+      throw new Error(decodeURIComponent(authError));
     }
+
+    if (!token) return false;
+
+    tokenManager.set(token);
+    // Clean the token from URL to avoid leaks
+    window.history.replaceState({}, '', window.location.pathname);
+    return true;
   },
 
   async validateToken(): Promise<TokenValidation> {

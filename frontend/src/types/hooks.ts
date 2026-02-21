@@ -5,7 +5,7 @@
  */
 
 import { ExecutionWithImageUrls } from './execution';
-import { ExecutionFilters } from './api';
+import { ExecutionFilters, DashboardRole } from './api';
 import { ProcessingStage } from './execution';
 
 /**
@@ -14,10 +14,11 @@ import { ProcessingStage } from './execution';
 export interface UseAuthReturn {
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (password: string) => Promise<void>;
+  login: (password?: string) => Promise<void>;
   logout: () => void;
   token: string | null;
   error: string | null;
+  user: { id: string; email: string; role: DashboardRole } | null;
 }
 
 /**

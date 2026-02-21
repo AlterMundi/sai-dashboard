@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import compression from 'compression';
 import morgan from 'morgan';
@@ -36,6 +37,7 @@ app.use(cors({
 // Request parsing
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(cookieParser(appConfig.security.sessionSecret));
 
 // Compression
 app.use(compression());
@@ -108,6 +110,16 @@ let etlService: TwoStageETLManager | null = null;
 
 const startServer = async (): Promise<void> => {
   try {
+    // Initialize OIDC client (discover Zitadel issuer metadata)
+    const { initOIDCClient } = require('@/auth/oidc');
+    try {
+      await initOIDCClient();
+      logger.info('OIDC client initialized');
+    } catch (oidcError) {
+      logger.error('Failed to initialize OIDC client (auth will not work):', oidcError);
+      // Don't exit — the server can still start, OIDC errors are reported per-request
+    }
+
     app.listen(appConfig.port, () => {
       logger.info(`SAI Dashboard API started on port ${appConfig.port}`);
       logger.info(`Environment: ${appConfig.nodeEnv}`);

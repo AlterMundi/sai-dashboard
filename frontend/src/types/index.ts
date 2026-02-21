@@ -33,7 +33,6 @@ export type {
   DailySummary,
   ExecutionStats,
   AuthResponse,
-  LoginRequest,
   TokenValidation,
   HealthStatus,
   SSEStatus,
@@ -47,6 +46,7 @@ export type {
   StatsFilters,
   StatsRankingItem,
   StatsRanking,
+  DashboardRole,
 } from './api';
 
 // ============================================================================

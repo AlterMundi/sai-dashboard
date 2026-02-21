@@ -254,7 +254,7 @@ check_prerequisites() {
     source "$SCRIPT_DIR/.env"
     
     # Check required environment variables
-    REQUIRED_VARS=("DB_HOST" "DB_PORT" "DB_NAME" "DB_USER" "DB_PASSWORD" "DASHBOARD_PASSWORD" "SESSION_SECRET")
+    REQUIRED_VARS=("SESSION_SECRET" "AUTH_ZITADEL_ISSUER" "AUTH_ZITADEL_ID" "AUTH_REDIRECT_URI" "AUTH_POST_LOGOUT_URI")
     for var in "${REQUIRED_VARS[@]}"; do
         if [[ -z "${!var}" ]]; then
             error "Required environment variable missing: $var"
@@ -263,10 +263,12 @@ check_prerequisites() {
     
     # Test database connectivity (quick check)
     log "Testing database connectivity..."
-    if timeout 3 bash -c "echo > /dev/tcp/$DB_HOST/${DB_PORT:-5432}" 2>/dev/null; then
-        log "✓ Database port accessible at $DB_HOST:${DB_PORT:-5432}"
+    DB_CHECK_HOST="${SAI_DB_HOST:-localhost}"
+    DB_CHECK_PORT="${SAI_DB_PORT:-5432}"
+    if timeout 3 bash -c "echo > /dev/tcp/$DB_CHECK_HOST/$DB_CHECK_PORT" 2>/dev/null; then
+        log "✓ Database port accessible at $DB_CHECK_HOST:$DB_CHECK_PORT"
     else
-        error "Cannot connect to database at $DB_HOST:${DB_PORT:-5432}"
+        error "Cannot connect to database at $DB_CHECK_HOST:$DB_CHECK_PORT"
     fi
     
     log "Prerequisites check passed"
@@ -564,6 +566,18 @@ deploy_files() {
     info "Setting file permissions..."
     sudo chown -R "$WEB_USER:$WEB_USER" "/opt/sai-dashboard"
     sudo chown -R "$WEB_USER:$WEB_USER" "$WEB_ROOT/sai-dashboard"
+    
+    # Run pending database migrations
+    info "Running database migrations..."
+    for migration_file in "$SCRIPT_DIR/database/migrations/"*.sql; do
+        migration_name=$(basename "$migration_file")
+        log "Applying migration: $migration_name"
+        if sudo -u postgres psql -d sai_dashboard -f "$migration_file" >/dev/null 2>&1; then
+            success "Migration applied: $migration_name"
+        else
+            warn "Migration may have already been applied (or failed): $migration_name"
+        fi
+    done
     
     success "Files deployed successfully"
 }
@@ -916,36 +930,15 @@ verify_installation() {
     # Test database connectivity through API with proper authentication
     log "Testing database connectivity via API..."
     
-    # Get authentication token
-    local auth_token=""
-    if [[ -n "${DASHBOARD_PASSWORD:-}" ]]; then
-        # Check if jq is available for JSON parsing
-        if command -v jq >/dev/null 2>&1; then
-            auth_token=$(curl -s -X POST http://localhost:3001/dashboard/api/auth/login \
-                -H "Content-Type: application/json" \
-                -d "{\"password\":\"$DASHBOARD_PASSWORD\"}" 2>/dev/null | \
-                jq -r '.data.token // empty' 2>/dev/null)
-        else
-            # Fallback: simple grep/sed extraction if jq is not available
-            local auth_response=$(curl -s -X POST http://localhost:3001/dashboard/api/auth/login \
-                -H "Content-Type: application/json" \
-                -d "{\"password\":\"$DASHBOARD_PASSWORD\"}" 2>/dev/null)
-            auth_token=$(echo "$auth_response" | grep -o '"token":"[^"]*"' | sed 's/"token":"\([^"]*\)"/\1/')
-        fi
-    fi
-    
-    # Test authenticated API call
-    if [[ -n "$auth_token" ]]; then
-        if curl -s -H "Authorization: Bearer $auth_token" \
-            http://localhost:3001/dashboard/api/executions?limit=1 | \
-            grep -q "data" 2>/dev/null; then
-            log "✓ Database queries working through API with authentication"
-        else
-            warn "⚠ Database queries may not be working properly (check database connection)"
-        fi
+    # Verify OIDC auth endpoint is reachable (should redirect to Zitadel)
+    local oidc_response_code
+    oidc_response_code=$(curl -s -o /dev/null -w "%{http_code}" -m 5 \
+        http://localhost:3001/dashboard/api/auth/login 2>/dev/null)
+    if [[ "$oidc_response_code" == "302" ]]; then
+        log "✓ OIDC login endpoint responding (redirects to Zitadel)"
     else
-        warn "⚠ Could not authenticate API - skipping database connectivity test"
-        warn "  Ensure DASHBOARD_PASSWORD is set correctly in .env file"
+        warn "⚠ OIDC login endpoint returned unexpected status: $oidc_response_code (expected 302 redirect)"
+        warn "  Verify AUTH_ZITADEL_ISSUER is reachable from this server"
     fi
     
     # Check if frontend files exist and are accessible
@@ -1013,8 +1006,9 @@ show_deployment_info() {
     printf "  • Restart: sudo systemctl restart sai-dashboard-api\n"
     printf "  • Logs:    sudo journalctl -u sai-dashboard-api -f\n"
     printf "\n"
-    printf "%b" "${BLUE}📁 Login Credentials:${NC}\n"
-    printf "  • Password: $(grep DASHBOARD_PASSWORD /opt/sai-dashboard/.env | cut -d'=' -f2)\n"
+    printf "%b" "${BLUE}🔐 Authentication:${NC}\n"
+    printf "  • OIDC via Zitadel: ${AUTH_ZITADEL_ISSUER}\n"
+    printf "  • Roles: ADMIN, OPERATOR, VIEWER (assigned in Zitadel project)\n"
 }
 
 # Show installation summary

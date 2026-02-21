@@ -1,16 +1,17 @@
 import { Router, Request, Response } from 'express';
 import {
   apiRateLimit,
-  loginRateLimit,
   authenticateToken,
   requireAuth,
+  requireRole,
   optionalAuth
 } from '@/middleware/auth';
-import { 
-  login, 
-  logout, 
-  validateToken, 
-  refreshToken 
+import {
+  initiateOIDC,
+  handleCallback,
+  logout,
+  validateToken,
+  refreshToken
 } from '@/controllers/auth';
 import {
   getExecutions,
@@ -51,12 +52,15 @@ router.get('/health/ready', readiness);
 router.get('/health/live', liveness);
 
 // =================================================================
-// Authentication Routes
+// Authentication Routes (OIDC)
 // =================================================================
 const authRouter = Router();
 
-// Login with strict rate limiting
-authRouter.post('/login', loginRateLimit, login);
+// OIDC: initiate login (redirect to Zitadel)
+authRouter.get('/login', initiateOIDC);
+
+// OIDC: callback from Zitadel (exchanges code, issues JWT, redirects frontend)
+authRouter.get('/callback', handleCallback);
 
 // Protected auth endpoints
 authRouter.post('/logout', authenticateToken, requireAuth, logout);
@@ -174,16 +178,16 @@ executionRouter.get('/filter-options', getFilterOptions);
 // Specific execution details
 executionRouter.get('/:executionId', getExecutionById);
 
-// Execution raw data (for debugging)
-executionRouter.get('/:executionId/data', getExecutionData);
+// Execution raw data (for debugging, ADMIN+OPERATOR only)
+executionRouter.get('/:executionId/data', requireRole('ADMIN', 'OPERATOR'), getExecutionData);
 
 // Image routes moved to public section above for HTML <img> tag compatibility
 
-// Manual analysis trigger
-executionRouter.post('/trigger-analysis', triggerAnalysisProcessing);
+// Manual analysis trigger (ADMIN only)
+executionRouter.post('/trigger-analysis', requireRole('ADMIN'), triggerAnalysisProcessing);
 
 // Bulk mark executions as false positive
-executionRouter.post('/bulk/false-positive', asyncHandler(async (req: Request, res: Response) => {
+executionRouter.post('/bulk/false-positive', requireRole('ADMIN', 'OPERATOR'), asyncHandler(async (req: Request, res: Response) => {
   const { executionIds, isFalsePositive, reason } = req.body;
 
   // Validate executionIds is an array of numbers, max 500
@@ -216,7 +220,7 @@ executionRouter.post('/bulk/false-positive', asyncHandler(async (req: Request, r
   }
 
   const { newExecutionService } = require('@/services/new-execution-service');
-  const result = await newExecutionService.bulkMarkFalsePositive(executionIds, isFalsePositive, reason);
+  const result = await newExecutionService.bulkMarkFalsePositive(executionIds, isFalsePositive, reason, req.user?.id, req.user?.email);
 
   if (!result.success) {
     res.status(500).json({
@@ -235,7 +239,7 @@ executionRouter.post('/bulk/false-positive', asyncHandler(async (req: Request, r
 }));
 
 // Mark execution as false positive
-executionRouter.post('/:executionId/false-positive', asyncHandler(async (req: Request, res: Response) => {
+executionRouter.post('/:executionId/false-positive', requireRole('ADMIN', 'OPERATOR'), asyncHandler(async (req: Request, res: Response) => {
   const executionId = parseInt(req.params.executionId);
   const { isFalsePositive, reason } = req.body;
 
@@ -260,7 +264,7 @@ executionRouter.post('/:executionId/false-positive', asyncHandler(async (req: Re
   }
 
   const { newExecutionService } = require('@/services/new-execution-service');
-  const result = await newExecutionService.markFalsePositive(executionId, isFalsePositive, reason);
+  const result = await newExecutionService.markFalsePositive(executionId, isFalsePositive, reason, req.user?.id, req.user?.email);
 
   if (!result.success) {
     res.status(404).json({
@@ -289,7 +293,7 @@ router.use('/executions', executionRouter);
 const detectionRouter = Router();
 
 // Search executions with advanced JSONB detection criteria
-detectionRouter.post('/search', asyncHandler(async (req: Request, res: Response) => {
+detectionRouter.post('/search', requireRole('ADMIN', 'OPERATOR'), asyncHandler(async (req: Request, res: Response) => {
   const criteria: DetectionFilterCriteria = req.body;
   const limit = parseInt(req.query.limit as string) || 100;
 
@@ -410,8 +414,9 @@ if (process.env.NODE_ENV === 'development' || process.env.ENABLE_API_DOCS === 't
         description: 'Visual management interface for n8n image analysis workflow',
         endpoints: {
           authentication: {
-            'POST /auth/login': 'Login with dashboard password',
-            'POST /auth/logout': 'Logout and invalidate token',
+            'GET /auth/login': 'Initiate OIDC login (redirect to Zitadel)',
+            'GET /auth/callback': 'OIDC callback handler (exchange code, issue JWT)',
+            'POST /auth/logout': 'Logout and redirect to Zitadel end_session',
             'GET /auth/validate': 'Validate current token',
             'POST /auth/refresh': 'Refresh expiring token'
           },
@@ -423,16 +428,15 @@ if (process.env.NODE_ENV === 'development' || process.env.ENABLE_API_DOCS === 't
             'GET /executions/:id': 'Get specific execution details',
             'GET /executions/:id/image': 'Get execution image (original)',
             'GET /executions/:id/image?thumbnail=true': 'Get execution thumbnail',
-            'GET /executions/:id/data': 'Get raw execution data',
-            'GET /executions/:id/analysis': 'Get comprehensive analysis',
-            'POST /executions/:id/process': 'Process execution analysis'
+            'GET /executions/:id/data': 'Get raw execution data (ADMIN/OPERATOR)',
+            'GET /executions/:id/analysis': 'Get comprehensive analysis'
           },
           realtime: {
             'GET /events': 'Server-Sent Events stream for real-time updates',
             'GET /events/status': 'SSE connection status and statistics'
           },
           detections: {
-            'POST /detections/search': 'Search executions with advanced JSONB detection filters',
+            'POST /detections/search': 'Search executions with advanced JSONB detection filters (ADMIN/OPERATOR)',
             'GET /detections/statistics': 'Get detection statistics with class distribution'
           },
           health: {
@@ -442,17 +446,12 @@ if (process.env.NODE_ENV === 'development' || process.env.ENABLE_API_DOCS === 't
           }
         },
         authentication: {
-          type: 'Bearer Token',
-          header: 'Authorization: Bearer <token>',
-          login: {
-            url: '/api/auth/login',
-            method: 'POST',
-            body: { password: 'dashboard_password' }
-          }
+          type: 'OIDC / Bearer Token',
+          flow: 'GET /api/auth/login → Zitadel → GET /api/auth/callback → JWT',
+          header: 'Authorization: Bearer <token>'
         },
         rateLimit: {
-          general: '60 requests per minute',
-          login: '5 attempts per 15 minutes'
+          general: '60 requests per minute'
         }
       }
     });

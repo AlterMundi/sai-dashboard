@@ -7,6 +7,8 @@
 
 import { Execution } from './execution';
 
+export type DashboardRole = 'ADMIN' | 'OPERATOR' | 'VIEWER';
+
 /**
  * Generic API Response wrapper
  */
@@ -142,15 +144,14 @@ export interface ExecutionStats {
 export interface AuthResponse {
   token: string;
   expiresIn: number;
-}
-
-export interface LoginRequest {
-  password: string;
+  user: { id: string; email: string; role: DashboardRole };
 }
 
 export interface TokenValidation {
   valid: boolean;
   userId: string;
+  email: string;
+  role: DashboardRole;
   expiresAt: string;
   remainingTime: number;
 }

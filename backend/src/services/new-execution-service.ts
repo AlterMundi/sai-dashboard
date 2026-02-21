@@ -834,7 +834,9 @@ export class NewExecutionService {
   async markFalsePositive(
     executionId: number,
     isFalsePositive: boolean,
-    reason?: string
+    reason?: string,
+    userId?: string,
+    userEmail?: string
   ): Promise<{ success: boolean; execution?: ExecutionWithImage; error?: string }> {
     try {
       // First check if execution exists
@@ -856,9 +858,9 @@ export class NewExecutionService {
       if (analysisExists.length === 0) {
         // Create execution_analysis row if it doesn't exist
         await dualDb.query(
-          `INSERT INTO execution_analysis (execution_id, is_false_positive, false_positive_reason, marked_false_positive_at)
-           VALUES ($1, $2, $3, $4)`,
-          [executionId, isFalsePositive, reason || null, isFalsePositive ? new Date() : null]
+          `INSERT INTO execution_analysis (execution_id, is_false_positive, false_positive_reason, marked_false_positive_at, marked_by_user_id, marked_by_email)
+           VALUES ($1, $2, $3, $4, $5, $6)`,
+          [executionId, isFalsePositive, reason || null, isFalsePositive ? new Date() : null, userId || null, userEmail || null]
         );
       } else {
         // Update existing row
@@ -866,9 +868,11 @@ export class NewExecutionService {
           `UPDATE execution_analysis
            SET is_false_positive = $2,
                false_positive_reason = $3,
-               marked_false_positive_at = $4
+               marked_false_positive_at = $4,
+               marked_by_user_id = $5,
+               marked_by_email = $6
            WHERE execution_id = $1`,
-          [executionId, isFalsePositive, reason || null, isFalsePositive ? new Date() : null]
+          [executionId, isFalsePositive, reason || null, isFalsePositive ? new Date() : null, userId || null, userEmail || null]
         );
       }
 
@@ -890,7 +894,9 @@ export class NewExecutionService {
   async bulkMarkFalsePositive(
     executionIds: number[],
     isFalsePositive: boolean,
-    reason?: string
+    reason?: string,
+    userId?: string,
+    userEmail?: string
   ): Promise<{ success: boolean; updatedCount: number; error?: string }> {
     try {
       if (executionIds.length === 0) {
@@ -899,19 +905,23 @@ export class NewExecutionService {
 
       // Upsert: insert if no analysis row exists, update if it does
       const query = `
-        INSERT INTO execution_analysis (execution_id, is_false_positive, false_positive_reason, marked_false_positive_at)
-        SELECT unnest($1::int[]), $2, $3, $4
+        INSERT INTO execution_analysis (execution_id, is_false_positive, false_positive_reason, marked_false_positive_at, marked_by_user_id, marked_by_email)
+        SELECT unnest($1::int[]), $2, $3, $4, $5, $6
         ON CONFLICT (execution_id) DO UPDATE SET
           is_false_positive = EXCLUDED.is_false_positive,
           false_positive_reason = EXCLUDED.false_positive_reason,
-          marked_false_positive_at = EXCLUDED.marked_false_positive_at
+          marked_false_positive_at = EXCLUDED.marked_false_positive_at,
+          marked_by_user_id = EXCLUDED.marked_by_user_id,
+          marked_by_email = EXCLUDED.marked_by_email
       `;
 
       const result = await dualDb.query(query, [
         executionIds,
         isFalsePositive,
         reason || null,
-        isFalsePositive ? new Date() : null
+        isFalsePositive ? new Date() : null,
+        userId || null,
+        userEmail || null
       ]);
 
       const updatedCount = executionIds.length;
