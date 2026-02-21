@@ -9,7 +9,10 @@ import { LanguageProvider, useTranslation } from '@/contexts/LanguageContext';
 import { Dashboard } from '@/pages/Dashboard';
 import { Login } from '@/pages/Login';
 import { AuthCallback } from '@/pages/AuthCallback';
+import { PendingApproval } from '@/pages/PendingApproval';
 import { Stats } from '@/pages/Stats';
+import { AdminPanel } from '@/components/AdminPanel';
+import { RoleGate } from '@/components/RoleGate';
 import './index.css';
 
 // Protected Route Component
@@ -86,13 +89,19 @@ function App() {
             {/* Public Routes */}
             <Route path="/login" element={<Login />} />
             <Route path="/auth/callback" element={<AuthCallback />} />
-            
+            <Route path="/pending-approval" element={<PendingApproval />} />
+
             {/* Protected Routes — SSEProvider shared across all of them via layout route */}
             <Route
               element={
                 <ProtectedRoute>
                   <SSEProvider>
                     <Outlet />
+                    <RoleGate roles={['SAI_ADMIN']}>
+                      <div className="mt-8 px-4">
+                        <AdminPanel />
+                      </div>
+                    </RoleGate>
                   </SSEProvider>
                 </ProtectedRoute>
               }
