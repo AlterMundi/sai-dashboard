@@ -120,6 +120,9 @@ export const appConfig = {
     redirectUri: process.env.AUTH_REDIRECT_URI!,
     postLogoutUri: process.env.AUTH_POST_LOGOUT_URI!,
     rolesClaim: process.env.ZITADEL_ROLES_CLAIM || 'urn:zitadel:iam:org:project:roles',
+    projectId: process.env.ZITADEL_PROJECT_ID || '',
+    mgmtClientId: process.env.ZITADEL_MGMT_CLIENT_ID || '',
+    mgmtClientSecret: process.env.ZITADEL_MGMT_CLIENT_SECRET || '',
   },
 
   rateLimit: {
