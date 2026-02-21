@@ -164,6 +164,16 @@ export interface SessionData {
   idToken?: string;
 }
 
+export interface PendingUser {
+  id: number;
+  zitadelSub: string;
+  email: string;
+  firstSeenAt: Date;
+  lastAttemptAt: Date;
+  attemptCount: number;
+  status: 'pending' | 'approved' | 'rejected';
+}
+
 export interface CacheConfig {
   path: string;
   basePath: string;  // Base path for image storage (used by ETL services)
