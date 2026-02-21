@@ -46,7 +46,7 @@ export const ImageCard = memo(function ImageCard({ execution, onClick, loading =
       aria-label={`Execution ${execution.id}, status ${execution.status}${execution.alertLevel && execution.alertLevel !== 'none' ? `, alert level ${execution.alertLevel}` : ''}`}
     >
       {/* Image Section */}
-      <div className="aspect-[4/3] relative bg-gradient-to-br from-gray-100 to-gray-200">
+      <div className="aspect-video relative bg-gradient-to-br from-gray-100 to-gray-200">
         {thumbnailUrl ? (
           <>
             {imageLoading && (
@@ -69,10 +69,11 @@ export const ImageCard = memo(function ImageCard({ execution, onClick, loading =
                   'group-hover:scale-105'
                 )}
                 width={400}
-                height={300}
+                height={225}
                 onLoad={handleImageLoad}
                 onError={handleImageError}
                 loading="lazy"
+                decoding="async"
               />
             )}
           </>
