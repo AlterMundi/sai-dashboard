@@ -12,6 +12,8 @@ import {
   FilterOptions,
   StatsFilters,
   StatsRanking,
+  DashboardRole,
+  PendingUser,
 } from '@/types';
 import { getStorageItem, setStorageItem, removeStorageItem } from '@/utils';
 
@@ -155,6 +157,22 @@ export const authApi = {
     } catch (error) {
       throw handleApiError(error);
     }
+  },
+};
+
+// Admin API
+export const adminApi = {
+  async getPendingUsers(): Promise<PendingUser[]> {
+    const response = await api.get<ApiResponse<PendingUser[]>>('/auth/admin/pending');
+    return response.data.data;
+  },
+
+  async approveUser(sub: string, role: DashboardRole): Promise<void> {
+    await api.post(`/auth/admin/users/${encodeURIComponent(sub)}/approve`, { role });
+  },
+
+  async rejectUser(sub: string): Promise<void> {
+    await api.post(`/auth/admin/users/${encodeURIComponent(sub)}/reject`);
   },
 };
 

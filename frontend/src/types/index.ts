@@ -47,6 +47,7 @@ export type {
   StatsRankingItem,
   StatsRanking,
   DashboardRole,
+  PendingUser,
 } from './api';
 
 // ============================================================================

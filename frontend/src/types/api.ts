@@ -274,3 +274,16 @@ export interface StatsRanking {
   locations: StatsRankingItem[];
   nodes: StatsRankingItem[];
 }
+
+/**
+ * Pending user in the access queue (admin API)
+ */
+export interface PendingUser {
+  id: number;
+  zitadelSub: string;
+  email: string;
+  firstSeenAt: string;   // ISO string from API
+  lastAttemptAt: string;
+  attemptCount: number;
+  status: 'pending' | 'approved' | 'rejected';
+}
