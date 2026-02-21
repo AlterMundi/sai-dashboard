@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { LoadingSpinner } from './ui/LoadingSpinner';
-import { useSecureImage } from './ui/SecureImage';
 import { BoundingBoxOverlay, BoundingBoxToggle } from './BoundingBoxOverlay';
+import { usePrefetchBuffer } from '@/hooks/usePrefetchBuffer';
 import { executionsApi, tokenManager } from '@/services/api';
 import {
   formatDate,
@@ -63,6 +63,11 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate, cameraNav, ga
     if (navMode === 'camera' && !cameraNav) setNavMode('gallery');
   }, [cameraNav, navMode]);
 
+  // Held-arrow FPS (images/second while arrow key is held)
+  const [navFps, setNavFps] = useState<3 | 10 | 20>(10);
+  const navIntervalRef = useRef<number>(100); // ms between nav steps
+  useEffect(() => { navIntervalRef.current = Math.round(1000 / navFps); }, [navFps]);
+
   const activeNav = navMode === 'camera' ? cameraNav : galleryNav;
 
   const [pressedBtn, setPressedBtn] = useState<'prev' | 'next' | null>(null);
@@ -80,13 +85,36 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate, cameraNav, ga
     setSheetExpanded(false); // collapse sheet on new execution
   }, [execution?.id, execution?.isFalsePositive]);
 
+  // Keep secureImageUrl for the download button handler
   const secureImageUrl = execution?.hasImage
     ? executionsApi.getImageUrl(execution.id, false)
     : undefined;
 
-  const { blobUrl: imageUrl, loading: imageLoading, error: imageError } = useSecureImage(
-    isOpen ? secureImageUrl : undefined
+  const prefetchBuffer = usePrefetchBuffer(
+    useCallback((id: number) => executionsApi.getImageUrl(id, false), [])
   );
+
+  useEffect(() => {
+    if (!isOpen || !execution) {
+      prefetchBuffer.prefetch([]); // clear buffer on close
+      return;
+    }
+    prefetchBuffer.setCurrent(execution.id);
+    const nav = (navMode === 'camera' ? cameraNav : galleryNav) ?? galleryNav ?? cameraNav;
+    // Scale lookahead with FPS so the buffer covers at least ~1s of navigation.
+    // 3fps → ±5, 10fps → ±12, 20fps → ±25
+    const lookahead = navFps >= 20 ? 25 : navFps >= 10 ? 12 : 5;
+    const neighbors = nav?.getNeighbors(lookahead, lookahead) ?? [execution];
+    prefetchBuffer.prefetch(
+      neighbors.filter(e => e.hasImage).map(e => e.id)
+    );
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [execution?.id, isOpen, navMode, cameraNav, galleryNav, navFps]);
+
+  const { blobUrl: imageUrl, loading: imageLoading, error: imageError } =
+    execution?.hasImage
+      ? prefetchBuffer.getEntry(execution.id)
+      : { blobUrl: null, loading: false, error: false };
 
   // Reset zoom/pan when execution changes
   useEffect(() => {
@@ -112,6 +140,9 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate, cameraNav, ga
     setZoomLevel(1);
     setTranslate({ x: 0, y: 0 });
   }, []);
+
+  // Throttle for held-arrow navigation in Fit mode (1 image per 300ms)
+  const lastNavTimeRef = useRef<number>(0);
 
   const containerRef   = useRef<HTMLDivElement>(null);
   const dialogRef      = useRef<HTMLDivElement>(null);
@@ -319,18 +350,52 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate, cameraNav, ga
 
   // ── Escape / Arrow keys + body scroll lock ───────────────────────────────
   useEffect(() => {
+    const PAN_STEP = 80; // px per keydown event when zoomed (repeat allowed)
+
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') { onClose(); return; }
-      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
-        if (e.repeat) return;
-        if (e.shiftKey || e.ctrlKey || e.metaKey || e.altKey) return;
-        const tag = (e.target as HTMLElement).tagName;
-        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
-        if (zoomRef.current > 1) return;  // don't hijack when image is zoomed
+
+      const isArrow = e.key === 'ArrowLeft' || e.key === 'ArrowRight'
+                   || e.key === 'ArrowUp'   || e.key === 'ArrowDown';
+      if (!isArrow) return;
+      if (e.shiftKey || e.ctrlKey || e.metaKey || e.altKey) return;
+      const tag = (e.target as HTMLElement).tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
+      if (zoomRef.current > 1) {
+        // ── ZOOM MODE: all 4 arrows pan the image ──────────────────────────
+        // e.repeat allowed → smooth continuous pan while key held
+        e.preventDefault();
+        setTranslate(prev => {
+          switch (e.key) {
+            case 'ArrowLeft':  return { x: prev.x + PAN_STEP, y: prev.y };
+            case 'ArrowRight': return { x: prev.x - PAN_STEP, y: prev.y };
+            case 'ArrowUp':    return { x: prev.x, y: prev.y + PAN_STEP };
+            case 'ArrowDown':  return { x: prev.x, y: prev.y - PAN_STEP };
+            default:           return prev;
+          }
+        });
+      } else {
+        // ── FIT MODE ────────────────────────────────────────────────────────
+        e.preventDefault();
+
+        if (e.key === 'ArrowUp') {
+          if (e.repeat) return;
+          // Zoom to 2x centered
+          setZoomLevel(2);
+          setTranslate({ x: 0, y: 0 });
+          return;
+        }
+        if (e.key === 'ArrowDown') return; // no-op in fit mode
+
+        // Left/Right: navigate on hold at navFps rate
+        const now = Date.now();
+        if (e.repeat && now - lastNavTimeRef.current < navIntervalRef.current) return;
+        lastNavTimeRef.current = now;
+
         const nav = navMode === 'camera' ? cameraNav : galleryNav;
         if (!nav) return;
-        e.preventDefault();
-        if (e.key === 'ArrowLeft' && nav.hasPrev) { setPressedBtn('prev'); nav.onPrev(); }
+        if (e.key === 'ArrowLeft'  && nav.hasPrev) { setPressedBtn('prev'); nav.onPrev(); }
         if (e.key === 'ArrowRight' && nav.hasNext) { setPressedBtn('next'); nav.onNext(); }
       }
     };
@@ -827,20 +892,57 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate, cameraNav, ga
                 </button>
               )}
 
-              {/* Counter + mode toggle */}
+              {/* Counter + mode selector + FPS selector */}
               {activeNav && activeNav.total > 1 && (
-                <div className="absolute bottom-14 sm:bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-black/60 rounded-lg px-3 py-1 z-10">
-                  <span className="text-white text-xs font-mono tabular-nums">
+                <div className="absolute bottom-14 sm:bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 bg-black/60 rounded-lg px-2.5 py-1.5 z-10 select-none">
+                  {/* Position counter */}
+                  <span className="text-white text-xs font-mono tabular-nums pr-1">
                     {activeNav.index + 1} / {activeNav.total}
                   </span>
+
+                  {/* Gallery / Camera mode selector */}
                   {cameraNav && galleryNav && (
-                    <button
-                      onClick={() => setNavMode(m => m === 'camera' ? 'gallery' : 'camera')}
-                      className="text-white/70 hover:text-white text-xs px-2 py-0.5 rounded border border-white/30 hover:border-white/60 transition-colors"
-                    >
-                      {navMode === 'camera' ? t('modal.navCamera') : t('modal.navGallery')}
-                    </button>
+                    <>
+                      <div className="w-px h-3 bg-white/30 mx-0.5" />
+                      <div className="flex rounded overflow-hidden border border-white/20">
+                        {(['gallery', 'camera'] as const).map(mode => (
+                          <button
+                            key={mode}
+                            onClick={() => setNavMode(mode)}
+                            className={cn(
+                              'text-xs px-2 py-0.5 transition-colors',
+                              navMode === mode
+                                ? 'bg-white/25 text-white'
+                                : 'text-white/50 hover:text-white/80'
+                            )}
+                          >
+                            {mode === 'gallery'
+                              ? t('modal.navModeGalleryLabel')
+                              : t('modal.navModeCameraLabel')}
+                          </button>
+                        ))}
+                      </div>
+                    </>
                   )}
+
+                  {/* FPS selector for held-arrow navigation */}
+                  <div className="w-px h-3 bg-white/30 mx-0.5" />
+                  <div className="flex rounded overflow-hidden border border-white/20">
+                    {([3, 10, 20] as const).map(fps => (
+                      <button
+                        key={fps}
+                        onClick={() => setNavFps(fps)}
+                        className={cn(
+                          'text-xs px-1.5 py-0.5 transition-colors',
+                          navFps === fps
+                            ? 'bg-white/25 text-white'
+                            : 'text-white/50 hover:text-white/80'
+                        )}
+                      >
+                        {fps}fps
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>

@@ -272,6 +272,8 @@ const en = {
     navNext: 'Next',
     navCamera: 'Same camera',
     navGallery: 'Gallery',
+    navModeCameraLabel: 'Camera',
+    navModeGalleryLabel: 'Gallery',
   },
   stats: {
     title: 'Statistics',
@@ -335,9 +337,9 @@ const en = {
     },
     ranking: {
       title: 'Top by period',
-      cameras: 'Top cameras',
-      locations: 'Top locations',
-      nodes: 'Top nodes',
+      cameras: 'Top detections by camera',
+      locations: 'Top detections by location',
+      nodes: 'Top executions by node',
       noData: 'No data for this period',
     },
   },

@@ -274,6 +274,8 @@ const es: TranslationKeys = {
     navNext: 'Siguiente',
     navCamera: 'Misma cámara',
     navGallery: 'Galería',
+    navModeCameraLabel: 'Cámara',
+    navModeGalleryLabel: 'Galería',
   },
   stats: {
     title: 'Estad\u00edsticas',
@@ -337,9 +339,9 @@ const es: TranslationKeys = {
     },
     ranking: {
       title: 'Top del período',
-      cameras: 'Top cámaras',
-      locations: 'Top ubicaciones',
-      nodes: 'Top nodos',
+      cameras: 'Top detecciones x cámara',
+      locations: 'Top detecciones x ubicación',
+      nodes: 'Top ejecución x nodo',
       noData: 'Sin datos para este período',
     },
   },

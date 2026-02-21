@@ -410,12 +410,20 @@ export function AlertFilterComponent({
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 {t('filters.location')}
               </label>
-              <Input
-                type="text"
-                placeholder="e.g., Building A"
+              <Select
                 value={filters.location || ''}
-                onChange={(e) => handleFilterChange('location', e.target.value || undefined)}
-              />
+                onValueChange={(value) => handleFilterChange('location', value || undefined)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={t('filters.allLocations')} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">{t('filters.allLocations')}</SelectItem>
+                  {options.location.map((loc) => (
+                    <SelectItem key={loc} value={loc}>{loc}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div>
