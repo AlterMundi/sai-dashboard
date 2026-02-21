@@ -113,7 +113,8 @@ export const getExecutions = asyncHandler(async (req: Request, res: Response): P
     telegramSent,
     datePreset,
     sortBy,
-    sortOrder
+    sortOrder,
+    yoloModelVersion
   } = req.query;
 
   // Parse array parameters (alertLevels, cameraTypes)
@@ -144,7 +145,8 @@ export const getExecutions = asyncHandler(async (req: Request, res: Response): P
     telegramSent: telegramSent === 'true' ? true : telegramSent === 'false' ? false : undefined,
     datePreset: datePreset as any,
     sortBy: sortBy as any,
-    sortOrder: sortOrder as any
+    sortOrder: sortOrder as any,
+    yoloModelVersion: yoloModelVersion as string,
   };
 
   // Get executions from NEW system only
