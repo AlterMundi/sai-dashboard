@@ -813,10 +813,7 @@ export class Stage2ETLService extends EventEmitter {
 
       // 9. Generate thumbnail WebP
       await sharp(imageBuffer)
-        .resize(cacheConfig.thumbnailSize, cacheConfig.thumbnailSize, {
-          fit: 'inside',
-          withoutEnlargement: true
-        })
+        .resize({ width: cacheConfig.thumbnailSize, withoutEnlargement: true })
         .webp({ quality: cacheConfig.thumbnailQuality })
         .toFile(thumbAbsolute);
 
