@@ -105,7 +105,7 @@ Coverage: Component behavior and integration testing
 
 **Production Verification**
 - File structure and permission validation
-- Service configuration and systemd testing
+- Service configuration and Docker container testing
 - nginx configuration syntax and routing
 - Database connectivity and schema validation
 - Cache setup and directory permissions
@@ -142,7 +142,7 @@ NODE_ENV=test
 
 **Backend**: Jest, Supertest, @types/jest
 **Frontend**: Vitest, @testing-library/react, @testing-library/jest-dom
-**System**: curl, jq, bash, systemd, nginx
+**System**: curl, jq, bash, docker, nginx
 
 ## Advanced Usage
 
@@ -207,11 +207,11 @@ psql $DATABASE_URL -c "SELECT 1;"
 
 **Service Startup Issues**
 ```bash
-# Check service status
-systemctl status sai-dashboard-api
+# Check container status
+docker ps -f name=sai-dashboard
 
-# View service logs
-journalctl -u sai-dashboard-api -f
+# View container logs
+docker logs -f sai-dashboard
 ```
 
 **nginx Configuration Issues**

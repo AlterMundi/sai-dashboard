@@ -159,23 +159,23 @@ test_database_connection() {
     fi
 }
 
-# Test 4: Service Configuration and systemd
+# Test 4: Service Configuration (Docker)
 test_service_configuration() {
-    log_info "Testing service configuration..."
-    
-    # Check systemd service files
-    if [[ -f "/etc/systemd/system/sai-dashboard-api.service" ]]; then
-        log_success "systemd service file exists"
-        
-        # Test service can start (dry run)
-        if sudo systemd-analyze verify /etc/systemd/system/sai-dashboard-api.service > /tmp/service_verify.log 2>&1; then
-            log_success "systemd service configuration is valid"
+    log_info "Testing container configuration..."
+
+    # Check Docker container is running
+    if docker ps -q -f name=sai-dashboard -f status=running | grep -q .; then
+        log_success "Container sai-dashboard is running"
+
+        local restart_policy
+        restart_policy=$(docker inspect sai-dashboard --format '{{.HostConfig.RestartPolicy.Name}}' 2>/dev/null)
+        if [[ "$restart_policy" == "unless-stopped" || "$restart_policy" == "always" ]]; then
+            log_success "Container restart policy: $restart_policy"
         else
-            log_error "systemd service configuration has issues"
-            cat /tmp/service_verify.log
+            log_warning "Container restart policy: ${restart_policy:-unknown}"
         fi
     else
-        log_error "systemd service file not found"
+        log_error "Container sai-dashboard is not running"
     fi
     
     # Check production backend directory structure
