@@ -39,11 +39,17 @@ export const apiRateLimit = rateLimit({
 });
 
 export const generateToken = (sessionData: Omit<SessionData, 'createdAt' | 'expiresAt'>): string => {
-  const payload = {
-    ...sessionData,
+  const { idToken, ...rest } = sessionData;
+  const payload: Record<string, unknown> = {
+    ...rest,
     iat: Math.floor(Date.now() / 1000),
     exp: Math.floor(Date.now() / 1000) + appConfig.security.sessionDuration
   };
+
+  // Include idToken hint for Zitadel end_session (not secret, just an identity assertion)
+  if (idToken) {
+    payload.idToken = idToken;
+  }
 
   return jwt.sign(payload, appConfig.security.sessionSecret);
 };
@@ -70,23 +76,14 @@ export const authenticateToken = async (req: Request, res: Response, next: NextF
 
     const decoded = jwt.verify(token, appConfig.security.sessionSecret) as any;
 
-    if (decoded.exp && decoded.exp < Math.floor(Date.now() / 1000)) {
-      res.status(401).json({
-        error: {
-          message: 'Token has expired',
-          code: 'TOKEN_EXPIRED'
-        }
-      });
-      return;
-    }
-
     req.session = {
       userId: decoded.userId,
       email: decoded.email || '',
       role: decoded.role || 'VIEWER',
       isAuthenticated: decoded.isAuthenticated,
       createdAt: new Date(decoded.iat * 1000),
-      expiresAt: new Date(decoded.exp * 1000)
+      expiresAt: new Date(decoded.exp * 1000),
+      ...(decoded.idToken ? { idToken: decoded.idToken } : {})
     };
 
     req.user = {

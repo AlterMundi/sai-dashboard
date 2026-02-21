@@ -161,6 +161,7 @@ export interface SessionData {
   isAuthenticated: boolean;
   createdAt: Date;
   expiresAt: Date;
+  idToken?: string;
 }
 
 export interface CacheConfig {

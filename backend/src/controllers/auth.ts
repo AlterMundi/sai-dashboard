@@ -9,9 +9,20 @@ import { appConfig } from '@/config';
 
 const COOKIE_OPTS = {
   httpOnly: true,
+  signed: true,
   sameSite: 'lax' as const,
   secure: appConfig.security.enforceHttps,
+  path: '/',
   maxAge: 10 * 60 * 1000, // 10 minutes
+};
+
+// Options for clearCookie — same as COOKIE_OPTS minus maxAge
+const CLEAR_COOKIE_OPTS = {
+  httpOnly: true,
+  signed: true,
+  sameSite: 'lax' as const,
+  secure: appConfig.security.enforceHttps,
+  path: '/',
 };
 
 /**
@@ -55,9 +66,9 @@ export const handleCallback = asyncHandler(async (req: Request, res: Response): 
     return;
   }
 
-  // Validate state from signed cookie
-  const storedState = (req as any).cookies?.oidc_state;
-  const codeVerifier = (req as any).cookies?.oidc_pkce;
+  // Validate state from signed cookies
+  const storedState = (req as any).signedCookies?.oidc_state;
+  const codeVerifier = (req as any).signedCookies?.oidc_pkce;
 
   if (!storedState || !codeVerifier) {
     logger.warn('OIDC callback: missing PKCE cookies', { ip: req.ip });
@@ -75,9 +86,9 @@ export const handleCallback = asyncHandler(async (req: Request, res: Response): 
     return;
   }
 
-  // Clear ephemeral cookies
-  res.clearCookie('oidc_state');
-  res.clearCookie('oidc_pkce');
+  // Clear ephemeral cookies (must pass matching options or browser won't delete them)
+  res.clearCookie('oidc_state', CLEAR_COOKIE_OPTS);
+  res.clearCookie('oidc_pkce', CLEAR_COOKIE_OPTS);
 
   // Exchange code for tokens
   const callbackUrl = `${appConfig.oidc.redirectUri}?code=${encodeURIComponent(code)}&state=${encodeURIComponent(state)}`;
@@ -116,20 +127,24 @@ export const handleCallback = asyncHandler(async (req: Request, res: Response): 
   const email = (claims.email as string) || '';
   const userId = claims.sub;
 
-  // Issue our own JWT
+  // Issue our own JWT (include idToken for Zitadel end_session hint on logout)
   const token = generateToken({
     userId,
     email,
     role,
     isAuthenticated: true,
+    idToken: tokenSet.id_token,
   });
 
   logger.info('OIDC: JWT issued', { userId, email, role, ip: req.ip });
 
   // Redirect frontend with token
+  // Referrer-Policy: no-referrer prevents token leaking via Referer header
+  // to any third-party resources the callback page might load.
   const frontendBase = appConfig.oidc.postLogoutUri || '/';
   const redirectTarget = `${frontendBase}auth/callback?token=${encodeURIComponent(token)}`;
 
+  res.setHeader('Referrer-Policy', 'no-referrer');
   res.redirect(redirectTarget);
 });
 
@@ -148,7 +163,8 @@ export const logout = asyncHandler(async (req: Request, res: Response): Promise<
     });
   }
 
-  const logoutUrl = buildLogoutUrl();
+  const idTokenHint = sessionData?.idToken;
+  const logoutUrl = buildLogoutUrl(idTokenHint);
   res.redirect(logoutUrl.toString());
 });
 
