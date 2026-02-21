@@ -13,6 +13,7 @@ import {
   validateToken,
   refreshToken
 } from '@/controllers/auth';
+import { getPendingUsers, approveUser, rejectUser } from '@/controllers/admin';
 import {
   getExecutions,
   getExecutionById,
@@ -66,6 +67,23 @@ authRouter.get('/callback', handleCallback);
 authRouter.post('/logout', authenticateToken, requireAuth, logout);
 authRouter.get('/validate', authenticateToken, requireAuth, validateToken);
 authRouter.post('/refresh', authenticateToken, requireAuth, refreshToken);
+
+// Admin routes (SAI_ADMIN only)
+authRouter.get(
+  '/admin/pending',
+  authenticateToken, requireAuth, requireRole('SAI_ADMIN'),
+  getPendingUsers
+);
+authRouter.post(
+  '/admin/users/:sub/approve',
+  authenticateToken, requireAuth, requireRole('SAI_ADMIN'),
+  approveUser
+);
+authRouter.post(
+  '/admin/users/:sub/reject',
+  authenticateToken, requireAuth, requireRole('SAI_ADMIN'),
+  rejectUser
+);
 
 router.use('/auth', authRouter);
 
