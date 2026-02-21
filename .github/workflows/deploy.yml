@@ -36,21 +36,92 @@ jobs:
     steps:
       - uses: appleboy/ssh-action@v1
         env:
-          PRODUCTION_ENV: ${{ secrets.PRODUCTION_ENV }}
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+          N8N_DB_PASSWORD: ${{ secrets.N8N_DB_PASSWORD }}
+          SAI_DB_PASSWORD: ${{ secrets.SAI_DB_PASSWORD }}
+          AUTH_ZITADEL_ID: ${{ secrets.AUTH_ZITADEL_ID }}
+          ZITADEL_PROJECT_ID: ${{ secrets.ZITADEL_PROJECT_ID }}
+          ZITADEL_MGMT_KEY_JSON: ${{ secrets.ZITADEL_MGMT_KEY_JSON }}
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
-          envs: PRODUCTION_ENV,GHCR_TOKEN
+          envs: GHCR_TOKEN,SESSION_SECRET,N8N_DB_PASSWORD,SAI_DB_PASSWORD,AUTH_ZITADEL_ID,ZITADEL_PROJECT_ID,ZITADEL_MGMT_KEY_JSON
           script: |
             set -e
 
             mkdir -p /opt/sai-dashboard
             cd /opt/sai-dashboard
 
-            # Write env from GitHub secrets
-            printf '%s\n' "$PRODUCTION_ENV" > .env
+            # Write .env — non-sensitive config hardcoded, secrets injected individually
+            cat > .env << 'ENVEOF'
+NODE_ENV=production
+API_PORT=3001
+API_BASE_PATH=/dashboard/api
+VITE_BASE_PATH=/dashboard/
+VITE_API_URL=/dashboard/api
+CORS_ORIGIN=https://sai.altermundi.net
+CORS_CREDENTIALS=true
+N8N_DB_HOST=localhost
+N8N_DB_PORT=5432
+N8N_DB_NAME=n8n
+N8N_DB_USER=n8n_user
+SAI_DB_HOST=localhost
+SAI_DB_PORT=5432
+SAI_DB_NAME=sai_dashboard
+SAI_DB_USER=n8n_user
+DB_MAX_CONNECTIONS=5
+DB_IDLE_TIMEOUT=30000
+DB_CONNECTION_TIMEOUT=2000
+SAI_WORKFLOW_NAME=Sai-webhook-upload-image+Ollama-analisys+telegram-sendphoto
+SAI_WORKFLOW_ID=yDbfhooKemfhMIkC
+DEFAULT_PAGE_SIZE=50
+MAX_PAGE_SIZE=200
+MAX_DAYS_LOOKBACK=365
+CACHE_PATH=/mnt/raid1/n8n-backup/images
+IMAGE_BASE_PATH=/mnt/raid1/n8n-backup/images
+N8N_BINARY_DATA_PATH=/mnt/n8n-data/.n8n/binaryData
+ENABLE_THUMBNAIL_GENERATION=true
+THUMBNAIL_SIZE=200
+THUMBNAIL_QUALITY=70
+MAX_IMAGE_SIZE=5242880
+SUPPORTED_IMAGE_FORMATS=jpeg,png,webp
+IMAGE_CACHE_TTL=86400
+AUTH_ZITADEL_ISSUER=https://auth.altermundi.net
+AUTH_ZITADEL_SECRET=
+AUTH_REDIRECT_URI=https://sai.altermundi.net/dashboard/api/auth/callback
+AUTH_POST_LOGOUT_URI=https://sai.altermundi.net/dashboard/
+ZITADEL_ROLES_CLAIM=urn:zitadel:iam:org:project:roles
+SESSION_DURATION=86400
+TRUST_PROXY=true
+ENFORCE_HTTPS=true
+RATE_LIMIT_WINDOW_MS=60000
+RATE_LIMIT_MAX_REQUESTS=10000
+LOGIN_RATE_LIMIT_WINDOW=900000
+LOGIN_RATE_LIMIT_MAX=5
+LOG_LEVEL=info
+LOG_FORMAT=simple
+LOG_FILE_PATH=
+LOG_DATABASE_QUERIES=false
+SSE_HEARTBEAT_INTERVAL=30000
+SSE_MAX_CLIENTS=100
+SSE_TIMEOUT=300000
+SSE_DEBUG=false
+HEALTH_CHECK_TIMEOUT=5000
+ENABLE_SYSTEM_METRICS=true
+FEATURE_REAL_TIME_UPDATES=true
+ENABLE_ETL_SERVICE=true
+USE_TWO_STAGE_ETL=true
+ENVEOF
+
+            # Append secrets (single-line values, no quoting issues)
+            printf 'SESSION_SECRET=%s\n' "$SESSION_SECRET" >> .env
+            printf 'N8N_DB_PASSWORD=%s\n' "$N8N_DB_PASSWORD" >> .env
+            printf 'SAI_DB_PASSWORD=%s\n' "$SAI_DB_PASSWORD" >> .env
+            printf 'AUTH_ZITADEL_ID=%s\n' "$AUTH_ZITADEL_ID" >> .env
+            printf 'ZITADEL_PROJECT_ID=%s\n' "$ZITADEL_PROJECT_ID" >> .env
+            printf 'ZITADEL_MGMT_KEY_JSON=%s\n' "$ZITADEL_MGMT_KEY_JSON" >> .env
             chmod 600 .env
 
             # Authenticate and pull
