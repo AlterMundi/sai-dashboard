@@ -421,7 +421,7 @@ Private Server (localhost)
 
 ### ETL Not Processing
 1. Check queue: `SELECT * FROM etl_processing_queue WHERE status = 'failed'`
-2. Check logs: `sudo journalctl -u sai-dashboard-api -f`
+2. Check logs: `docker logs -f sai-dashboard`
 3. Check n8n NOTIFY: `LISTEN n8n_execution_update;` in psql
 4. Verify Stage 1 running: Look for "Stage 1: Processing execution X" in logs
 5. Verify Stage 2 running: Look for "Stage 2: Completed execution X" in logs

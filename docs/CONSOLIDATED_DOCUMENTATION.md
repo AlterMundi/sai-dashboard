@@ -777,7 +777,7 @@ sai-dashboard/
 **Logs:**
 ```bash
 # Application logs
-sudo journalctl -u sai-dashboard-api -f
+docker logs -f sai-dashboard
 
 # nginx logs
 sudo tail -f /var/log/nginx/access.log | grep dashboard
@@ -797,16 +797,16 @@ sudo tail -f /var/log/nginx/error.log
 
 ### Starting/Stopping Services
 
-**Dashboard Services:**
+**Dashboard Container:**
 ```bash
 # Check status
-sudo systemctl status sai-dashboard-api
+docker ps -f name=sai-dashboard
 
 # Restart
-sudo systemctl restart sai-dashboard-api
+docker restart sai-dashboard
 
 # View logs
-sudo journalctl -u sai-dashboard-api -f
+docker logs -f sai-dashboard
 ```
 
 **SSH Tunnels:**
@@ -978,13 +978,13 @@ SELECT pg_notify('sai_execution_stage1', json_build_object(
 **Monitor ETL Processing:**
 ```bash
 # Watch Stage 1 activity
-sudo journalctl -u sai-dashboard-api | grep "Stage 1:"
+docker logs sai-dashboard 2>&1 | grep "Stage 1:"
 
 # Watch Stage 2 activity
-sudo journalctl -u sai-dashboard-api | grep "Stage 2:"
+docker logs sai-dashboard 2>&1 | grep "Stage 2:"
 
 # Watch for errors
-sudo journalctl -u sai-dashboard-api | grep "❌"
+docker logs sai-dashboard 2>&1 | grep "❌"
 ```
 
 ### Code Quality Checks
@@ -1025,7 +1025,7 @@ sudo systemctl status nginx
 ssh root@sai.altermundi.net "netstat -tlnp | grep -E '3000|3001'"
 
 # 5. Check logs
-sudo journalctl -u sai-dashboard-api --since "5 minutes ago"
+docker logs --since 5m sai-dashboard
 ```
 
 #### Issue: SSE not connecting
@@ -1042,7 +1042,7 @@ sudo nginx -t
 sudo grep -A 20 "location /dashboard/api/events" /etc/nginx/sites-available/*
 
 # 3. Verify backend SSE controller
-sudo journalctl -u sai-dashboard-api | grep "SSE client"
+docker logs sai-dashboard 2>&1 | grep "SSE client"
 
 # 4. Check for buffering issues
 # Ensure X-Accel-Buffering: no header is set
@@ -1076,7 +1076,7 @@ grep "ENABLE_ETL_SERVICE" /root/REPOS/sai-dashboard/.env
 grep "USE_TWO_STAGE_ETL" /root/REPOS/sai-dashboard/.env
 
 # 2. Restart backend
-sudo systemctl restart sai-dashboard-api
+docker restart sai-dashboard
 
 # 3. Manual trigger test (see Development Workflow section)
 ```
@@ -1133,10 +1133,9 @@ GROUP BY status;
 # private readonly BATCH_SIZE = 20; // from 10
 # private readonly POLL_INTERVAL_MS = 2000; // from 5000
 
-# 2. Rebuild and restart
-cd /root/REPOS/sai-dashboard
-npm run build
-sudo systemctl restart sai-dashboard-api
+# 2. Redeploy (push to release branch triggers CI/CD)
+# Or manual restart if image is already up to date:
+docker restart sai-dashboard
 
 # 3. Monitor queue decrease
 watch -n 5 'psql -U sai_dashboard_user -d sai_dashboard -c \
@@ -1148,7 +1147,7 @@ watch -n 5 'psql -U sai_dashboard_user -d sai_dashboard -c \
 **API Response Times:**
 ```bash
 # Monitor API logs for slow requests
-sudo journalctl -u sai-dashboard-api -f | grep -E "GET|POST" | grep -E "[0-9]{3,}ms"
+docker logs -f sai-dashboard 2>&1 | grep -E "GET|POST" | grep -E "[0-9]{3,}ms"
 ```
 
 **Database Query Performance:**
@@ -1163,7 +1162,7 @@ SELECT * FROM pg_stat_statements ORDER BY mean_time DESC LIMIT 10;
 **System Resources:**
 ```bash
 # Check CPU and memory
-top -p $(pgrep -f "sai-dashboard-api")
+docker stats sai-dashboard --no-stream
 
 # Check disk usage
 df -h /mnt/raid1/
