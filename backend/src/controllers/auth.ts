@@ -6,6 +6,7 @@ import { asyncHandler } from '@/utils';
 import { buildAuthorizationUrl, generatePKCEParams, exchangeCode, buildLogoutUrl } from '@/auth/oidc';
 import { extractRole } from '@/auth/roles';
 import { appConfig } from '@/config';
+import { upsertPendingUser } from '@/services/pending-users-service';
 
 const COOKIE_OPTS = {
   httpOnly: true,
@@ -106,26 +107,34 @@ export const handleCallback = asyncHandler(async (req: Request, res: Response): 
     email: claims.email,
   });
 
+  const email = (claims.email as string) || '';
+  const userId = claims.sub;
+
   // Extract role from Zitadel project claims
   let role;
   try {
     role = extractRole(claims as Record<string, unknown>);
   } catch (err) {
-    logger.warn('OIDC: User has no recognized role', {
-      sub: claims.sub,
-      email: claims.email,
+    // User authenticated successfully but has no role in this project.
+    // Register them in the access queue and show the pending-approval page.
+    try {
+      await upsertPendingUser(userId, email);
+    } catch (dbErr) {
+      logger.error('Failed to upsert pending user', { userId, email, dbErr });
+    }
+
+    logger.info('OIDC: user has no role, added to pending queue', {
+      sub: userId,
+      email,
+      ip: req.ip,
     });
+
     const frontendBase = appConfig.oidc.postLogoutUri || '/';
     res.redirect(
-      `${frontendBase}?auth_error=${encodeURIComponent(
-        'Tu cuenta no tiene rol asignado en este proyecto. Contactar al administrador.'
-      )}`
+      `${frontendBase}pending-approval?email=${encodeURIComponent(email)}`
     );
     return;
   }
-
-  const email = (claims.email as string) || '';
-  const userId = claims.sub;
 
   // Issue our own JWT (include idToken for Zitadel end_session hint on logout)
   const token = generateToken({
