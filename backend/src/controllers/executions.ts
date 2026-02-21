@@ -220,6 +220,7 @@ export const getExecutionImage = asyncHandler(async (req: Request, res: Response
     return;
   }
 
+  res.set('Cache-Control', 'public, max-age=31536000, immutable');
   res.sendFile(path.resolve(imagePath));
 });
 
@@ -253,6 +254,7 @@ export const getExecutionImageWebP = asyncHandler(async (req: Request, res: Resp
     return;
   }
 
+  res.set('Cache-Control', 'public, max-age=31536000, immutable');
   res.sendFile(path.resolve(imagePath));
 });
 
@@ -281,6 +283,7 @@ export const getExecutionThumbnail = asyncHandler(async (req: Request, res: Resp
     return;
   }
 
+  res.set('Cache-Control', 'public, max-age=31536000, immutable');
   res.sendFile(path.resolve(thumbnailPath));
 });
 
