@@ -442,8 +442,7 @@ curl -X POST https://n8n.altermundi.net/dashboard/api/auth/login \
 # On private server
 
 # Application logs
-docker-compose logs -f sai-dashboard-api
-docker-compose logs -f sai-dashboard-ui
+docker logs -f sai-dashboard
 
 # SSH tunnel logs
 sudo journalctl -u sai-tunnels -f
@@ -527,7 +526,7 @@ docker stats
 du -sh /mnt/raid1/n8n/backup/images/
 
 # Database connections
-docker-compose exec sai-dashboard-api npm run db:check
+docker exec sai-dashboard npm run db:check
 ```
 
 ---
