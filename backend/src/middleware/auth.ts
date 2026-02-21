@@ -79,7 +79,7 @@ export const authenticateToken = async (req: Request, res: Response, next: NextF
     req.session = {
       userId: decoded.userId,
       email: decoded.email || '',
-      role: decoded.role || 'VIEWER',
+      role: decoded.role || 'SAI_VIEWER',
       isAuthenticated: decoded.isAuthenticated,
       createdAt: new Date(decoded.iat * 1000),
       expiresAt: new Date(decoded.exp * 1000),
@@ -89,7 +89,7 @@ export const authenticateToken = async (req: Request, res: Response, next: NextF
     req.user = {
       id: decoded.userId,
       email: decoded.email || '',
-      role: decoded.role || 'VIEWER',
+      role: decoded.role || 'SAI_VIEWER',
       isAuthenticated: decoded.isAuthenticated
     };
 
@@ -177,7 +177,7 @@ export const optionalAuth = async (req: Request, _res: Response, next: NextFunct
       req.session = {
         userId: decoded.userId,
         email: decoded.email || '',
-        role: decoded.role || 'VIEWER',
+        role: decoded.role || 'SAI_VIEWER',
         isAuthenticated: decoded.isAuthenticated,
         createdAt: new Date(decoded.iat * 1000),
         expiresAt: new Date(decoded.exp * 1000)
@@ -186,7 +186,7 @@ export const optionalAuth = async (req: Request, _res: Response, next: NextFunct
       req.user = {
         id: decoded.userId,
         email: decoded.email || '',
-        role: decoded.role || 'VIEWER',
+        role: decoded.role || 'SAI_VIEWER',
         isAuthenticated: decoded.isAuthenticated
       };
     }

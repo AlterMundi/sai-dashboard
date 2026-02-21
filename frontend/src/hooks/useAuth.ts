@@ -113,7 +113,7 @@ export function useAuth(): UseAuthReturn {
     token,
     error,
     user: isAuthenticated && userId
-      ? { id: userId, email: userEmail || '', role: userRole || 'VIEWER' }
+      ? { id: userId, email: userEmail || '', role: userRole || 'SAI_VIEWER' }
       : null,
   };
 }

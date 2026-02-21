@@ -6,7 +6,7 @@ import { logger } from '@/utils/logger';
  * Extract the DashboardRole from Zitadel OIDC token claims.
  *
  * Zitadel stores project roles in the claim as an object:
- * { "urn:zitadel:iam:org:project:roles": { "ADMIN": { "<orgId>": "<orgName>" } } }
+ * { "urn:zitadel:iam:org:project:roles": { "SAI_ADMIN": { "<orgId>": "<orgName>" } } }
  *
  * The keys of the inner object are the role names.
  */
@@ -26,9 +26,9 @@ export function extractRole(claims: Record<string, unknown>): DashboardRole {
 
   logger.debug('OIDC: Found roles in claim', { roleNames });
 
-  if (roleNames.includes('ADMIN')) return 'ADMIN';
-  if (roleNames.includes('OPERATOR')) return 'OPERATOR';
-  if (roleNames.includes('VIEWER')) return 'VIEWER';
+  if (roleNames.includes('SAI_ADMIN')) return 'SAI_ADMIN';
+  if (roleNames.includes('SAI_OPERATOR')) return 'SAI_OPERATOR';
+  if (roleNames.includes('SAI_VIEWER')) return 'SAI_VIEWER';
 
   logger.warn('OIDC: User has roles but none are recognized', { roleNames });
   throw new Error('USER_NO_ROLE');

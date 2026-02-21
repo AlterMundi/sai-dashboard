@@ -179,15 +179,15 @@ executionRouter.get('/filter-options', getFilterOptions);
 executionRouter.get('/:executionId', getExecutionById);
 
 // Execution raw data (for debugging, ADMIN+OPERATOR only)
-executionRouter.get('/:executionId/data', requireRole('ADMIN', 'OPERATOR'), getExecutionData);
+executionRouter.get('/:executionId/data', requireRole('SAI_ADMIN', 'SAI_OPERATOR'), getExecutionData);
 
 // Image routes moved to public section above for HTML <img> tag compatibility
 
 // Manual analysis trigger (ADMIN only)
-executionRouter.post('/trigger-analysis', requireRole('ADMIN'), triggerAnalysisProcessing);
+executionRouter.post('/trigger-analysis', requireRole('SAI_ADMIN'), triggerAnalysisProcessing);
 
 // Bulk mark executions as false positive
-executionRouter.post('/bulk/false-positive', requireRole('ADMIN', 'OPERATOR'), asyncHandler(async (req: Request, res: Response) => {
+executionRouter.post('/bulk/false-positive', requireRole('SAI_ADMIN', 'SAI_OPERATOR'), asyncHandler(async (req: Request, res: Response) => {
   const { executionIds, isFalsePositive, reason } = req.body;
 
   // Validate executionIds is an array of numbers, max 500
@@ -239,7 +239,7 @@ executionRouter.post('/bulk/false-positive', requireRole('ADMIN', 'OPERATOR'), a
 }));
 
 // Mark execution as false positive
-executionRouter.post('/:executionId/false-positive', requireRole('ADMIN', 'OPERATOR'), asyncHandler(async (req: Request, res: Response) => {
+executionRouter.post('/:executionId/false-positive', requireRole('SAI_ADMIN', 'SAI_OPERATOR'), asyncHandler(async (req: Request, res: Response) => {
   const executionId = parseInt(req.params.executionId);
   const { isFalsePositive, reason } = req.body;
 
@@ -293,7 +293,7 @@ router.use('/executions', executionRouter);
 const detectionRouter = Router();
 
 // Search executions with advanced JSONB detection criteria
-detectionRouter.post('/search', requireRole('ADMIN', 'OPERATOR'), asyncHandler(async (req: Request, res: Response) => {
+detectionRouter.post('/search', requireRole('SAI_ADMIN', 'SAI_OPERATOR'), asyncHandler(async (req: Request, res: Response) => {
   const criteria: DetectionFilterCriteria = req.body;
   const limit = parseInt(req.query.limit as string) || 100;
 

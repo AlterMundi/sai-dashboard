@@ -146,7 +146,7 @@ export interface DatabaseConfig {
   connectionTimeout: number;
 }
 
-export type DashboardRole = 'ADMIN' | 'OPERATOR' | 'VIEWER';
+export type DashboardRole = 'SAI_ADMIN' | 'SAI_OPERATOR' | 'SAI_VIEWER';
 
 export interface AuthResponse {
   token: string;
