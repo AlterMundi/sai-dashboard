@@ -274,6 +274,8 @@ const es: TranslationKeys = {
     navNext: 'Siguiente',
     navCamera: 'Misma cámara',
     navGallery: 'Galería',
+    navModeCameraLabel: 'Cámara',
+    navModeGalleryLabel: 'Galería',
   },
   stats: {
     title: 'Estad\u00edsticas',

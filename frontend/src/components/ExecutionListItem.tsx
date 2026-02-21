@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { LoadingSpinner } from './ui/LoadingSpinner';
 import { cn } from '@/utils';
 import { ExecutionWithImageUrls } from '@/types';
@@ -20,7 +21,7 @@ interface ExecutionListItemProps {
   onToggleSelect?: (id: number) => void;
 }
 
-export function ExecutionListItem({ execution, onClick, loading = false, isSelected, onToggleSelect }: ExecutionListItemProps) {
+export const ExecutionListItem = memo(function ExecutionListItem({ execution, onClick, loading = false, isSelected, onToggleSelect }: ExecutionListItemProps) {
   const {
     imageLoading,
     imageError,
@@ -270,4 +271,4 @@ export function ExecutionListItem({ execution, onClick, loading = false, isSelec
       )}
     </div>
   );
-}
+});

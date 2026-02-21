@@ -272,6 +272,8 @@ const en = {
     navNext: 'Next',
     navCamera: 'Same camera',
     navGallery: 'Gallery',
+    navModeCameraLabel: 'Camera',
+    navModeGalleryLabel: 'Gallery',
   },
   stats: {
     title: 'Statistics',

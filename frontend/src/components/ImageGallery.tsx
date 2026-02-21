@@ -41,6 +41,7 @@ export function ImageGallery({ initialFilters = {}, className, refreshTrigger, o
     updateFilters,
     filters,
     prependExecutions,
+    totalResults,
   } = useExecutions(initialFilters, refreshTrigger);
 
   // Intersection observer for infinite scroll
@@ -223,6 +224,11 @@ export function ImageGallery({ initialFilters = {}, className, refreshTrigger, o
       hasNext: idx < siblings.length - 1,
       index: idx,
       total: siblings.length,
+      getNeighbors: (behind, ahead) => {
+        const start = Math.max(0, idx - behind);
+        const end   = Math.min(siblings.length - 1, idx + ahead);
+        return siblings.slice(start, end + 1);
+      },
     };
   }, [executions, selectedExecution?.id, selectedExecution?.nodeId, selectedExecution?.cameraId]);
 
@@ -231,14 +237,35 @@ export function ImageGallery({ initialFilters = {}, className, refreshTrigger, o
     const idx = executions.findIndex(e => e.id === selectedExecution.id);
     if (idx === -1) return undefined;
     return {
-      onPrev: () => { if (idx > 0) setSelectedExecution(executions[idx - 1]); },
-      onNext: () => { if (idx < executions.length - 1) setSelectedExecution(executions[idx + 1]); },
-      hasPrev: idx > 0,
-      hasNext: idx < executions.length - 1,
+      // executions are newest-first: higher idx = older.
+      // Left (Prev) → older → increase idx; Right (Next) → newer → decrease idx.
+      onPrev: () => { if (idx < executions.length - 1) setSelectedExecution(executions[idx + 1]); },
+      onNext: () => { if (idx > 0) setSelectedExecution(executions[idx - 1]); },
+      hasPrev: idx < executions.length - 1,
+      hasNext: idx > 0,
       index: idx,
-      total: executions.length,
+      // Show DB total (after filtering) rather than just the loaded page set
+      total: totalResults || executions.length,
+      getNeighbors: (behind, ahead) => {
+        const start = Math.max(0, idx - behind);
+        const end   = Math.min(executions.length - 1, idx + ahead);
+        return executions.slice(start, end + 1);
+      },
     };
-  }, [executions, selectedExecution?.id]);
+  }, [executions, selectedExecution?.id, totalResults]);
+
+  // Preemptively load the next page when approaching the end of loaded data,
+  // either in gallery order OR in camera-sibling order.
+  useEffect(() => {
+    if (!selectedExecution || !hasNext || isLoading) return;
+    // Gallery boundary: within 10 of end of loaded executions
+    const galleryIdx = executions.findIndex(e => e.id === selectedExecution.id);
+    if (galleryIdx !== -1 && galleryIdx >= executions.length - 10) { loadMore(); return; }
+    // Camera boundary: within 5 of either end of loaded siblings.
+    // Going right (newer) hits total-1; going left (older) hits 0.
+    // Both ends need more gallery pages to expand the sibling set.
+    if (cameraNav && (cameraNav.index >= cameraNav.total - 5 || cameraNav.index <= 4)) { loadMore(); }
+  }, [selectedExecution?.id, executions.length, cameraNav?.index, cameraNav?.total, hasNext, isLoading, loadMore]);
 
   const handleRefresh = useCallback(() => {
     refresh();
