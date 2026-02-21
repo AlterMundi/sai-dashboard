@@ -99,10 +99,10 @@ export const ImageCard = memo(function ImageCard({ execution, onClick, loading =
         )}
 
         {/* Top overlay gradient */}
-        <div className="absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-black/10 to-transparent pointer-events-none" />
+        <div className="absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-black/5 to-transparent pointer-events-none" />
 
         {/* Bottom overlay gradient */}
-        <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/10 to-transparent pointer-events-none" />
+        <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/5 to-transparent pointer-events-none" />
 
         {/* Alert Level Badge - Top Left */}
         {execution.alertLevel && execution.alertLevel !== 'none' && (
