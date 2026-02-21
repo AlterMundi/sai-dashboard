@@ -22,6 +22,7 @@ WORKDIR /app
 ENV NODE_ENV=production
 RUN apk add --no-cache curl
 COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/backend/node_modules ./backend/node_modules
 COPY --from=builder /app/backend/dist ./backend/dist
 COPY --from=builder /app/frontend/dist ./frontend/dist
 COPY --from=builder /app/package.json ./
