@@ -1,8 +1,8 @@
 [Unit]
 Description=SAI Dashboard SSH Reverse Tunnel Services
 Documentation=https://sai.altermundi.net/dashboard/
-After=network.target sai-dashboard-api.service nginx.service
-Wants=sai-dashboard-api.service nginx.service
+After=network.target docker.service nginx.service
+Wants=docker.service nginx.service
 
 [Service]
 Type=oneshot
