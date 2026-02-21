@@ -121,7 +121,7 @@ WHERE id = (
 LISTEN sai_execution_stage1;
 
 -- In SAI Dashboard logs:
-sudo journalctl -u sai-dashboard-api | grep "Stage 1:"
+docker logs sai-dashboard 2>&1 | grep "Stage 1:"
 ```
 
 ### Trigger Performance
@@ -187,11 +187,11 @@ See also: `../archive/one-time/fix_duplicate_triggers.sql`
 
 **Checks:**
 ```bash
-# 1. Check service is running
-sudo systemctl status sai-dashboard-api
+# 1. Check container is running
+docker ps -f name=sai-dashboard
 
 # 2. Check logs for LISTEN
-sudo journalctl -u sai-dashboard-api | grep "LISTEN"
+docker logs sai-dashboard 2>&1 | grep "LISTEN"
 # Should see: "Stage 1 ETL: Listening on channel 'sai_execution_stage1'"
 
 # 3. Check ETL is enabled

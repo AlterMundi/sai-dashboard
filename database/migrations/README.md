@@ -225,7 +225,7 @@ ROLLBACK;
 
 3. **Restart application:**
    ```bash
-   sudo systemctl restart sai-dashboard-api
+   docker restart sai-dashboard
    ```
 
 ---

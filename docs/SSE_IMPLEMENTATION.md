@@ -236,7 +236,7 @@ eventSource.onmessage = (event) => {
 
 ```bash
 # Check SSE connections in logs
-sudo journalctl -u sai-dashboard-api.service --since '5 minutes ago' | grep "SSE client"
+docker logs --since 5m sai-dashboard 2>&1 | grep "SSE client"
 
 # Test SSE endpoint directly
 curl -N "https://sai.altermundi.net/dashboard/api/events?token=YOUR_TOKEN"
