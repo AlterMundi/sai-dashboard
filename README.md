@@ -129,10 +129,10 @@ Archived analysis and migration docs available in `/docs/archive/`
 curl https://sai.altermundi.net/dashboard/api/health
 
 # View logs
-sudo journalctl -u sai-dashboard-api -f
+docker logs -f sai-dashboard
 
-# Restart services
-sudo systemctl restart sai-dashboard-api
+# Restart container
+docker restart sai-dashboard
 
 # Check ETL queue
 psql -U sai_dashboard_user -d sai_dashboard -c "SELECT * FROM etl_queue_health"
