@@ -178,12 +178,12 @@ executionRouter.get('/filter-options', getFilterOptions);
 // Specific execution details
 executionRouter.get('/:executionId', getExecutionById);
 
-// Execution raw data (for debugging, ADMIN+OPERATOR only)
+// Execution raw data (for debugging, SAI_ADMIN+SAI_OPERATOR only)
 executionRouter.get('/:executionId/data', requireRole('SAI_ADMIN', 'SAI_OPERATOR'), getExecutionData);
 
 // Image routes moved to public section above for HTML <img> tag compatibility
 
-// Manual analysis trigger (ADMIN only)
+// Manual analysis trigger (SAI_ADMIN only)
 executionRouter.post('/trigger-analysis', requireRole('SAI_ADMIN'), triggerAnalysisProcessing);
 
 // Bulk mark executions as false positive
@@ -428,7 +428,7 @@ if (process.env.NODE_ENV === 'development' || process.env.ENABLE_API_DOCS === 't
             'GET /executions/:id': 'Get specific execution details',
             'GET /executions/:id/image': 'Get execution image (original)',
             'GET /executions/:id/image?thumbnail=true': 'Get execution thumbnail',
-            'GET /executions/:id/data': 'Get raw execution data (ADMIN/OPERATOR)',
+            'GET /executions/:id/data': 'Get raw execution data (SAI_ADMIN/SAI_OPERATOR)',
             'GET /executions/:id/analysis': 'Get comprehensive analysis'
           },
           realtime: {
@@ -436,7 +436,7 @@ if (process.env.NODE_ENV === 'development' || process.env.ENABLE_API_DOCS === 't
             'GET /events/status': 'SSE connection status and statistics'
           },
           detections: {
-            'POST /detections/search': 'Search executions with advanced JSONB detection filters (ADMIN/OPERATOR)',
+            'POST /detections/search': 'Search executions with advanced JSONB detection filters (SAI_ADMIN/SAI_OPERATOR)',
             'GET /detections/statistics': 'Get detection statistics with class distribution'
           },
           health: {
