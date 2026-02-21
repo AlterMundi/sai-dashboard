@@ -9,6 +9,7 @@ Usage:
 
 import argparse
 import json
+import os
 import sys
 import time
 import psycopg2
@@ -17,7 +18,7 @@ from pathlib import Path
 
 # ── Config ────────────────────────────────────────────────────────────────────
 INFERENCE_URL = "http://localhost:8888/api/v1/infer"
-DB_DSN = "host=localhost dbname=sai_dashboard user=n8n_user password=REDACTED"
+DB_DSN = os.environ.get("DB_DSN", "host=localhost dbname=sai_dashboard user=n8n_user password=<your-db-password>")
 CONFIDENCE_THRESHOLD = 0.25
 IOU_THRESHOLD = 0.1
 REQUEST_TIMEOUT = 30  # seconds per image
