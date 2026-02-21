@@ -279,7 +279,7 @@ const es: TranslationKeys = {
   },
   stats: {
     title: 'Estad\u00edsticas',
-    subtitle: 'Estad\u00edsticas detalladas de ejecuci\u00f3n y m\u00e9tricas de rendimiento',
+    subtitle: 'Estad\u00edsticas generales de ejecuci\u00f3n',
     failedToLoad: 'Error al cargar estad\u00edsticas',
     totalExecutions: 'Total Ejecuciones',
     successRate: 'Tasa de \u00c9xito',
