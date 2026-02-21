@@ -1,13 +1,22 @@
 /**
  * Zitadel Management API client.
  *
- * Uses client_credentials grant to obtain a short-lived access token,
- * then calls the Management API to assign project roles (user grants).
+ * Authenticates via JWT bearer grant (private key JSON file) to obtain a
+ * short-lived access token, then calls the Management API to assign project
+ * roles (user grants).
  *
- * Uses the global fetch API (Node 18+) — no additional HTTP library required.
+ * Docs: https://zitadel.com/docs/guides/integrate/service-users/private-key-jwt
  */
+import jwt from 'jsonwebtoken';
 import { appConfig } from '@/config';
 import { logger } from '@/utils/logger';
+
+interface ZitadelKeyFile {
+  type: string;
+  keyId: string;
+  key: string;    // RSA private key PEM
+  userId: string;
+}
 
 interface TokenResponse {
   access_token: string;
@@ -17,6 +26,14 @@ interface TokenResponse {
 
 let cachedToken: { value: string; expiresAt: number } | null = null;
 
+function parseKeyFile(): ZitadelKeyFile {
+  const raw = appConfig.oidc.mgmtKeyJson;
+  if (!raw) {
+    throw new Error('ZITADEL_MGMT_KEY_JSON is not configured');
+  }
+  return JSON.parse(raw) as ZitadelKeyFile;
+}
+
 async function getMgmtToken(): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
 
@@ -24,24 +41,32 @@ async function getMgmtToken(): Promise<string> {
     return cachedToken.value;
   }
 
+  const keyFile = parseKeyFile();
   const issuer = appConfig.oidc.issuer;
-  const tokenUrl = `${issuer}/oauth/v2/token`;
 
+  // Build the JWT assertion signed with the service account's RSA private key
+  const assertion = jwt.sign(
+    {
+      iss: keyFile.userId,
+      sub: keyFile.userId,
+      aud: issuer,
+      iat: now,
+      exp: now + 3600,
+    },
+    keyFile.key,
+    { algorithm: 'RS256', keyid: keyFile.keyId }
+  );
+
+  const tokenUrl = `${issuer}/oauth/v2/token`;
   const params = new URLSearchParams({
-    grant_type: 'client_credentials',
+    grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+    assertion,
     scope: 'openid urn:zitadel:iam:org:project:id:zitadel:aud',
   });
 
-  const credentials = Buffer.from(
-    `${appConfig.oidc.mgmtClientId}:${appConfig.oidc.mgmtClientSecret}`
-  ).toString('base64');
-
   const response = await fetch(tokenUrl, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-      Authorization: `Basic ${credentials}`,
-    },
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: params.toString(),
   });
 
@@ -51,14 +76,13 @@ async function getMgmtToken(): Promise<string> {
   }
 
   const data = (await response.json()) as TokenResponse;
-  const { access_token, expires_in } = data;
 
   cachedToken = {
-    value: access_token,
-    expiresAt: now + expires_in,
+    value: data.access_token,
+    expiresAt: now + data.expires_in,
   };
 
-  return access_token;
+  return data.access_token;
 }
 
 /**

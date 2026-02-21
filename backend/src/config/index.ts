@@ -121,8 +121,7 @@ export const appConfig = {
     postLogoutUri: process.env.AUTH_POST_LOGOUT_URI!,
     rolesClaim: process.env.ZITADEL_ROLES_CLAIM || 'urn:zitadel:iam:org:project:roles',
     projectId: process.env.ZITADEL_PROJECT_ID || '',
-    mgmtClientId: process.env.ZITADEL_MGMT_CLIENT_ID || '',
-    mgmtClientSecret: process.env.ZITADEL_MGMT_CLIENT_SECRET || '',
+    mgmtKeyJson: process.env.ZITADEL_MGMT_KEY_JSON || '',
   },
 
   rateLimit: {
