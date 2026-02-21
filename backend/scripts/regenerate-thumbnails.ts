@@ -105,7 +105,13 @@ async function main(): Promise<void> {
   logger.info(`Starting thumbnail regeneration (dry-run=${dryRun}, concurrency=${concurrency})`);
   logger.info(`IMAGE_BASE_PATH=${IMAGE_BASE_PATH}, target: ${THUMB_WIDTH}px wide, ${THUMB_QUALITY}% WebP`);
 
-  const pool = new Pool(saiDatabaseConfig);
+  const pool = new Pool({
+    host: saiDatabaseConfig.host,
+    port: saiDatabaseConfig.port,
+    database: saiDatabaseConfig.database,
+    user: saiDatabaseConfig.username,
+    password: saiDatabaseConfig.password,
+  });
 
   try {
     const result = await pool.query<ImageRow>(
