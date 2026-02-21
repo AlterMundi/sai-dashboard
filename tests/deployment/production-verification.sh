@@ -16,7 +16,7 @@ NC='\033[0m'
 PRODUCTION_BACKEND_DIR="/opt/sai-dashboard/backend"
 LOCAL_PROJECT_DIR="/root/sai-dashboard"
 NGINX_CONFIG="/etc/nginx/sites-available/sai-dashboard"
-SYSTEMD_SERVICE="/etc/systemd/system/sai-dashboard-api.service"
+CONTAINER_NAME="sai-dashboard"
 CACHE_DIR="/mnt/raid1/n8n/backup/images"
 FRONTEND_BUILD_DIR="/var/www/sai-dashboard"
 
@@ -111,41 +111,29 @@ test_file_structure() {
 
 # Test 2: Service Configuration
 test_service_configuration() {
-    log_info "Testing service configuration..."
-    
-    # Check systemd service file
-    if [[ -f "$SYSTEMD_SERVICE" ]]; then
-        log_success "systemd service file exists"
-        
-        # Validate service file syntax
-        if sudo systemd-analyze verify "$SYSTEMD_SERVICE" >/dev/null 2>&1; then
-            log_success "systemd service configuration is valid"
+    log_info "Testing container configuration..."
+
+    # Check container is running
+    if docker ps -q -f name="$CONTAINER_NAME" -f status=running | grep -q .; then
+        log_success "Container $CONTAINER_NAME is running"
+
+        # Check restart policy
+        local restart_policy
+        restart_policy=$(docker inspect "$CONTAINER_NAME" --format '{{.HostConfig.RestartPolicy.Name}}' 2>/dev/null)
+        if [[ "$restart_policy" == "unless-stopped" || "$restart_policy" == "always" ]]; then
+            log_success "Container restart policy: $restart_policy"
         else
-            log_error "systemd service configuration has issues"
+            log_warning "Container restart policy is '$restart_policy' (expected 'unless-stopped')"
         fi
-        
-        # Check service status
-        if systemctl is-enabled sai-dashboard-api.service >/dev/null 2>&1; then
-            log_success "SAI Dashboard API service is enabled"
+
+        # Test API endpoint
+        if curl -s http://localhost:3001/api/health >/dev/null 2>&1; then
+            log_success "API health endpoint responding"
         else
-            log_warning "SAI Dashboard API service is not enabled"
-        fi
-        
-        # Check if service is running
-        if systemctl is-active sai-dashboard-api.service >/dev/null 2>&1; then
-            log_success "SAI Dashboard API service is running"
-            
-            # Test API endpoint
-            if curl -s http://localhost:3001/api/health >/dev/null 2>&1; then
-                log_success "API health endpoint responding"
-            else
-                log_error "API health endpoint not responding"
-            fi
-        else
-            log_warning "SAI Dashboard API service is not running"
+            log_error "API health endpoint not responding"
         fi
     else
-        log_error "systemd service file not found: $SYSTEMD_SERVICE"
+        log_error "Container $CONTAINER_NAME is not running (docker ps -f name=$CONTAINER_NAME)"
     fi
 }
 
@@ -318,20 +306,20 @@ test_security_configuration() {
 test_monitoring_logging() {
     log_info "Testing monitoring and logging..."
     
-    # Check service logs
-    if journalctl -u sai-dashboard-api.service --since "1 hour ago" --no-pager -q >/dev/null 2>&1; then
-        log_success "Service logs accessible via journalctl"
-        
+    # Check container logs
+    if docker logs --since 1h "$CONTAINER_NAME" >/dev/null 2>&1; then
+        log_success "Container logs accessible via docker logs"
+
         # Check for errors in recent logs
-        error_count=$(journalctl -u sai-dashboard-api.service --since "1 hour ago" --no-pager -q | grep -ci "error\|failed\|exception" || true)
-        
+        error_count=$(docker logs --since 1h "$CONTAINER_NAME" 2>&1 | grep -ci "error\|failed\|exception" || true)
+
         if [[ "$error_count" == "0" ]]; then
-            log_success "No recent errors in service logs"
+            log_success "No recent errors in container logs"
         else
-            log_warning "Recent errors found in service logs: $error_count"
+            log_warning "Recent errors found in container logs: $error_count"
         fi
     else
-        log_warning "Service logs not accessible or service not found"
+        log_warning "Container logs not accessible or container not found"
     fi
     
     # Check nginx logs
@@ -475,8 +463,8 @@ if [[ $TESTS_FAILED -gt 0 ]]; then
     echo "Recommended actions:"
     echo "1. Review failed tests above"
     echo "2. Run deployment script: $LOCAL_PROJECT_DIR/scripts/install.sh"
-    echo "3. Check service status: systemctl status sai-dashboard-api"
-    echo "4. Review logs: journalctl -u sai-dashboard-api -f"
+    echo "3. Check container status: docker ps -f name=sai-dashboard"
+    echo "4. Review logs: docker logs -f sai-dashboard"
     exit 1
 else
     echo
@@ -485,7 +473,7 @@ else
     echo "Dashboard Status:"
     echo "- Local Access: http://localhost/dashboard/"
     echo "- API Health: http://localhost:3001/api/health"
-    echo "- Service Status: $(systemctl is-active sai-dashboard-api.service 2>/dev/null || echo 'unknown')"
+    echo "- Container Status: $(docker inspect sai-dashboard --format '{{.State.Status}}' 2>/dev/null || echo 'unknown')"
     echo "- nginx Status: $(systemctl is-active nginx.service 2>/dev/null || echo 'unknown')"
     exit 0
 fi

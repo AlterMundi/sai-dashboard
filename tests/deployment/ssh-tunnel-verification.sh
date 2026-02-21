@@ -340,11 +340,13 @@ test_failover_recovery() {
         fi
     done
     
-    # Check systemd service configuration for restart
-    if systemctl show sai-dashboard-api.service -p Restart | grep -q "Restart=always\|Restart=on-failure"; then
-        log_success "API service configured for automatic restart"
+    # Check Docker container restart policy
+    local restart_policy
+    restart_policy=$(docker inspect sai-dashboard --format '{{.HostConfig.RestartPolicy.Name}}' 2>/dev/null || echo "")
+    if [[ "$restart_policy" == "unless-stopped" || "$restart_policy" == "always" ]]; then
+        log_success "API container configured for automatic restart ($restart_policy)"
     else
-        log_warning "API service may not be configured for automatic restart"
+        log_warning "API container may not be configured for automatic restart (policy: ${restart_policy:-unknown})"
     fi
     
     # Check nginx service restart configuration

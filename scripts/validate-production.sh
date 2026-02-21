@@ -78,12 +78,11 @@ test_service_running() {
     print_test "Service Status"
     run_test
 
-    if sudo systemctl is-active --quiet sai-dashboard-api; then
-        local pid=$(sudo systemctl show -p MainPID sai-dashboard-api | cut -d= -f2)
-        local uptime=$(ps -p $pid -o etime= 2>/dev/null | xargs)
-        test_passed "Service running (PID: $pid, Uptime: $uptime)"
+    if docker ps -q -f name=sai-dashboard -f status=running | grep -q .; then
+        local uptime=$(docker inspect sai-dashboard --format '{{.State.StartedAt}}' 2>/dev/null | xargs)
+        test_passed "Container running (started: $uptime)"
     else
-        test_failed "Service not running" "systemctl is-active failed"
+        test_failed "Container not running" "docker ps -f name=sai-dashboard returned nothing"
         return 1
     fi
 }
@@ -179,8 +178,8 @@ test_etl_logs() {
     print_test "ETL Processing Logs"
     run_test
 
-    local stage1_count=$(sudo journalctl -u sai-dashboard-api.service --since '5 minutes ago' --no-pager 2>/dev/null | grep -c "Stage 1:" || echo "0")
-    local stage2_count=$(sudo journalctl -u sai-dashboard-api.service --since '5 minutes ago' --no-pager 2>/dev/null | grep -c "Stage 2:" || echo "0")
+    local stage1_count=$(docker logs --since 5m sai-dashboard 2>&1 | grep -c "Stage 1:" || echo "0")
+    local stage2_count=$(docker logs --since 5m sai-dashboard 2>&1 | grep -c "Stage 2:" || echo "0")
     stage1_count=$(echo "$stage1_count" | tr -d '\n\r ')
     stage2_count=$(echo "$stage2_count" | tr -d '\n\r ')
 
@@ -243,7 +242,7 @@ test_recent_errors() {
     print_test "Recent Error Logs"
     run_test
 
-    local error_count=$(sudo journalctl -u sai-dashboard-api.service --since '5 minutes ago' --no-pager 2>/dev/null | grep -c "ERROR" || echo "0")
+    local error_count=$(docker logs --since 5m sai-dashboard 2>&1 | grep -c "ERROR" || echo "0")
     error_count=$(echo "$error_count" | tr -d '\n\r ')
 
     if [[ "$error_count" -eq 0 ]]; then
@@ -252,7 +251,7 @@ test_recent_errors() {
         print_warn "$error_count errors found (check logs for details)"
         TESTS_PASSED=$((TESTS_PASSED + 1)) # Don't fail on minor errors
     else
-        test_failed "Multiple errors detected: $error_count" "Check: sudo journalctl -u sai-dashboard-api -f"
+        test_failed "Multiple errors detected: $error_count" "Check: docker logs -f sai-dashboard"
     fi
 }
 
