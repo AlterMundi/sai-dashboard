@@ -99,8 +99,8 @@ async function findExistingGrant(
   userId: string,
   projectId: string,
 ): Promise<string | null> {
-  // Zitadel Management API v1: global usergrants search with userId + projectId filters
-  const url = `${issuer}/management/v1/usergrants/_search`;
+  // Zitadel Management API v1: search user grants by userId, then filter by projectId client-side
+  const url = `${issuer}/management/v1/users/grants/_search`;
   const response = await fetch(url, {
     method: 'POST',
     headers: {
@@ -109,8 +109,7 @@ async function findExistingGrant(
     },
     body: JSON.stringify({
       queries: [
-        { userIdQuery: { userId } },
-        { projectIdQuery: { projectId } },
+        { user_id_query: { user_id: userId } },
       ],
     }),
   });
