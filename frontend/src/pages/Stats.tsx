@@ -1,5 +1,7 @@
 import { Layout } from '@/components/Layout';
 import { StatsDashboard } from '@/components/StatsDashboard';
+import { AdminPanel } from '@/components/AdminPanel';
+import { RoleGate } from '@/components/RoleGate';
 import { useTranslation } from '@/contexts/LanguageContext';
 
 export function Stats() {
@@ -15,6 +17,10 @@ export function Stats() {
         </div>
 
         <StatsDashboard />
+
+        <RoleGate roles={['SAI_ADMIN']}>
+          <AdminPanel />
+        </RoleGate>
       </div>
     </Layout>
   );
