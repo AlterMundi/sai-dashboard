@@ -96,27 +96,30 @@ export function StatsControls({ value, onChange, className }: StatsControlsProps
   }, [fromDate, dimensionKey, dimensionValue, emitChange]);
 
   const handlePreset = useCallback((preset: typeof PRESETS[0]) => {
+    // Parse date strings as LOCAL time (not UTC) to avoid off-by-one timezone shifts
+    const parseLocal = (dateStr: string): Date => {
+      const [y, m, d] = dateStr.split('-').map(Number);
+      return new Date(y, m - 1, d);
+    };
+
     const applyOffset = (anchor: Date, forward: boolean): Date => {
       const d = new Date(anchor);
-      if (preset.applyDays)   forward ? d.setDate(d.getDate() + preset.applyDays!)         : d.setDate(d.getDate() - preset.applyDays!);
-      else if (preset.applyMonths) forward ? d.setMonth(d.getMonth() + preset.applyMonths!) : d.setMonth(d.getMonth() - preset.applyMonths!);
-      else if (preset.applyYears)  forward ? d.setFullYear(d.getFullYear() + preset.applyYears!) : d.setFullYear(d.getFullYear() - preset.applyYears!);
+      if (preset.applyDays)        forward ? d.setDate(d.getDate() + preset.applyDays!)              : d.setDate(d.getDate() - preset.applyDays!);
+      else if (preset.applyMonths) forward ? d.setMonth(d.getMonth() + preset.applyMonths!)          : d.setMonth(d.getMonth() - preset.applyMonths!);
+      else if (preset.applyYears)  forward ? d.setFullYear(d.getFullYear() + preset.applyYears!)     : d.setFullYear(d.getFullYear() - preset.applyYears!);
       return d;
     };
 
     let s: string, e: string;
     if (fromDate) {
-      // Anchor on "from": extend forward
-      const anchor = new Date(fromDate);
+      const anchor = parseLocal(fromDate);
       s = toDateStr(anchor);
       e = toDateStr(applyOffset(anchor, true));
     } else if (toDate) {
-      // Anchor on "to": extend backward
-      const anchor = new Date(toDate);
+      const anchor = parseLocal(toDate);
       s = toDateStr(applyOffset(anchor, false));
       e = toDateStr(anchor);
     } else {
-      // No anchor: N days back from today
       const today = new Date();
       s = toDateStr(applyOffset(today, false));
       e = toDateStr(today);
