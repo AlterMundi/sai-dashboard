@@ -51,9 +51,13 @@ export function StatsDashboard() {
   // Navigate to gallery with filters for a given date
   const drillDown = useCallback((date: string, extra: Record<string, string> = {}) => {
     const params = new URLSearchParams();
-    // Date range: full day in local time
-    params.set('startDate', `${date}T00:00:00.000`);
-    params.set('endDate', `${date}T23:59:59.999`);
+    // Normalize: date may be ISO "2026-02-18T00:00:00.000Z" or plain "2026-02-18"
+    const ymd = date.slice(0, 10); // always "YYYY-MM-DD"
+    const [y, m, d] = ymd.split('-').map(Number);
+    const start = new Date(y, m - 1, d, 0, 0, 0);
+    const end = new Date(y, m - 1, d, 23, 59, 59, 999);
+    params.set('startDate', start.toISOString());
+    params.set('endDate', end.toISOString());
     // Dimension filter
     const dim = buildDimensionParams();
     for (const [k, v] of Object.entries(dim)) params.set(k, v);

@@ -111,13 +111,17 @@ let etlService: TwoStageETLManager | null = null;
 const startServer = async (): Promise<void> => {
   try {
     // Initialize OIDC client (discover Zitadel issuer metadata)
-    const { initOIDCClient } = require('@/auth/oidc');
-    try {
-      await initOIDCClient();
-      logger.info('OIDC client initialized');
-    } catch (oidcError) {
-      logger.error('Failed to initialize OIDC client (auth will not work):', oidcError);
-      // Don't exit — the server can still start, OIDC errors are reported per-request
+    if (appConfig.features.devBypassAuth) {
+      logger.warn('🔓 DEV_BYPASS_AUTH enabled — skipping OIDC initialization');
+    } else {
+      const { initOIDCClient } = require('@/auth/oidc');
+      try {
+        await initOIDCClient();
+        logger.info('OIDC client initialized');
+      } catch (oidcError) {
+        logger.error('Failed to initialize OIDC client (auth will not work):', oidcError);
+        // Don't exit — the server can still start, OIDC errors are reported per-request
+      }
     }
 
     app.listen(appConfig.port, () => {

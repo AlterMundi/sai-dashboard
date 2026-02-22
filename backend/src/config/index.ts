@@ -8,13 +8,18 @@ config({ path: resolve(__dirname, '../../../.env') });
 /**
  * Validation: Required environment variables
  */
-const requiredEnvVars = [
-  'SESSION_SECRET',
-  'AUTH_ZITADEL_ISSUER',
-  'AUTH_ZITADEL_ID',
-  'AUTH_REDIRECT_URI',
-  'AUTH_POST_LOGOUT_URI',
-] as const;
+// In dev mode with DEV_BYPASS_AUTH, Zitadel config is not required
+const devBypassAuth = process.env.DEV_BYPASS_AUTH === 'true' && process.env.NODE_ENV !== 'production';
+
+const requiredEnvVars = devBypassAuth
+  ? ['SESSION_SECRET'] as const
+  : [
+      'SESSION_SECRET',
+      'AUTH_ZITADEL_ISSUER',
+      'AUTH_ZITADEL_ID',
+      'AUTH_REDIRECT_URI',
+      'AUTH_POST_LOGOUT_URI',
+    ] as const;
 
 // DB passwords + Zitadel project scope required in production only
 const productionRequiredVars = [
@@ -161,6 +166,7 @@ export const appConfig = {
   features: {
     realTimeUpdates: process.env.FEATURE_REAL_TIME_UPDATES !== 'false',
     devTools: process.env.ENABLE_DEV_TOOLS === 'true',
+    devBypassAuth,
   }
 };
 

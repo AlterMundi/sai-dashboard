@@ -3,6 +3,7 @@ import {
   apiRateLimit,
   pendingStatusRateLimit,
   authenticateToken,
+  generateToken,
   requireAuth,
   requireRole,
   optionalAuth
@@ -40,6 +41,7 @@ import {
   readiness,
   liveness
 } from '@/controllers/health';
+import { appConfig } from '@/config';
 import { dualDb } from '@/database/dual-pool';
 import { logger } from '@/utils/logger';
 import { asyncHandler } from '@/utils';
@@ -89,6 +91,21 @@ authRouter.post(
   authenticateToken, requireAuth, requireRole('SAI_ADMIN'),
   rejectUser
 );
+
+// Dev-only: instant login bypass (no Zitadel required)
+if (appConfig.features.devBypassAuth) {
+  authRouter.get('/dev-login', (_req: Request, res: Response) => {
+    const token = generateToken({
+      userId: 'dev-user',
+      email: 'dev@localhost',
+      role: 'SAI_ADMIN',
+      isAuthenticated: true,
+    });
+    logger.info('🔓 Dev bypass: issued token for dev@localhost (SAI_ADMIN)');
+    res.json({ data: { token } });
+  });
+  logger.warn('⚠️  DEV_BYPASS_AUTH is enabled — /auth/dev-login available');
+}
 
 router.use('/auth', authRouter);
 
