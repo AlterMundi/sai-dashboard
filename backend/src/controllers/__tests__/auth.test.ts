@@ -1,24 +1,47 @@
+// Mock @/config before any module imports to prevent process.exit on missing env vars.
+jest.mock('@/config', () => ({
+  appConfig: {
+    security: { sessionSecret: 'test-secret', sessionDuration: 86400, enforceHttps: false, trustProxy: false },
+    rateLimit: { windowMs: 60_000, maxRequests: 60, loginWindowMs: 900_000, loginMaxAttempts: 5 },
+    oidc: { issuer: 'https://auth.example.com', clientId: 'test-client', clientSecret: '', redirectUri: '', postLogoutUri: '', projectId: '', mgmtKeyJson: '' },
+    nodeEnv: 'test',
+  },
+}));
+
+jest.mock('@/utils/logger', () => ({
+  logger: { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() },
+}));
+
+jest.mock('@/auth/oidc', () => ({
+  buildAuthorizationUrl: jest.fn().mockResolvedValue(new URL('https://auth.example.com/authorize')),
+  generatePKCEParams: jest.fn().mockResolvedValue({ codeVerifier: 'v', codeChallenge: 'c', state: 's' }),
+  exchangeCode: jest.fn(),
+  buildLogoutUrl: jest.fn().mockReturnValue(new URL('https://auth.example.com/end_session')),
+}));
+
 import request from 'supertest';
 import express from 'express';
 import jwt from 'jsonwebtoken';
-import { login, logout, validateToken, refreshToken } from '../auth';
-import { loginRateLimit, authenticateToken } from '../../middleware/auth';
+import { logout, validateToken, refreshToken } from '../auth';
+import { authenticateToken } from '../../middleware/auth';
+
+// Must match the sessionSecret in the @/config mock above
+const TEST_SECRET = 'test-secret';
 
 // Inline token helper — no dependency on deleted legacy setup
 const createTestToken = (payload: any = { userId: 'test-user', isAuthenticated: true }) => {
-  return jwt.sign(payload, process.env.SESSION_SECRET!, { expiresIn: '1h' });
+  return jwt.sign(payload, TEST_SECRET, { expiresIn: '1h' });
 };
 
 // Create test app
 const createTestApp = () => {
   const app = express();
   app.use(express.json());
-  
-  app.post('/auth/login', loginRateLimit, login);
+
   app.post('/auth/logout', authenticateToken, logout);
   app.get('/auth/validate', authenticateToken, validateToken);
   app.post('/auth/refresh', authenticateToken, refreshToken);
-  
+
   return app;
 };
 
@@ -30,87 +53,16 @@ describe('Auth Controller', () => {
     jest.clearAllMocks();
   });
 
-  describe('POST /auth/login', () => {
-    it('should login with correct password', async () => {
-      const response = await request(app)
-        .post('/auth/login')
-        .send({ password: 'test_password' })
-        .expect(200);
-
-      expect(response.body).toHaveProperty('data');
-      expect(response.body.data).toHaveProperty('token');
-      expect(response.body.data).toHaveProperty('expiresIn', 86400);
-      expect(typeof response.body.data.token).toBe('string');
-    });
-
-    it('should reject login with incorrect password', async () => {
-      const response = await request(app)
-        .post('/auth/login')
-        .send({ password: 'wrong-password' })
-        .expect(401);
-
-      expect(response.body).toHaveProperty('error');
-      expect(response.body.error.message).toBe('Invalid password');
-      expect(response.body.error.code).toBe('INVALID_CREDENTIALS');
-    });
-
-    it('should reject login without password', async () => {
-      const response = await request(app)
-        .post('/auth/login')
-        .send({})
-        .expect(400);
-
-      expect(response.body).toHaveProperty('error');
-      expect(response.body.error.message).toBe('Password is required');
-      expect(response.body.error.code).toBe('MISSING_PASSWORD');
-    });
-
-    it('should reject login with empty password', async () => {
-      const response = await request(app)
-        .post('/auth/login')
-        .send({ password: '' })
-        .expect(400);
-
-      expect(response.body.error.message).toBe('Password is required');
-    });
-
-    it('should reject login with non-string password', async () => {
-      const response = await request(app)
-        .post('/auth/login')
-        .send({ password: 12345 })
-        .expect(400);
-
-      expect(response.body.error.message).toBe('Password is required');
-    });
-
-    it('should handle rate limiting', async () => {
-      // Note: Rate limiting is bypassed in test environment for localhost
-      // This test would need modification to test actual rate limiting
-      const promises = Array(10).fill(null).map(() =>
-        request(app)
-          .post('/auth/login')
-          .send({ password: 'wrong' })
-      );
-
-      const responses = await Promise.all(promises);
-      
-      // In test environment, all should return 401 (wrong password)
-      responses.forEach(res => {
-        expect(res.status).toBe(401);
-      });
-    });
-  });
-
   describe('POST /auth/logout', () => {
-    it('should logout with valid token', async () => {
+    it('should redirect to Zitadel end_session with valid token', async () => {
       const token = createTestToken();
 
       const response = await request(app)
         .post('/auth/logout')
         .set('Authorization', `Bearer ${token}`)
-        .expect(200);
+        .expect(302);
 
-      expect(response.body.data).toHaveProperty('message', 'Logged out successfully');
+      expect(response.headers['location']).toContain('auth.example.com');
     });
 
     it('should reject logout without token', async () => {
@@ -161,17 +113,12 @@ describe('Auth Controller', () => {
     });
 
     it('should reject expired token', async () => {
-      // Create a token that expires very quickly, then wait for it to expire
       const expiredToken = jwt.sign(
-        { 
-          userId: 'test-user', 
-          isAuthenticated: true
-        },
-        process.env.SESSION_SECRET!,
-        { expiresIn: '1ms' } // Expires in 1 millisecond
+        { userId: 'test-user', isAuthenticated: true },
+        TEST_SECRET,
+        { expiresIn: '1ms' }
       );
-      
-      // Wait for the token to expire
+
       await new Promise(resolve => setTimeout(resolve, 10));
 
       const response = await request(app)
@@ -186,10 +133,9 @@ describe('Auth Controller', () => {
 
   describe('POST /auth/refresh', () => {
     it('should refresh token when close to expiry', async () => {
-      // Create token that expires in 30 minutes (less than 1 hour)
       const nearExpiryToken = jwt.sign(
         { userId: 'test-user', isAuthenticated: true },
-        process.env.SESSION_SECRET!,
+        TEST_SECRET,
         { expiresIn: 1800 } // 30 minutes
       );
 
@@ -200,16 +146,13 @@ describe('Auth Controller', () => {
 
       expect(response.body.data).toHaveProperty('token');
       expect(response.body.data).toHaveProperty('expiresIn', 86400);
-      
-      // New token should be different
       expect(response.body.data.token).not.toBe(nearExpiryToken);
     });
 
     it('should reject refresh for token with lots of time remaining', async () => {
-      // Create a token with 2 hours expiry (more than the 1 hour threshold)
       const token = jwt.sign(
         { userId: 'test-user', isAuthenticated: true },
-        process.env.SESSION_SECRET!,
+        TEST_SECRET,
         { expiresIn: '2h' }
       );
 
