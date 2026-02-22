@@ -27,6 +27,7 @@ COPY --from=builder /app/backend/dist ./backend/dist
 COPY --from=builder /app/frontend/dist ./frontend/dist
 COPY --from=builder /app/package.json ./
 
+USER node
 EXPOSE 3001
 HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
   CMD curl -f http://localhost:3001/dashboard/api/health || exit 1

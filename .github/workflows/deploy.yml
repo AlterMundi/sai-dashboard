@@ -131,6 +131,9 @@ jobs:
             docker stop sai-dashboard 2>/dev/null || true
             docker rm sai-dashboard 2>/dev/null || true
 
+            # Ensure image directories are accessible by container user (node, uid 1000)
+            chown -R 1000:1000 /mnt/raid1/n8n-backup/images
+
             # Start new container
             docker run -d \
               --name sai-dashboard \
