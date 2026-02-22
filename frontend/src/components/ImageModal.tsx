@@ -31,20 +31,11 @@ import {
   FlagOff,
   ZoomIn,
   ZoomOut,
-  ChevronUp,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-
-// Alert level colors for the peek strip
-const alertColors: Record<string, string> = {
-  critical: 'bg-red-600 text-white',
-  high: 'bg-orange-500 text-white',
-  medium: 'bg-yellow-500 text-white',
-  low: 'bg-blue-500 text-white',
-  none: 'bg-gray-200 text-gray-600',
-};
 
 export function ImageModal({ execution, isOpen, onClose, onUpdate, cameraNav, galleryNav, initialNavMode }: ImageModalProps) {
   const { t } = useTranslation();
@@ -55,8 +46,8 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate, cameraNav, ga
   const [showBoundingBoxes, setShowBoundingBoxes] = useState(true);
   const [updatingFalsePositive, setUpdatingFalsePositive] = useState(false);
   const [localIsFalsePositive, setLocalIsFalsePositive] = useState(execution?.isFalsePositive ?? false);
-  // Bottom sheet state (mobile only)
-  const [sheetExpanded, setSheetExpanded] = useState(false);
+  // Detail panel state (mobile top dropdown)
+  const [detailExpanded, setDetailExpanded] = useState(false);
 
   // Navigation mode state
   const [navMode, setNavMode] = useState<'camera' | 'gallery'>(
@@ -92,7 +83,7 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate, cameraNav, ga
     if (execution) {
       setLocalIsFalsePositive(execution.isFalsePositive ?? false);
     }
-    setSheetExpanded(false); // collapse sheet on new execution
+    setDetailExpanded(false); // collapse panel on new execution
   }, [execution?.id, execution?.isFalsePositive]);
 
   // Keep secureImageUrl for the download button handler
@@ -156,16 +147,12 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate, cameraNav, ga
 
   const containerRef   = useRef<HTMLDivElement>(null);
   const dialogRef      = useRef<HTMLDivElement>(null);
-  const sheetRef       = useRef<HTMLDivElement>(null);
-  const sheetHandleRef = useRef<HTMLDivElement>(null);
 
   // Stable refs for use inside imperative event handlers
   const zoomRef          = useRef(zoomLevel);
   const translateRef     = useRef(translate);
-  const sheetExpandedRef = useRef(sheetExpanded);
   useEffect(() => { zoomRef.current = zoomLevel; }, [zoomLevel]);
   useEffect(() => { translateRef.current = translate; }, [translate]);
-  useEffect(() => { sheetExpandedRef.current = sheetExpanded; }, [sheetExpanded]);
 
   // Prevent mouse-emulation events from double-firing on touch devices
   const isTouching = useRef(false);
@@ -308,55 +295,6 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate, cameraNav, ga
       el.removeEventListener('touchcancel',onEnd);
     };
   }, [isOpen, onClose, resetZoomToFit]);
-
-  // ── Bottom sheet drag (handle area) ──────────────────────────────────────
-  useEffect(() => {
-    const handle = sheetHandleRef.current;
-    const sheet  = sheetRef.current;
-    if (!handle || !sheet || !isOpen) return;
-
-    let startY = 0;
-    let dragging = false;
-
-    const onStart = (e: TouchEvent) => {
-      startY = e.touches[0].clientY;
-      dragging = true;
-      sheet.style.transition = 'none';
-    };
-
-    const onMove = (e: TouchEvent) => {
-      if (!dragging) return;
-      e.preventDefault();
-      const dy = e.touches[0].clientY - startY;
-      if (sheetExpandedRef.current && dy > 0) {
-        // dragging down while expanded → lower the sheet
-        sheet.style.transform = `translateY(${dy}px)`;
-      } else if (!sheetExpandedRef.current && dy < 0) {
-        // dragging up while collapsed → pull sheet up from its CSS position
-        const collapsedY = sheet.clientHeight - 48;
-        sheet.style.transform = `translateY(${Math.max(0, collapsedY + dy)}px)`;
-      }
-    };
-
-    const onEnd = (e: TouchEvent) => {
-      if (!dragging) return;
-      dragging = false;
-      sheet.style.transform = '';
-      sheet.style.transition = '';
-      const dy = e.changedTouches[0].clientY - startY;
-      if (!sheetExpandedRef.current && dy < -60) setSheetExpanded(true);
-      if (sheetExpandedRef.current  && dy >  60) setSheetExpanded(false);
-    };
-
-    handle.addEventListener('touchstart', onStart, { passive: true });
-    handle.addEventListener('touchmove',  onMove,  { passive: false });
-    handle.addEventListener('touchend',   onEnd,   { passive: true });
-    return () => {
-      handle.removeEventListener('touchstart', onStart);
-      handle.removeEventListener('touchmove',  onMove);
-      handle.removeEventListener('touchend',   onEnd);
-    };
-  }, [isOpen]);
 
   // ── Escape / Arrow keys + body scroll lock ───────────────────────────────
   useEffect(() => {
@@ -730,9 +668,28 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate, cameraNav, ga
           className="shrink-0 flex items-center justify-between px-3 sm:px-4 pb-3 border-b border-gray-200 bg-gray-50"
           style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}
         >
-          <h2 className="text-base sm:text-lg font-semibold text-gray-900 truncate min-w-0">
-            {t('modal.execution')} <span className="font-mono">#{execution.id}</span>
-          </h2>
+          {/* Title — tappable on mobile to toggle detail panel */}
+          <button
+            onClick={() => setDetailExpanded(prev => !prev)}
+            className="lg:pointer-events-none flex items-center gap-1 min-w-0 rounded-lg px-1 -mx-1 transition-colors lg:hover:bg-transparent hover:bg-gray-200/60 active:bg-gray-200"
+          >
+            <h2 className="text-base sm:text-lg font-semibold text-gray-900 truncate min-w-0">
+              {t('modal.execution')} <span className="font-mono">#{execution.id}</span>
+            </h2>
+            <ChevronDown className={cn('h-4 w-4 text-gray-400 shrink-0 transition-transform duration-300 lg:hidden', detailExpanded && 'rotate-180')} />
+          </button>
+
+          {/* Bounding Box Toggle — center of header */}
+          {execution.detections && execution.detections.length > 0 && !imageError && !!imageUrl && (
+            <div className="shrink-0 mx-1">
+              <BoundingBoxToggle
+                visible={showBoundingBoxes}
+                onToggle={setShowBoundingBoxes}
+                detectionCount={execution.detections.length}
+              />
+            </div>
+          )}
+
           <div className="flex items-center shrink-0">
             <button onClick={handleCopyId}
               className="flex items-center justify-center min-w-[44px] min-h-[44px] text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
@@ -760,22 +717,19 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate, cameraNav, ga
           </div>
         </div>
 
+        {/* Mobile detail dropdown */}
+        <div className={cn(
+          'lg:hidden overflow-hidden border-b border-gray-200 bg-white transition-all duration-300 ease-out',
+          detailExpanded ? 'max-h-[calc(100dvh-4rem)] overflow-y-auto overscroll-contain' : 'max-h-0 border-b-0'
+        )}>
+          <SidebarContent />
+        </div>
+
         {/* Content */}
         <div className="flex-1 flex flex-col lg:flex-row min-h-0 overflow-hidden">
 
           {/* Image section — fills ALL remaining height on mobile (sheet overlays it) */}
           <div className="flex-1 bg-gray-900 flex flex-col min-h-0 min-w-0 relative overflow-hidden">
-            {/* Bounding Box Toggle */}
-            {execution.detections && execution.detections.length > 0 && !imageError && !!imageUrl && (
-              <div className="flex justify-center p-2 bg-gray-800 shrink-0">
-                <BoundingBoxToggle
-                  visible={showBoundingBoxes}
-                  onToggle={setShowBoundingBoxes}
-                  detectionCount={execution.detections.length}
-                />
-              </div>
-            )}
-
             {/* Image container */}
             <div
               ref={containerRef}
@@ -906,7 +860,7 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate, cameraNav, ga
 
               {/* Counter + mode selector + FPS selector */}
               {activeNav && activeNav.total > 1 && (
-                <div className="absolute bottom-14 sm:bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 bg-black/60 rounded-lg px-2.5 py-1.5 z-10 select-none">
+                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 bg-black/60 rounded-lg px-2.5 py-1.5 z-10 select-none">
                   {/* Position counter */}
                   <span className="text-white text-xs font-mono tabular-nums pr-1">
                     {activeNav.index + 1} / {activeNav.total}
@@ -967,63 +921,6 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate, cameraNav, ga
           </div>
         </div>
 
-        {/* ── Mobile bottom sheet ── (hidden on lg+) */}
-        <div
-          ref={sheetRef}
-          className={cn(
-            'lg:hidden absolute inset-x-0 bottom-0 bg-white rounded-t-2xl z-20',
-            'shadow-[0_-4px_24px_rgba(0,0,0,0.18)] flex flex-col',
-            'transition-transform duration-300 ease-out',
-            sheetExpanded ? 'translate-y-0' : 'translate-y-[calc(100%-3rem)]',
-          )}
-          style={{
-            maxHeight: 'calc(100% - 3.5rem)',
-            paddingBottom: 'env(safe-area-inset-bottom)',
-          }}
-        >
-          {/* Handle + collapsed peek */}
-          <div
-            ref={sheetHandleRef}
-            className="shrink-0 flex flex-col items-center pt-2 pb-1 cursor-grab active:cursor-grabbing select-none"
-            onClick={() => setSheetExpanded(v => !v)}
-          >
-            {/* Drag bar */}
-            <div className="w-10 h-1 rounded-full bg-gray-300 mb-2" />
-
-            {/* Collapsed info strip — hidden when expanded */}
-            <div className={cn(
-              'flex items-center gap-2 px-4 pb-1 text-xs transition-opacity',
-              sheetExpanded ? 'opacity-0 pointer-events-none' : 'opacity-100'
-            )}>
-              {execution.alertLevel && execution.alertLevel !== 'none' && (
-                <span className={cn('px-2 py-0.5 rounded font-bold uppercase text-xs',
-                  alertColors[execution.alertLevel] ?? alertColors.none)}>
-                  {execution.alertLevel}
-                </span>
-              )}
-              {execution.cameraId && (
-                <span className="flex items-center gap-1 text-gray-600">
-                  <Camera className="h-3 w-3" />{execution.cameraId}
-                </span>
-              )}
-              {execution.hasSmoke && (
-                <span className="flex items-center gap-1 text-gray-600">
-                  <Wind className="h-3 w-3" />
-                  {execution.confidenceSmoke
-                    ? `${Math.round(execution.confidenceSmoke * 100)}%`
-                    : 'smoke'}
-                </span>
-              )}
-              {/* Chevron hint */}
-              <ChevronUp className="h-4 w-4 text-gray-400 ml-auto" />
-            </div>
-          </div>
-
-          {/* Scrollable sheet content */}
-          <div className="overflow-y-auto flex-1 overscroll-contain">
-            <SidebarContent />
-          </div>
-        </div>
       </div>
     </div>
   );
