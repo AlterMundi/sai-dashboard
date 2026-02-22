@@ -20,3 +20,11 @@ CREATE TABLE IF NOT EXISTS dataset_jobs (
 CREATE INDEX idx_dataset_jobs_status   ON dataset_jobs(status);
 CREATE INDEX idx_dataset_jobs_dataset  ON dataset_jobs(dataset_name);
 CREATE INDEX idx_dataset_jobs_created  ON dataset_jobs(created_at DESC);
+
+-- Grant access to the application user (sai_user on production)
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sai_user') THEN
+    EXECUTE 'GRANT ALL ON dataset_jobs TO sai_user';
+  END IF;
+END $$;
