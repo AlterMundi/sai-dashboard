@@ -99,10 +99,15 @@ async function findExistingGrant(
   userId: string,
   projectId: string,
 ): Promise<string | null> {
-  // Fetch all grants for this user (no server-side filter — filter client-side)
-  const url = `${issuer}/management/v1/users/${userId}/grants`;
+  // Zitadel Management API requires POST /_search to list grants
+  const url = `${issuer}/management/v1/users/${userId}/grants/_search`;
   const response = await fetch(url, {
-    headers: { Authorization: `Bearer ${token}` },
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({}),
   });
 
   if (!response.ok) {
