@@ -210,6 +210,7 @@ const en = {
     noImagesAvailable: 'No images available for selected executions',
     downloaded: 'Downloaded {count} image{s}',
     downloadFailed: 'Failed to download images',
+    latestDetections: 'Latest detections',
   },
   batch: {
     selected: '{count} selected',

@@ -2,6 +2,7 @@ import { useState, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
 import { ImageGallery } from '@/components/ImageGallery';
+import { LatestDetectionsCarousel } from '@/components/LatestDetectionsCarousel';
 import { AlertFilterComponent } from '@/components/AlertFilterComponent';
 import { ExportDropdown } from '@/components/ExportDropdown';
 import { AdvancedSearchPanel, CompoundSearchCriteria } from '@/components/AdvancedSearchPanel';
@@ -238,9 +239,24 @@ export function Dashboard() {
     clearAllFilters();
   }, [clearAllFilters]);
 
+  const handleCarouselSelect = useCallback((execution: { executionTimestamp: string }) => {
+    // Filter gallery to show detections around this execution's time
+    const ts = new Date(execution.executionTimestamp);
+    const dayStart = new Date(ts.getFullYear(), ts.getMonth(), ts.getDate());
+    const dayEnd = new Date(ts.getFullYear(), ts.getMonth(), ts.getDate(), 23, 59, 59, 999);
+    setFilters({
+      hasSmoke: true,
+      startDate: dayStart.toISOString(),
+      endDate: dayEnd.toISOString(),
+    });
+  }, [setFilters]);
+
   return (
     <Layout>
       <div className="space-y-8">
+        {/* Latest Detections Carousel */}
+        <LatestDetectionsCarousel onSelect={handleCarouselSelect} />
+
         {/* Filters and Export */}
         <div className="space-y-4">
           <AlertFilterComponent

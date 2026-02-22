@@ -212,6 +212,7 @@ const es: TranslationKeys = {
     noImagesAvailable: 'No hay im\u00e1genes disponibles para las ejecuciones seleccionadas',
     downloaded: '{count} imagen{s} descargada{s}',
     downloadFailed: 'Error al descargar im\u00e1genes',
+    latestDetections: '\u00daltimas detecciones',
   },
   batch: {
     selected: '{count} seleccionados',
