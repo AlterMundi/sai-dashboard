@@ -131,7 +131,7 @@ export const handleCallback = asyncHandler(async (req: Request, res: Response): 
 
     const frontendBase = appConfig.oidc.postLogoutUri || '/';
     res.redirect(
-      `${frontendBase}pending-approval?email=${encodeURIComponent(email)}`
+      `${frontendBase}pending-approval?email=${encodeURIComponent(email)}&sub=${encodeURIComponent(userId)}`
     );
     return;
   }
