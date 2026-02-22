@@ -103,29 +103,32 @@ export function useExecutions(
   }, []);
 
   // Update execution processing stage (for Stage 2 completion)
-  const updateExecutionStage = useCallback((executionId: number, stage: ProcessingStage, additionalData?: any) => {
+  const updateExecutionStage = useCallback((executionId: number, stage: ProcessingStage, additionalData?: any): boolean => {
+    let found = false;
+
     setExecutions(prev => prev.map(exec => {
-      if (exec.id === executionId) {
-        const updatedExec = {
-          ...exec,
-          processingStage: stage,
-          ...additionalData
-        };
+      if (exec.id !== executionId) return exec;
 
-        // If Stage 2 completed, update the execution data with new information
-        if (stage === 'stage2' && additionalData) {
-          updatedExec.hasSmoke = additionalData.has_smoke ?? exec.hasSmoke;
-          updatedExec.alertLevel = additionalData.alert_level ?? exec.alertLevel;
-          updatedExec.detectionCount = additionalData.detection_count ?? exec.detectionCount;
-          updatedExec.hasImage = additionalData.has_image ?? exec.hasImage;
-          updatedExec.telegramSent = additionalData.telegram_sent ?? exec.telegramSent;
-        }
+      found = true;
+      const updatedExec = {
+        ...exec,
+        processingStage: stage,
+        ...additionalData
+      };
 
-        console.log(`🔄 Updated execution ${executionId} to stage ${stage}`);
-        return updatedExec;
+      if (stage === 'stage2' && additionalData) {
+        updatedExec.hasSmoke = additionalData.has_smoke ?? exec.hasSmoke;
+        updatedExec.alertLevel = additionalData.alert_level ?? exec.alertLevel;
+        updatedExec.detectionCount = additionalData.detection_count ?? exec.detectionCount;
+        updatedExec.hasImage = additionalData.has_image ?? exec.hasImage;
+        updatedExec.telegramSent = additionalData.telegram_sent ?? exec.telegramSent;
       }
-      return exec;
+
+      console.log(`🔄 Updated execution ${executionId} to stage ${stage}`);
+      return updatedExec;
     }));
+
+    return found;
   }, []);
 
   // Sync internal filters when external initialFilters change

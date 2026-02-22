@@ -34,7 +34,7 @@ export interface UseExecutionsReturn {
   updateFilters: (filters: ExecutionFilters) => void;
   filters: ExecutionFilters;
   prependExecutions: (executions: ExecutionWithImageUrls[]) => void;
-  updateExecutionStage: (executionId: number, stage: ProcessingStage, additionalData?: any) => void;
+  updateExecutionStage: (executionId: number, stage: ProcessingStage, additionalData?: any) => boolean;
   totalResults: number;
 }
 
