@@ -55,6 +55,8 @@ export function getOIDCClient(): Client {
 export function buildAuthorizationUrl(params: {
   state: string;
   codeChallenge: string;
+  /** Pass 'login' to force Zitadel to re-authenticate and re-issue grants (post-approval flow). */
+  prompt?: 'login';
 }): URL {
   const client = getOIDCClient();
   const projectId = appConfig.oidc.projectId;
@@ -78,6 +80,7 @@ export function buildAuthorizationUrl(params: {
     state: params.state,
     code_challenge: params.codeChallenge,
     code_challenge_method: 'S256',
+    ...(params.prompt ? { prompt: params.prompt } : {}),
   });
 
   return new URL(authUrl);

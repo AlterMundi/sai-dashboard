@@ -26,7 +26,11 @@ export function PendingApproval() {
 
       if (result.status === 'approved') {
         if (intervalRef.current) clearInterval(intervalRef.current);
-        setTimeout(() => authApi.login(), 1500);
+        // Use loginFresh() instead of login() to force Zitadel to re-authenticate
+        // and issue a new token that includes the newly assigned role grant.
+        // Without this, Zitadel may reuse the cached SSO session and return a token
+        // without the new grant, causing an infinite redirect loop to pending-approval.
+        setTimeout(() => authApi.loginFresh(), 1500);
       } else if (result.status === 'rejected') {
         if (intervalRef.current) clearInterval(intervalRef.current);
       }

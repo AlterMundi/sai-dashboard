@@ -68,6 +68,10 @@ function RouteTitleManager() {
       pageTitle = t('login.title');
     } else if (pathname === '/stats') {
       pageTitle = t('stats.title');
+    } else if (pathname === '/pending-approval') {
+      pageTitle = 'Acceso pendiente';
+    } else if (pathname === '/auth/callback') {
+      pageTitle = 'Autenticando…';
     } else if (pathname !== '/') {
       pageTitle = t('notFound.title');
     }

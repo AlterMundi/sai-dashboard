@@ -32,7 +32,14 @@ const CLEAR_COOKIE_OPTS = {
 export const initiateOIDC = asyncHandler(async (req: Request, res: Response): Promise<void> => {
   const { state, codeVerifier, codeChallenge } = generatePKCEParams();
 
-  const authUrl = buildAuthorizationUrl({ state, codeChallenge });
+  // Allow post-approval flow to force re-authentication so Zitadel issues
+  // a fresh token that includes the newly assigned grant (not cached session claims).
+  const forceLogin = req.query.prompt === 'login';
+  const authUrl = buildAuthorizationUrl({
+    state,
+    codeChallenge,
+    ...(forceLogin ? { prompt: 'login' } : {}),
+  });
 
   // Store ephemeral PKCE params in signed cookies (10 min TTL)
   res.cookie('oidc_state', state, COOKIE_OPTS);

@@ -107,6 +107,19 @@ export const authApi = {
   },
 
   /**
+   * Like login() but adds prompt=login so Zitadel forces re-authentication
+   * and re-issues the token with current grants.
+   *
+   * Used by the pending-approval flow: after the admin assigns a role, the user's
+   * existing Zitadel SSO session may not include the new grant in its cached claims.
+   * prompt=login bypasses session caching and guarantees a fresh token.
+   */
+  loginFresh(): void {
+    const baseUrl = import.meta.env.VITE_API_URL || '/api';
+    window.location.href = `${baseUrl}/auth/login?prompt=login`;
+  },
+
+  /**
    * Logout: clear local token then redirect to backend /auth/logout
    * (which redirects to Zitadel end_session).
    */
