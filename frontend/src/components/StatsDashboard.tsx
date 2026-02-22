@@ -80,6 +80,14 @@ export function StatsDashboard() {
     drillDown(date, { hasSmoke: 'true' });
   }, [drillDown]);
 
+  const handleRankingClick = useCallback((dimension: 'cameraId' | 'location' | 'nodeId', value: string) => {
+    const params = new URLSearchParams();
+    params.set('startDate', filters.startDate);
+    params.set('endDate', filters.endDate);
+    params.set(dimension, value);
+    navigate({ pathname: '/', search: params.toString() });
+  }, [navigate, filters.startDate, filters.endDate]);
+
   if (isLoading && summary.length === 0) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -263,6 +271,7 @@ export function StatsDashboard() {
         <RankingPanel
           startDate={filters.startDate}
           endDate={filters.endDate}
+          onItemClick={handleRankingClick}
         />
       )}
     </div>

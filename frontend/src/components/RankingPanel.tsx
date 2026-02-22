@@ -7,6 +7,7 @@ interface RankingPanelProps {
   startDate: string;
   endDate: string;
   className?: string;
+  onItemClick?: (dimension: 'cameraId' | 'location' | 'nodeId', value: string) => void;
 }
 
 interface MiniBarListProps {
@@ -15,9 +16,10 @@ interface MiniBarListProps {
   getValue: (item: StatsRankingItem) => number;
   bgClass: string;
   noDataLabel: string;
+  onItemClick?: (id: string) => void;
 }
 
-function MiniBarList({ title, items, getValue, bgClass, noDataLabel }: MiniBarListProps) {
+function MiniBarList({ title, items, getValue, bgClass, noDataLabel, onItemClick }: MiniBarListProps) {
   const sorted = [...items].sort((a, b) => getValue(b) - getValue(a));
   const maxVal = Math.max(...sorted.map(getValue), 1);
 
@@ -34,7 +36,15 @@ function MiniBarList({ title, items, getValue, bgClass, noDataLabel }: MiniBarLi
             const val = getValue(item);
             const widthPct = (val / maxVal) * 100;
             return (
-              <div key={item.id} className="flex items-center gap-2">
+              <div
+                key={item.id}
+                className={cn(
+                  'flex items-center gap-2',
+                  onItemClick && 'cursor-pointer hover:bg-gray-50 -mx-1 px-1 rounded transition-colors',
+                )}
+                role={onItemClick ? 'button' : undefined}
+                onClick={onItemClick ? () => onItemClick(item.id) : undefined}
+              >
                 <span className="text-[11px] text-gray-500 w-24 truncate shrink-0" title={item.id}>
                   {item.id}
                 </span>
@@ -56,7 +66,7 @@ function MiniBarList({ title, items, getValue, bgClass, noDataLabel }: MiniBarLi
   );
 }
 
-export function RankingPanel({ startDate, endDate, className }: RankingPanelProps) {
+export function RankingPanel({ startDate, endDate, className, onItemClick }: RankingPanelProps) {
   const { t } = useTranslation();
   const { ranking, isLoading } = useStatsRanking(startDate, endDate);
 
@@ -97,6 +107,7 @@ export function RankingPanel({ startDate, endDate, className }: RankingPanelProp
           getValue={(item) => item.smokeDetections}
           bgClass="bg-slate-400"
           noDataLabel={noData}
+          onItemClick={onItemClick ? (id) => onItemClick('cameraId', id) : undefined}
         />
         <MiniBarList
           title={t('stats.ranking.locations')}
@@ -104,6 +115,7 @@ export function RankingPanel({ startDate, endDate, className }: RankingPanelProp
           getValue={(item) => item.criticalAlerts}
           bgClass="bg-red-400"
           noDataLabel={noData}
+          onItemClick={onItemClick ? (id) => onItemClick('location', id) : undefined}
         />
         <MiniBarList
           title={t('stats.ranking.nodes')}
@@ -111,6 +123,7 @@ export function RankingPanel({ startDate, endDate, className }: RankingPanelProp
           getValue={(item) => item.totalExecutions}
           bgClass="bg-sky-400"
           noDataLabel={noData}
+          onItemClick={onItemClick ? (id) => onItemClick('nodeId', id) : undefined}
         />
       </div>
     </div>
