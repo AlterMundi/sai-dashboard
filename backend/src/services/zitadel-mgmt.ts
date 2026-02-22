@@ -85,9 +85,38 @@ async function getMgmtToken(): Promise<string> {
   return data.access_token;
 }
 
+interface UserGrantListResponse {
+  result?: Array<{ id: string; projectId: string; roleKeys: string[] }>;
+}
+
+/**
+ * Find an existing user grant for the configured project.
+ * Returns the grant ID if found, null otherwise.
+ */
+async function findExistingGrant(
+  token: string,
+  issuer: string,
+  userId: string,
+  projectId: string,
+): Promise<string | null> {
+  const url = `${issuer}/management/v1/users/${userId}/grants?projectId=${encodeURIComponent(projectId)}`;
+  const response = await fetch(url, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (!response.ok) {
+    return null;
+  }
+
+  const data = (await response.json()) as UserGrantListResponse;
+  const grant = data.result?.find((g) => g.projectId === projectId);
+  return grant?.id ?? null;
+}
+
 /**
  * Assign a project role to a user via the Zitadel Management API.
- * Creates a user grant for the configured project.
+ * Creates a user grant for the configured project, or updates the existing one
+ * if a grant already exists (409 Conflict).
  */
 export async function assignRole(userId: string, roleKey: string): Promise<void> {
   const token = await getMgmtToken();
@@ -104,6 +133,41 @@ export async function assignRole(userId: string, roleKey: string): Promise<void>
     },
     body: JSON.stringify({ projectId, roleKeys: [roleKey] }),
   });
+
+  // 409 means a grant already exists for this project — update it instead
+  if (response.status === 409) {
+    logger.info('Zitadel: grant already exists, updating', { userId, roleKey, projectId });
+
+    const grantId = await findExistingGrant(token, issuer, userId, projectId);
+    if (!grantId) {
+      throw new Error('Failed to assign role in Zitadel: grant exists but could not retrieve grant ID');
+    }
+
+    const updateUrl = `${issuer}/management/v1/users/${userId}/grants/${grantId}`;
+    const updateResponse = await fetch(updateUrl, {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ roleKeys: [roleKey] }),
+    });
+
+    if (!updateResponse.ok) {
+      let message = updateResponse.statusText;
+      try {
+        const body = (await updateResponse.json()) as { message?: string };
+        if (body.message) message = body.message;
+      } catch {
+        // ignore parse errors
+      }
+      logger.error('Zitadel: failed to update existing grant', { userId, roleKey, grantId, status: updateResponse.status, message });
+      throw new Error(`Failed to update role in Zitadel: ${message}`);
+    }
+
+    logger.info('Zitadel: existing grant updated', { userId, roleKey, projectId, grantId });
+    return;
+  }
 
   if (!response.ok) {
     let message = response.statusText;
