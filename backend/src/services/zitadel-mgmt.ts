@@ -99,16 +99,22 @@ async function findExistingGrant(
   userId: string,
   projectId: string,
 ): Promise<string | null> {
-  const url = `${issuer}/management/v1/users/${userId}/grants?projectId=${encodeURIComponent(projectId)}`;
+  // Fetch all grants for this user (no server-side filter — filter client-side)
+  const url = `${issuer}/management/v1/users/${userId}/grants`;
   const response = await fetch(url, {
     headers: { Authorization: `Bearer ${token}` },
   });
 
   if (!response.ok) {
+    const text = await response.text().catch(() => '');
+    logger.error('Zitadel: failed to list user grants', {
+      userId, projectId, status: response.status, body: text,
+    });
     return null;
   }
 
   const data = (await response.json()) as UserGrantListResponse;
+  logger.debug('Zitadel: user grants list', { userId, grants: data.result });
   const grant = data.result?.find((g) => g.projectId === projectId);
   return grant?.id ?? null;
 }
