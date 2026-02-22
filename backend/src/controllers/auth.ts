@@ -6,7 +6,7 @@ import { asyncHandler } from '@/utils';
 import { buildAuthorizationUrl, generatePKCEParams, exchangeCode, buildLogoutUrl } from '@/auth/oidc';
 import { extractRole } from '@/auth/roles';
 import { appConfig } from '@/config';
-import { upsertPendingUser } from '@/services/pending-users-service';
+import { upsertPendingUser, getPendingUserBySub } from '@/services/pending-users-service';
 
 const COOKIE_OPTS = {
   httpOnly: true,
@@ -131,7 +131,7 @@ export const handleCallback = asyncHandler(async (req: Request, res: Response): 
 
     const frontendBase = appConfig.oidc.postLogoutUri || '/';
     res.redirect(
-      `${frontendBase}pending-approval?email=${encodeURIComponent(email)}`
+      `${frontendBase}pending-approval?email=${encodeURIComponent(email)}&sub=${encodeURIComponent(userId)}`
     );
     return;
   }
@@ -240,3 +240,37 @@ export const refreshToken = asyncHandler(async (req: Request, res: Response): Pr
 
   res.json({ data: response });
 });
+
+/**
+ * GET /auth/pending/status?sub=<zitadel_sub>
+ * Public endpoint (no auth required). Returns the approval status for a pending user.
+ * Used by the PendingApproval frontend page to poll for status changes.
+ */
+export const getPendingStatus = asyncHandler(
+  async (req: Request, res: Response): Promise<void> => {
+    const { sub } = req.query as { sub?: string };
+
+    if (!sub) {
+      res.status(400).json({
+        error: { message: 'sub query parameter is required', code: 'MISSING_SUB' },
+      });
+      return;
+    }
+
+    if (sub.length > 128) {
+      res.status(400).json({
+        error: { message: 'Invalid sub parameter', code: 'INVALID_SUB' },
+      });
+      return;
+    }
+
+    const user = await getPendingUserBySub(sub);
+
+    if (!user) {
+      res.json({ data: { status: 'not_found' } });
+      return;
+    }
+
+    res.json({ data: { status: user.status } });
+  }
+);

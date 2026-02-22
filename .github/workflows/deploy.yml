@@ -90,7 +90,6 @@ jobs:
             printf 'AUTH_ZITADEL_SECRET=\n'
             printf 'AUTH_REDIRECT_URI=https://sai.altermundi.net/dashboard/api/auth/callback\n'
             printf 'AUTH_POST_LOGOUT_URI=https://sai.altermundi.net/dashboard/\n'
-            printf 'ZITADEL_ROLES_CLAIM=urn:zitadel:iam:org:project:roles\n'
             printf 'SESSION_DURATION=86400\n'
             printf 'TRUST_PROXY=true\n'
             printf 'ENFORCE_HTTPS=true\n'

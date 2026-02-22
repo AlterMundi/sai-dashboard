@@ -38,6 +38,23 @@ export const apiRateLimit = rateLimit({
   }
 });
 
+// Dedicated rate limit for the public pending-status polling endpoint.
+// 30 req / 5 min per IP — enough for 30s polling + manual checks from a
+// handful of users behind the same NAT, while preventing DB hammering.
+export const pendingStatusRateLimit = rateLimit({
+  windowMs: 5 * 60 * 1000,   // 5 minutes
+  max: 30,
+  message: {
+    error: {
+      message: 'Too many status requests, please try again later',
+      code: 'RATE_LIMIT_EXCEEDED'
+    }
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => req.ip || 'unknown',
+});
+
 export const generateToken = (sessionData: Omit<SessionData, 'createdAt' | 'expiresAt'>): string => {
   const { idToken, ...rest } = sessionData;
   const payload: Record<string, unknown> = {
