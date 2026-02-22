@@ -18,6 +18,42 @@ import path from 'path';
 import fs from 'fs';
 
 /**
+ * Content-Type map for image extensions
+ */
+const IMAGE_CONTENT_TYPES: Record<string, string> = {
+  '.webp': 'image/webp',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.png': 'image/png',
+};
+
+/**
+ * Serve an image via nginx X-Accel-Redirect (zero-copy sendfile).
+ * Express handles auth + path resolution, then delegates file I/O to nginx.
+ * Falls back to res.sendFile() in development (no nginx).
+ */
+function sendImageViaAccel(res: Response, imagePath: string): void {
+  const resolved = path.resolve(imagePath);
+  const basePath = cacheConfig.basePath;
+
+  const ext = path.extname(resolved).toLowerCase();
+  const contentType = IMAGE_CONTENT_TYPES[ext] || 'application/octet-stream';
+
+  res.set('Content-Type', contentType);
+  res.set('Cache-Control', 'public, max-age=31536000, immutable');
+
+  // X-Accel-Redirect: strip basePath to get relative path for nginx internal location
+  if (resolved.startsWith(basePath)) {
+    const relative = resolved.slice(basePath.length);
+    res.set('X-Accel-Redirect', `/internal-images${relative}`);
+    res.status(200).end();
+  } else {
+    // Fallback for paths outside basePath (legacy absolute paths, dev mode)
+    res.sendFile(resolved);
+  }
+}
+
+/**
  * Resolve a relative image path to an absolute filesystem path
  * Uses IMAGE_BASE_PATH from configuration
  */
@@ -220,8 +256,7 @@ export const getExecutionImage = asyncHandler(async (req: Request, res: Response
     return;
   }
 
-  res.set('Cache-Control', 'public, max-age=31536000, immutable');
-  res.sendFile(path.resolve(imagePath));
+  sendImageViaAccel(res, imagePath);
 });
 
 export const getExecutionImageWebP = asyncHandler(async (req: Request, res: Response): Promise<void> => {
@@ -254,8 +289,7 @@ export const getExecutionImageWebP = asyncHandler(async (req: Request, res: Resp
     return;
   }
 
-  res.set('Cache-Control', 'public, max-age=31536000, immutable');
-  res.sendFile(path.resolve(imagePath));
+  sendImageViaAccel(res, imagePath);
 });
 
 export const getExecutionThumbnail = asyncHandler(async (req: Request, res: Response): Promise<void> => {
@@ -283,8 +317,7 @@ export const getExecutionThumbnail = asyncHandler(async (req: Request, res: Resp
     return;
   }
 
-  res.set('Cache-Control', 'public, max-age=31536000, immutable');
-  res.sendFile(path.resolve(thumbnailPath));
+  sendImageViaAccel(res, thumbnailPath);
 });
 
 export const getExecutionData = asyncHandler(async (req: Request, res: Response): Promise<void> => {
