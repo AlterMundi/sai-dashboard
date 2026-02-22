@@ -8,7 +8,7 @@ import { AdvancedSearchPanel, CompoundSearchCriteria } from '@/components/Advanc
 import { useDailySummary, useExecutions } from '@/hooks/useExecutions';
 import { executionsApi, detectionsApi, DetectionFilterCriteria } from '@/services/api';
 import { useSSEHandler } from '@/contexts/SSEContext';
-import { ExecutionFilters, SSEStage2CompletionEvent, SSEStage2FailureEvent } from '@/types';
+import { ExecutionFilters, ExecutionWithImageUrls, SSEStage2CompletionEvent, SSEStage2FailureEvent } from '@/types';
 import toast from 'react-hot-toast';
 
 function parseFiltersFromURL(searchParams: URLSearchParams): ExecutionFilters {
@@ -84,20 +84,28 @@ export function Dashboard() {
   }, [filters]);
 
   // Handle Stage 2 ETL completion
-  const onStage2Complete = useCallback((data: SSEStage2CompletionEvent) => {
+  const onStage2Complete = useCallback(async (data: SSEStage2CompletionEvent) => {
     console.log('🔄 Dashboard: Stage 2 completion received', data);
+    if (!data.execution_id) return;
 
-    // Update the specific execution with new Stage 2 data
-    if (updateExecutionStage && data.execution_id) {
-      updateExecutionStage(data.execution_id, 'stage2', {
-        has_smoke: data.extracted_data?.has_smoke,
-        alert_level: data.extracted_data?.alert_level,
-        detection_count: data.extracted_data?.detection_count,
-        has_image: data.extracted_data?.has_image,
-        telegram_sent: data.extracted_data?.telegram_sent,
-      });
+    const wasUpdated = updateExecutionStage(data.execution_id, 'stage2', {
+      has_smoke: data.extracted_data?.has_smoke,
+      alert_level: data.extracted_data?.alert_level,
+      detection_count: data.extracted_data?.detection_count,
+      has_image: data.extracted_data?.has_image,
+      telegram_sent: data.extracted_data?.telegram_sent,
+    });
+
+    if (!wasUpdated && galleryPrependRef.current) {
+      console.log(`📥 Dashboard: Execution ${data.execution_id} not in gallery, fetching and prepending`);
+      try {
+        const execution = await executionsApi.getExecutionById(data.execution_id);
+        if (execution) galleryPrependRef.current([execution as ExecutionWithImageUrls]);
+      } catch (fetchError) {
+        console.warn(`Failed to fetch execution ${data.execution_id} after Stage 2 completion`, fetchError);
+      }
     }
-  }, [updateExecutionStage]);
+  }, [updateExecutionStage, galleryPrependRef]);
 
   // Handle Stage 2 ETL failure
   const onStage2Failure = useCallback((data: SSEStage2FailureEvent) => {
