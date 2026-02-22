@@ -112,7 +112,7 @@ export function RankingPanel({ startDate, endDate, className, onItemClick }: Ran
         <MiniBarList
           title={t('stats.ranking.locations')}
           items={ranking.locations}
-          getValue={(item) => item.criticalAlerts}
+          getValue={(item) => item.smokeDetections}
           bgClass="bg-red-400"
           noDataLabel={noData}
           onItemClick={onItemClick ? (id) => onItemClick('location', id) : undefined}
