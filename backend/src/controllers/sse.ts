@@ -514,8 +514,9 @@ export const notifyExecutionProgress = async (executionId: string, progress: {
 let systemMonitoringInterval: NodeJS.Timeout | null = null;
 let executionPollingInterval: NodeJS.Timeout | null = null;
 
-// Execution tracking - no more batching, immediate broadcast
-let lastKnownExecutionId: number | null = null;
+// Execution tracking — Set-based to avoid cursor race conditions
+const broadcastedExecutionIds = new Set<number>();
+const MAX_BROADCAST_TRACKED = 200;
 
 // Poll for new executions and broadcast immediately
 const pollAndBroadcastExecutions = async (): Promise<void> => {
@@ -538,28 +539,28 @@ const pollAndBroadcastExecutions = async (): Promise<void> => {
     if (latestExecutions.executions.length === 0) return;
 
     const newExecutions = [];
-
-    // Find new executions since last known ID
-    // Only broadcast executions that have completed Stage 2 ETL (have image data)
     for (const execution of latestExecutions.executions) {
-      if (execution.id === lastKnownExecutionId) {
-        break; // Found where we left off
+      // Skip already-broadcast executions
+      if (broadcastedExecutionIds.has(execution.id)) continue;
+
+      // Skip executions where Stage 2 hasn't completed yet
+      if (!execution.extractedAt) {
+        logger.debug(`Skipping execution ${execution.id} - Stage 2 ETL not yet complete`);
+        continue;
       }
 
-      // Only include executions where Stage 2 has completed
-      // extractedAt is ONLY set after Stage 2 ETL completes (including image processing)
-      if (execution.extractedAt) {
-        newExecutions.push(execution);
-      } else {
-        // Skip this execution - Stage 2 hasn't completed yet
-        // It will be picked up in the next poll cycle
-        logger.debug(`Skipping execution ${execution.id} - Stage 2 ETL not yet complete (extractedAt: ${execution.extractedAt}, hasImage: ${execution.hasImage})`);
-      }
+      newExecutions.push(execution);
+      broadcastedExecutionIds.add(execution.id);
+    }
+
+    // Trim the set to prevent unbounded memory growth (keep newest MAX_BROADCAST_TRACKED IDs)
+    if (broadcastedExecutionIds.size > MAX_BROADCAST_TRACKED) {
+      const sorted = [...broadcastedExecutionIds].sort((a, b) => a - b);
+      sorted.slice(0, broadcastedExecutionIds.size - MAX_BROADCAST_TRACKED)
+        .forEach(id => broadcastedExecutionIds.delete(id));
     }
 
     if (newExecutions.length > 0) {
-      // Update last known execution
-      lastKnownExecutionId = newExecutions[0].id;
       
       // Broadcast immediately - no batching delay
       const batchData = {
@@ -582,7 +583,7 @@ const pollAndBroadcastExecutions = async (): Promise<void> => {
         successful: batchData.successful,
         highAlert: batchData.highAlert,
         clientCount,
-        latestId: lastKnownExecutionId
+        latestIds: newExecutions.map(e => e.id)
       });
     }
   } catch (error) {
@@ -869,7 +870,7 @@ export const getSSEDebugInfo = asyncHandler(async (req: Request, res: Response):
     monitoring: {
       systemMonitoring: systemMonitoringInterval !== null,
       executionPolling: executionPollingInterval !== null,
-      lastKnownExecutionId,
+      broadcastedCount: broadcastedExecutionIds.size,
       pollingInterval: 10000
     },
     environment: {
