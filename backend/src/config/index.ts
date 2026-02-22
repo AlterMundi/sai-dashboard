@@ -207,5 +207,15 @@ export const saiDatabaseConfig = {
   password: process.env.SAI_DB_PASSWORD ?? '',
 };
 
+const rawDatasetsBasePath = process.env.DATASETS_BASE_PATH || '/mnt/raid1/datasets';
+const resolvedDatasetsBasePath = rawDatasetsBasePath.startsWith('/')
+  ? rawDatasetsBasePath
+  : resolve(projectRoot, rawDatasetsBasePath);
+
+export const datasetsConfig = {
+  basePath: resolvedDatasetsBasePath,
+  scanCacheTtlMs: 30_000,
+};
+
 export const isDevelopment = appConfig.nodeEnv === 'development';
 export const isProduction = appConfig.nodeEnv === 'production';

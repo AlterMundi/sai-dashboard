@@ -14,6 +14,7 @@ import {
   Home,
   Menu,
   X,
+  Database,
 } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import toast from 'react-hot-toast';
@@ -24,7 +25,7 @@ interface LayoutProps {
 }
 
 export function Layout({ children, className }: LayoutProps) {
-  const { logout, isLoading: authLoading } = useAuth();
+  const { logout, isLoading: authLoading, user } = useAuth();
   const { isConnected, clientCount, lastEvent } = useSSE();
   const { t } = useTranslation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -38,9 +39,12 @@ export function Layout({ children, className }: LayoutProps) {
     }
   };
 
+  const canAccessDatasets = user?.role === 'SAI_RESEARCHER' || user?.role === 'SAI_ADMIN';
+
   const navLinks = [
     { to: '/', labelKey: 'nav.gallery', icon: Home },
     { to: '/stats', labelKey: 'nav.statistics', icon: BarChart3 },
+    ...(canAccessDatasets ? [{ to: '/datasets', labelKey: 'nav.datasets', icon: Database }] : []),
   ];
 
   const isActiveRoute = (path: string) => {

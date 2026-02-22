@@ -21,11 +21,16 @@ FROM base AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 RUN apk add --no-cache curl
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/backend/node_modules ./backend/node_modules
-COPY --from=builder /app/backend/dist ./backend/dist
-COPY --from=builder /app/frontend/dist ./frontend/dist
-COPY --from=builder /app/package.json ./
+
+# Run as non-root user (node:node is built into node-alpine, uid/gid 1000)
+RUN mkdir -p /app && chown node:node /app
+COPY --from=builder --chown=node:node /app/node_modules ./node_modules
+COPY --from=builder --chown=node:node /app/backend/node_modules ./backend/node_modules
+COPY --from=builder --chown=node:node /app/backend/dist ./backend/dist
+COPY --from=builder --chown=node:node /app/frontend/dist ./frontend/dist
+COPY --from=builder --chown=node:node /app/package.json ./
+
+USER node
 
 USER node
 EXPOSE 3001

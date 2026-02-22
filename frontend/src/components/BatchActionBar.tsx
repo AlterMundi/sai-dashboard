@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Flag, Image, FileSpreadsheet, X, Loader2 } from 'lucide-react';
+import { Flag, Image, FileSpreadsheet, X, Loader2, FolderInput } from 'lucide-react';
 import { useTranslation } from '@/contexts/LanguageContext';
 
 interface BatchActionBarProps {
@@ -8,6 +8,7 @@ interface BatchActionBarProps {
   onExportCsv: () => void;
   onDownloadImages: () => Promise<void>;
   onClearSelection: () => void;
+  onAddToDataset?: () => void;
 }
 
 export function BatchActionBar({
@@ -16,6 +17,7 @@ export function BatchActionBar({
   onExportCsv,
   onDownloadImages,
   onClearSelection,
+  onAddToDataset,
 }: BatchActionBarProps) {
   const { t } = useTranslation();
   const [isFpLoading, setIsFpLoading] = useState(false);
@@ -80,6 +82,16 @@ export function BatchActionBar({
         <FileSpreadsheet className="h-4 w-4" />
         {t('batch.exportCsv')}
       </button>
+
+      {onAddToDataset && (
+        <button
+          onClick={onAddToDataset}
+          className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium bg-green-700 hover:bg-green-600 rounded-lg transition-colors"
+        >
+          <FolderInput className="h-4 w-4" />
+          Dataset
+        </button>
+      )}
 
       <div className="w-px h-6 bg-gray-600" />
 

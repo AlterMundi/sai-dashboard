@@ -46,6 +46,7 @@ import { dualDb } from '@/database/dual-pool';
 import { logger } from '@/utils/logger';
 import { asyncHandler } from '@/utils';
 import { advancedDetectionFilter, DetectionFilterCriteria } from '@/services/advanced-detection-filter';
+import datasetRouter from './datasets';
 
 const router = Router();
 
@@ -387,6 +388,11 @@ detectionRouter.get('/statistics', asyncHandler(async (req: Request, res: Respon
 }));
 
 router.use('/detections', detectionRouter);
+
+// =================================================================
+// Dataset Routes (SAI_RESEARCHER + SAI_ADMIN)
+// =================================================================
+router.use('/datasets', datasetRouter);
 
 // =================================================================
 // Optional Routes (With Optional Auth)
