@@ -280,6 +280,64 @@ export function useDailySummary(params: StatsFilters | number = 30) {
   };
 }
 
+/**
+ * Fetch all shots from a specific camera (nodeId+cameraId) around a pivot
+ * timestamp, ignoring any gallery filters.  Used by ImageGallery to build
+ * the camera-mode navigator so that navigation is never restricted by the
+ * active gallery filter.
+ *
+ * The pivot is the timestamp of the execution the user first opened in camera
+ * mode for this camera.  It is intentionally NOT updated on navigation (only
+ * on camera identity change) so that we don't re-fetch while the user scrolls
+ * through shots.
+ */
+export function useCameraExecutions(
+  nodeId?: string,
+  cameraId?: string,
+  pivotTimestamp?: string,
+) {
+  const [executions, setExecutions] = useState<ExecutionWithImageUrls[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    if (!nodeId || !cameraId || !pivotTimestamp) {
+      setExecutions([]);
+      return;
+    }
+
+    let cancelled = false;
+    setIsLoading(true);
+
+    // Fetch up to 200 shots of this camera within ±30 days of the pivot,
+    // sorted oldest-first so the index order matches chronological nav.
+    const pivot = new Date(pivotTimestamp).getTime();
+    const MS30D = 30 * 24 * 60 * 60 * 1000;
+    executionsApi
+      .getExecutions({
+        nodeId,
+        cameraId,
+        startDate: new Date(pivot - MS30D).toISOString(),
+        endDate:   new Date(pivot + MS30D).toISOString(),
+        sortBy:    'date',
+        sortOrder: 'asc',
+        limit:     200,
+      })
+      .then(({ executions: data }) => {
+        if (!cancelled) setExecutions(data);
+      })
+      .catch(() => {
+        if (!cancelled) setExecutions([]);
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+
+    return () => { cancelled = true; };
+  }, [nodeId, cameraId, pivotTimestamp]);
+
+  return { executions, isLoading };
+}
+
 // Hook for stats ranking (top cameras/locations/nodes)
 export function useStatsRanking(startDate: string, endDate: string) {
   const [ranking, setRanking] = useState<StatsRanking | null>(null);

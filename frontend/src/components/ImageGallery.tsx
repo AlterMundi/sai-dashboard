@@ -6,7 +6,7 @@ import { ExecutionListItem } from './ExecutionListItem';
 import { BatchActionBar } from './BatchActionBar';
 import { ImageModal } from './ImageModal';
 import { LoadingSpinner, LoadingState } from './ui/LoadingSpinner';
-import { useExecutions } from '@/hooks/useExecutions';
+import { useExecutions, useCameraExecutions } from '@/hooks/useExecutions';
 import { executionsApi, tokenManager } from '@/services/api';
 import { ExecutionWithImageUrls, ExecutionFilters, NavContext } from '@/types';
 import { cn } from '@/utils';
@@ -197,6 +197,36 @@ export function ImageGallery({ initialFilters = {}, className, refreshTrigger, o
     }
   }, [executions, selectedIds]);
 
+  // Camera pivot: fixed per camera identity so we don't re-fetch on every
+  // navigation step.  Only updates when the user opens a different camera.
+  const [cameraPivot, setCameraPivot] = useState<{
+    nodeId: string; cameraId: string; timestamp: string;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!selectedExecution?.nodeId || !selectedExecution?.cameraId) {
+      return;
+    }
+    setCameraPivot(prev => {
+      if (
+        prev?.nodeId  === selectedExecution.nodeId &&
+        prev?.cameraId === selectedExecution.cameraId
+      ) return prev; // same camera — keep existing pivot, no re-fetch
+      return {
+        nodeId:    selectedExecution.nodeId!,
+        cameraId:  selectedExecution.cameraId!,
+        timestamp: selectedExecution.executionTimestamp,
+      };
+    });
+  }, [selectedExecution?.nodeId, selectedExecution?.cameraId, selectedExecution?.executionTimestamp]);
+
+  // Unfiltered camera feed — independent of any gallery filters.
+  const { executions: cameraExecutions } = useCameraExecutions(
+    cameraPivot?.nodeId,
+    cameraPivot?.cameraId,
+    cameraPivot?.timestamp,
+  );
+
   const handleCardClick = useCallback((execution: ExecutionWithImageUrls) => {
     setSelectedExecution(execution);
     setIsModalOpen(true);
@@ -211,10 +241,14 @@ export function ImageGallery({ initialFilters = {}, className, refreshTrigger, o
     if (!selectedExecution || !selectedExecution.nodeId || !selectedExecution.cameraId) {
       return undefined;
     }
-    const { nodeId, cameraId } = selectedExecution;
-    const siblings = executions
-      .filter(e => e.nodeId === nodeId && e.cameraId === cameraId)
-      .sort((a, b) => new Date(a.executionTimestamp).getTime() - new Date(b.executionTimestamp).getTime());
+    // Use the unfiltered camera feed so navigation is never restricted by
+    // the active gallery filter (e.g. "only smoke detections").
+    // Fall back to gallery executions if the fetch hasn't completed yet.
+    const siblings = cameraExecutions.length > 0
+      ? cameraExecutions
+      : executions
+          .filter(e => e.nodeId === selectedExecution.nodeId && e.cameraId === selectedExecution.cameraId)
+          .sort((a, b) => new Date(a.executionTimestamp).getTime() - new Date(b.executionTimestamp).getTime());
     const idx = siblings.findIndex(e => e.id === selectedExecution.id);
     if (idx === -1) return undefined;
     return {
@@ -230,7 +264,7 @@ export function ImageGallery({ initialFilters = {}, className, refreshTrigger, o
         return siblings.slice(start, end + 1);
       },
     };
-  }, [executions, selectedExecution?.id, selectedExecution?.nodeId, selectedExecution?.cameraId]);
+  }, [cameraExecutions, executions, selectedExecution?.id, selectedExecution?.nodeId, selectedExecution?.cameraId]);
 
   const galleryNav = useMemo((): NavContext | undefined => {
     if (!selectedExecution) return undefined;
