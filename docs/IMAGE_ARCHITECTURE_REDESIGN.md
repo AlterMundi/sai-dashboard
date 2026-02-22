@@ -4,7 +4,7 @@
 
 1. **No Raw Frames** - Only annotated images (with bounding boxes) are stored
 2. **Triple File Redundancy** - 3 files per execution (original.jpg, webp, thumb.webp)
-3. **Express Serving** - Node.js handles every image request (inefficient)
+3. ~~**Express Serving** - Node.js handles every image request (inefficient)~~ ✅ Fixed — nginx X-Accel-Redirect (Feb 2026)
 4. **Path Complexity** - 3 fallback patterns, stored paths vs computed paths
 5. **Storage Inflexibility** - Tightly coupled to filesystem
 
@@ -216,9 +216,9 @@ private async processImage(executionId: number, yoloData: any): Promise<ImageRes
 3. Stop generating webp/thumb variants
 
 ### Phase 3: Nginx Setup
-1. Configure nginx for direct image serving
+1. ~~Configure nginx for direct image serving~~ ✅ Done — X-Accel-Redirect (Feb 2026)
 2. Deploy imgproxy for on-demand transforms
-3. Set up caching
+3. ~~Set up caching~~ ✅ Done — open_file_cache on internal location
 
 ### Phase 4: Frontend Update
 1. Update image URLs to new paths
@@ -241,7 +241,7 @@ private async processImage(executionId: number, yoloData: any): Promise<ImageRes
 | **Image source** | Annotated (boxes drawn) | Raw frame |
 | **Bounding boxes** | Burned into image | SVG overlay in frontend |
 | **Thumbnail generation** | ETL (Sharp) | On-demand (imgproxy) |
-| **Serving** | Express sendFile | Nginx direct |
+| **Serving** | ~~Express sendFile~~ nginx X-Accel-Redirect ✅ | Nginx direct |
 | **Path storage** | 3 columns in DB | Computed from ID |
 | **Re-analysis possible** | No (boxes burned in) | Yes (raw preserved) |
 | **Dataset export** | Unusable (annotated) | Clean raw frames |

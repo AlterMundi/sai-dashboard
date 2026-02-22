@@ -188,7 +188,7 @@ n8n Workflow Execution (YOLO Fire Detection)
          ▼                      ▼
     [SSE Broadcast]      [Image Cache]
          ↓                      ↓
-    Real-time UI         Fast Image Serving
+    Real-time UI         nginx X-Accel-Redirect
 ```
 
 ---

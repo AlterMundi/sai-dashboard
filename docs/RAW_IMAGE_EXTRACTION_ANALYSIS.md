@@ -271,7 +271,7 @@ Already handles both cases:
 | Component | Change | Status |
 |-----------|--------|--------|
 | imgproxy | On-demand thumbnails/WebP | 📋 Planned |
-| nginx | Direct image serving | 📋 Planned |
+| nginx | Direct image serving via X-Accel-Redirect | ✅ Done (Feb 2026) |
 | Frontend | Use imgproxy URLs | 📋 Planned |
 
 ---

@@ -177,15 +177,22 @@ import { config } from '@/config';        // → backend/src/config/index.ts
 
 **Build Process:** `tsc` compiles, then `tsc-alias` resolves `@/` paths to relative paths in `dist/`.
 
-### Image Storage Strategy
+### Image Storage & Serving Strategy
 
-**Primary Storage:** `/mnt/raid1/n8n-backup/images/by-execution/{execution_id}/`
-- `original.jpg` - JPEG from n8n
-- `high.webp` - High-quality WebP (80% quality)
-- `thumb.webp` - Thumbnail WebP (200px, 70% quality)
+**Primary Storage:** `/mnt/raid1/n8n-backup/images/`
+- Partition layout: `{type}/{partition}/{executionId}.{ext}` (e.g. `webp/450/450432.webp`)
+- Legacy layout: `by-execution/{execution_id}/original.jpg`, `high.webp`, `thumb.webp`
 
-**Database Reference:** `execution_images` table stores paths + metadata
+**Database Reference:** `execution_images` table stores relative paths + metadata
 **Why Filesystem?** Large images (500KB-2MB) unsuitable for PostgreSQL bytea
+
+**Serving: nginx X-Accel-Redirect (zero-copy)**
+- Express handles auth + 3-tier path resolution, then sets `X-Accel-Redirect: /internal-images/...`
+- nginx serves the file directly from disk via `sendfile` syscall — Node.js never touches image bytes
+- `/internal-images/` is an `internal` nginx location (direct requests return 404)
+- `proxy_buffering on` is required on the API location for X-Accel-Redirect to work
+- Falls back to `res.sendFile()` in development (no nginx)
+- See: `backend/src/controllers/executions.ts` (`sendImageViaAccel`), `nginx/sai-dashboard-docker.conf`
 
 ---
 
@@ -397,9 +404,10 @@ Images are stored on filesystem, not in database. Always check `execution_images
 ```
 Public Server (131.72.205.6:443)
   ↓ [nginx]
+  ├── /internal-images/ → sendfile from RAID (X-Accel-Redirect)
   ↓
 Private Server (localhost)
-  ├── Dashboard API :3001
+  ├── Dashboard API :3001 (auth + path resolution, image I/O delegated to nginx)
   ├── Dashboard UI :3000
   ├── PostgreSQL (n8n + sai_dashboard)
   └── RAID Storage (/mnt/raid1/n8n-backup/images/)
