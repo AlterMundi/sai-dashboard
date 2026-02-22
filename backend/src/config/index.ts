@@ -119,7 +119,6 @@ export const appConfig = {
     clientSecret: process.env.AUTH_ZITADEL_SECRET || '',
     redirectUri: process.env.AUTH_REDIRECT_URI!,
     postLogoutUri: process.env.AUTH_POST_LOGOUT_URI!,
-    rolesClaim: process.env.ZITADEL_ROLES_CLAIM || 'urn:zitadel:iam:org:project:roles',
     projectId: process.env.ZITADEL_PROJECT_ID || '',
     mgmtKeyJson: process.env.ZITADEL_MGMT_KEY_JSON || '',
   },
