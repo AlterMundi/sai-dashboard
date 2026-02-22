@@ -71,8 +71,11 @@ authRouter.get('/callback', handleCallback);
 // Public: approval status polling (no auth required, rate-limited)
 authRouter.get('/pending/status', pendingStatusRateLimit, getPendingStatus);
 
+// Logout: GET, no auth required — frontend clears the token before redirecting here.
+// The controller redirects to Zitadel end_session (without id_token_hint since token is gone).
+authRouter.get('/logout', logout);
+
 // Protected auth endpoints
-authRouter.post('/logout', authenticateToken, requireAuth, logout);
 authRouter.get('/validate', authenticateToken, requireAuth, validateToken);
 authRouter.post('/refresh', authenticateToken, requireAuth, refreshToken);
 
@@ -462,7 +465,7 @@ if (process.env.NODE_ENV === 'development' || process.env.ENABLE_API_DOCS === 't
           authentication: {
             'GET /auth/login': 'Initiate OIDC login (redirect to Zitadel)',
             'GET /auth/callback': 'OIDC callback handler (exchange code, issue JWT)',
-            'POST /auth/logout': 'Logout and redirect to Zitadel end_session',
+            'GET /auth/logout': 'Logout and redirect to Zitadel end_session',
             'GET /auth/validate': 'Validate current token',
             'POST /auth/refresh': 'Refresh expiring token'
           },
