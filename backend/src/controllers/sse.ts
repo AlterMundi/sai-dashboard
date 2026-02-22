@@ -429,6 +429,13 @@ export const notifyStage2Complete = async (
     };
 
     const clientCount = sseManager.broadcast(message);
+    // Register this ID so the polling loop doesn't re-broadcast it
+    broadcastedExecutionIds.add(executionId);
+    if (broadcastedExecutionIds.size > MAX_BROADCAST_TRACKED) {
+      const sorted = [...broadcastedExecutionIds].sort((a, b) => a - b);
+      sorted.slice(0, broadcastedExecutionIds.size - MAX_BROADCAST_TRACKED)
+        .forEach(id => broadcastedExecutionIds.delete(id));
+    }
     logger.debug('Stage 2 completion notified', { executionId, clientCount });
   } catch (error) {
     logger.error('Failed to notify Stage 2 completion', { executionId, error });
@@ -576,9 +583,15 @@ let executionPollingInterval: NodeJS.Timeout | null = null;
 // Execution tracking — Set-based to avoid cursor race conditions
 const broadcastedExecutionIds = new Set<number>();
 const MAX_BROADCAST_TRACKED = 200;
+let isPolling = false;
 
 // Poll for new executions and broadcast immediately
 const pollAndBroadcastExecutions = async (): Promise<void> => {
+  if (isPolling) {
+    logger.debug('Poll skipped: previous poll still in progress');
+    return;
+  }
+  isPolling = true;
   try {
     // Only poll if there are active clients
     if (sseManager.getClientCount() === 0) return;
@@ -651,6 +664,8 @@ const pollAndBroadcastExecutions = async (): Promise<void> => {
     }
   } catch (error) {
     logger.warn('Failed to poll and broadcast executions:', error);
+  } finally {
+    isPolling = false;
   }
 };
 
@@ -666,8 +681,8 @@ export const startSystemMonitoring = (): void => {
     clearInterval(executionPollingInterval);
   }
 
-  // Start execution polling and immediate broadcast every 3 seconds (fast for testing)
-  executionPollingInterval = setInterval(pollAndBroadcastExecutions, 3000);
+  // Start execution polling and immediate broadcast every 30 seconds
+  executionPollingInterval = setInterval(pollAndBroadcastExecutions, 30000);
 
   // Start system monitoring every 3 seconds (fast for testing)
   systemMonitoringInterval = setInterval(async () => {
