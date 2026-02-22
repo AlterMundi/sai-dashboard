@@ -308,29 +308,37 @@ export function useCameraExecutions(
     let cancelled = false;
     setIsLoading(true);
 
-    // Fetch up to 200 shots of this camera within ±30 days of the pivot,
-    // sorted oldest-first so the index order matches chronological nav.
-    const pivot = new Date(pivotTimestamp).getTime();
-    const MS30D = 30 * 24 * 60 * 60 * 1000;
-    executionsApi
-      .getExecutions({
-        nodeId,
-        cameraId,
-        startDate: new Date(pivot - MS30D).toISOString(),
-        endDate:   new Date(pivot + MS30D).toISOString(),
+    // Two parallel fetches centred on the pivot so the selected execution
+    // is ALWAYS included regardless of how frequently the camera fires:
+    //   before: 100 shots ending at the pivot (newest-first → desc)
+    //   after:  100 shots starting at the pivot (oldest-first → asc)
+    // We then merge, deduplicate (pivot appears in both), and sort ASC.
+    Promise.all([
+      executionsApi.getExecutions({
+        nodeId, cameraId,
+        endDate:   pivotTimestamp,
+        sortBy:    'date',
+        sortOrder: 'desc',
+        limit:     100,
+      }),
+      executionsApi.getExecutions({
+        nodeId, cameraId,
+        startDate: pivotTimestamp,
         sortBy:    'date',
         sortOrder: 'asc',
-        limit:     200,
+        limit:     100,
+      }),
+    ])
+      .then(([before, after]) => {
+        if (cancelled) return;
+        const seen = new Set<number>();
+        const merged = [...before.executions, ...after.executions]
+          .filter(e => { if (seen.has(e.id)) return false; seen.add(e.id); return true; })
+          .sort((a, b) => new Date(a.executionTimestamp).getTime() - new Date(b.executionTimestamp).getTime());
+        setExecutions(merged);
       })
-      .then(({ executions: data }) => {
-        if (!cancelled) setExecutions(data);
-      })
-      .catch(() => {
-        if (!cancelled) setExecutions([]);
-      })
-      .finally(() => {
-        if (!cancelled) setIsLoading(false);
-      });
+      .catch(() => { if (!cancelled) setExecutions([]); })
+      .finally(() => { if (!cancelled) setIsLoading(false); });
 
     return () => { cancelled = true; };
   }, [nodeId, cameraId, pivotTimestamp]);
