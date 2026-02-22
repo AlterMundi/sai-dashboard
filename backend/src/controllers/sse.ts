@@ -400,6 +400,65 @@ export const notifyExecutionError = async (executionId: string, error: string): 
   }
 };
 
+export const notifyStage2Complete = async (
+  executionId: number,
+  extracted: {
+    has_smoke: boolean;
+    alert_level: string | null;
+    detection_count: number;
+  },
+  hasImage: boolean,
+  processingTimeMs: number
+): Promise<void> => {
+  try {
+    const message: SSEMessage = {
+      type: 'etl:stage2:complete',
+      data: {
+        execution_id: executionId,
+        stage: 'stage2',
+        processing_time_ms: processingTimeMs,
+        extracted_data: {
+          has_smoke: extracted.has_smoke,
+          alert_level: extracted.alert_level,
+          detection_count: extracted.detection_count,
+          has_image: hasImage,
+          telegram_sent: false,
+        },
+        timestamp: new Date().toISOString(),
+      },
+    };
+
+    const clientCount = sseManager.broadcast(message);
+    logger.debug('Stage 2 completion notified', { executionId, clientCount });
+  } catch (error) {
+    logger.error('Failed to notify Stage 2 completion', { executionId, error });
+  }
+};
+
+export const notifyStage2Failed = async (
+  executionId: number,
+  errorMessage: string,
+  retryCount: number
+): Promise<void> => {
+  try {
+    const message: SSEMessage = {
+      type: 'etl:stage2:failed',
+      data: {
+        execution_id: executionId,
+        stage: 'stage2',
+        error: errorMessage,
+        retry_count: retryCount,
+        timestamp: new Date().toISOString(),
+      },
+    };
+
+    const clientCount = sseManager.broadcast(message);
+    logger.debug('Stage 2 failure notified', { executionId, clientCount });
+  } catch (error) {
+    logger.error('Failed to notify Stage 2 failure', { executionId, error });
+  }
+};
+
 // Notify SSE clients of system statistics updates
 export const notifySystemStats = async (stats: {
   totalExecutions: number;
