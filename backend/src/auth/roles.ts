@@ -15,8 +15,11 @@ import { logger } from '@/utils/logger';
 export function extractRole(claims: Record<string, unknown>): DashboardRole {
   const projectId = appConfig.oidc.projectId;
   const genericClaimKey = 'urn:zitadel:iam:org:project:roles';
+  // NOTE: The scope we *request* is urn:zitadel:iam:org:project:id:<projectId>:roles (with :id:)
+  // but the *claim key* Zitadel returns in the token omits :id: — it is just
+  // urn:zitadel:iam:org:project:<projectId>:roles.  These are different URIs.
   const projectClaimKey = projectId
-    ? `urn:zitadel:iam:org:project:id:${projectId}:roles`
+    ? `urn:zitadel:iam:org:project:${projectId}:roles`
     : null;
 
   // When projectId is configured, use ONLY the project-scoped claim — no generic fallback.
