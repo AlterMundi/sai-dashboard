@@ -188,6 +188,8 @@ const es: TranslationKeys = {
     noExecutionsYet: 'A\u00fan no hay ejecuciones de flujos SAI disponibles.',
     clearAllFilters: 'Limpiar todos los filtros',
     refreshExecutions: 'Actualizar ejecuciones',
+    sortNewestFirst: 'Ordenar: más recientes primero',
+    sortOldestFirst: 'Ordenar: más antiguos primero',
     gridView: 'Vista cuadr\u00edcula',
     listView: 'Vista lista',
     loadingMore: 'Cargando m\u00e1s ejecuciones\u2026',

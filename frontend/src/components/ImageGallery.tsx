@@ -11,7 +11,7 @@ import { executionsApi, tokenManager } from '@/services/api';
 import { ExecutionWithImageUrls, ExecutionFilters, NavContext } from '@/types';
 import { cn } from '@/utils';
 import { useTranslation } from '@/contexts/LanguageContext';
-import { Grid, List, RefreshCw, ArrowUp } from 'lucide-react';
+import { Grid, List, RefreshCw, ArrowUp, ArrowDownNarrowWide, ArrowUpNarrowWide } from 'lucide-react';
 
 interface ImageGalleryProps {
   initialFilters?: ExecutionFilters;
@@ -360,6 +360,19 @@ export function ImageGallery({ initialFilters = {}, className, refreshTrigger, o
             title={t('gallery.refreshExecutions')}
           >
             <RefreshCw className={cn('h-4 w-4', isLoading && 'animate-spin')} />
+          </button>
+
+          {/* Sort Order Toggle */}
+          <button
+            onClick={() => updateFilters({ ...filters, sortOrder: filters.sortOrder === 'asc' ? 'desc' : 'asc' })}
+            disabled={isLoading}
+            className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
+            title={filters.sortOrder === 'asc' ? t('gallery.sortNewestFirst') : t('gallery.sortOldestFirst')}
+          >
+            {filters.sortOrder === 'asc'
+              ? <ArrowUpNarrowWide className="h-4 w-4" />
+              : <ArrowDownNarrowWide className="h-4 w-4" />
+            }
           </button>
 
           {/* View Mode Toggle */}

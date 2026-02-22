@@ -186,6 +186,8 @@ const en = {
     noExecutionsYet: 'No SAI workflow executions are available yet.',
     clearAllFilters: 'Clear all filters',
     refreshExecutions: 'Refresh executions',
+    sortNewestFirst: 'Sort: newest first',
+    sortOldestFirst: 'Sort: oldest first',
     gridView: 'Grid view',
     listView: 'List view',
     loadingMore: 'Loading more executions\u2026',
