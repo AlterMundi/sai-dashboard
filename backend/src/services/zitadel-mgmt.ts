@@ -99,27 +99,32 @@ async function findExistingGrant(
   userId: string,
   projectId: string,
 ): Promise<string | null> {
-  // Zitadel Management API requires POST /_search to list grants
-  const url = `${issuer}/management/v1/users/${userId}/grants/_search`;
+  // Zitadel Management API v1: global usergrants search with userId + projectId filters
+  const url = `${issuer}/management/v1/usergrants/_search`;
   const response = await fetch(url, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({}),
+    body: JSON.stringify({
+      queries: [
+        { userIdQuery: { userId } },
+        { projectIdQuery: { projectId } },
+      ],
+    }),
   });
 
   if (!response.ok) {
     const text = await response.text().catch(() => '');
-    logger.error('Zitadel: failed to list user grants', {
+    logger.error('Zitadel: failed to search user grants', {
       userId, projectId, status: response.status, body: text,
     });
     return null;
   }
 
   const data = (await response.json()) as UserGrantListResponse;
-  logger.debug('Zitadel: user grants list', { userId, grants: data.result });
+  logger.debug('Zitadel: user grants search result', { userId, grants: data.result });
   const grant = data.result?.find((g) => g.projectId === projectId);
   return grant?.id ?? null;
 }
