@@ -100,7 +100,10 @@ export function Dashboard() {
       console.log(`📥 Dashboard: Execution ${data.execution_id} not in gallery, fetching and prepending`);
       try {
         const execution = await executionsApi.getExecutionById(data.execution_id);
-        if (execution) galleryPrependRef.current([execution as ExecutionWithImageUrls]);
+        if (execution) {
+          // execution already has imageUrl/thumbnailUrl from the API's transformExecution
+          galleryPrependRef.current([{ ...execution, processingStage: 'stage2' } as ExecutionWithImageUrls]);
+        }
       } catch (fetchError) {
         console.warn(`Failed to fetch execution ${data.execution_id} after Stage 2 completion`, fetchError);
       }
