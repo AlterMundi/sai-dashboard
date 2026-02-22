@@ -56,6 +56,7 @@ export function DateTimeRangeSelector({
   const [fromTime, setFromTime] = useState('');
   const [toDate,   setToDate]   = useState('');
   const [toTime,   setToTime]   = useState('');
+  const [lastTouched, setLastTouched] = useState<'from' | 'to'>('to');
 
   useEffect(() => {
     if (value?.startDate) {
@@ -92,15 +93,17 @@ export function DateTimeRangeSelector({
     const offset = minutes * 60 * 1000;
     const fromDt = combine(fromDate, fromTime);
     const toDt   = combine(toDate,   toTime);
-    if (fromDt) {
+    if (lastTouched === 'from' && fromDt) {
       onChange({ startDate: fromDt.toISOString(), endDate: new Date(fromDt.getTime() + offset).toISOString() });
     } else if (toDt) {
       onChange({ startDate: new Date(toDt.getTime() - offset).toISOString(), endDate: toDt.toISOString() });
+    } else if (fromDt) {
+      onChange({ startDate: fromDt.toISOString(), endDate: new Date(fromDt.getTime() + offset).toISOString() });
     } else {
       const now = new Date();
       onChange({ startDate: new Date(now.getTime() - offset).toISOString(), endDate: now.toISOString() });
     }
-  }, [fromDate, fromTime, toDate, toTime, onChange]);
+  }, [lastTouched, fromDate, fromTime, toDate, toTime, onChange]);
 
   const hasActiveRange = value?.startDate && value?.endDate;
 
@@ -114,12 +117,12 @@ export function DateTimeRangeSelector({
           <Input
             type="date"
             value={fromDate}
-            onChange={(e) => setFromDate(e.target.value)}
+            onChange={(e) => { setFromDate(e.target.value); setLastTouched('from'); }}
             disabled={disabled}
             className="h-8 text-sm w-auto"
           />
         </div>
-        <TimePicker24h value={fromTime} onChange={setFromTime} disabled={disabled} />
+        <TimePicker24h value={fromTime} onChange={(v) => { setFromTime(v); setLastTouched('from'); }} disabled={disabled} />
       </div>
 
       {/* Quick presets */}
@@ -147,12 +150,12 @@ export function DateTimeRangeSelector({
           <Input
             type="date"
             value={toDate}
-            onChange={(e) => setToDate(e.target.value)}
+            onChange={(e) => { setToDate(e.target.value); setLastTouched('to'); }}
             disabled={disabled}
             className="h-8 text-sm w-auto"
           />
         </div>
-        <TimePicker24h value={toTime} onChange={setToTime} disabled={disabled} />
+        <TimePicker24h value={toTime} onChange={(v) => { setToTime(v); setLastTouched('to'); }} disabled={disabled} />
         {hasActiveRange && (
           <Button
             variant="ghost"
