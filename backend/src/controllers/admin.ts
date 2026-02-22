@@ -9,7 +9,7 @@ import {
 import { assignRole } from '@/services/zitadel-mgmt';
 import { DashboardRole } from '@/types';
 
-const VALID_ROLES: DashboardRole[] = ['SAI_ADMIN', 'SAI_OPERATOR', 'SAI_VIEWER'];
+const VALID_ROLES: DashboardRole[] = ['SAI_ADMIN', 'SAI_OPERATOR', 'SAI_RESEARCHER', 'SAI_VIEWER'];
 
 /**
  * GET /auth/admin/pending

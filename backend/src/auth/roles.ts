@@ -42,6 +42,7 @@ export function extractRole(claims: Record<string, unknown>): DashboardRole {
   // Highest-privilege wins
   if (roleNames.includes('SAI_ADMIN')) return 'SAI_ADMIN';
   if (roleNames.includes('SAI_OPERATOR')) return 'SAI_OPERATOR';
+  if (roleNames.includes('SAI_RESEARCHER')) return 'SAI_RESEARCHER';
   if (roleNames.includes('SAI_VIEWER')) return 'SAI_VIEWER';
 
   logger.warn('OIDC: User has roles but none are recognized for this project', {

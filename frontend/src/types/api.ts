@@ -7,7 +7,7 @@
 
 import { Execution } from './execution';
 
-export type DashboardRole = 'SAI_ADMIN' | 'SAI_OPERATOR' | 'SAI_VIEWER';
+export type DashboardRole = 'SAI_ADMIN' | 'SAI_OPERATOR' | 'SAI_RESEARCHER' | 'SAI_VIEWER';
 
 /**
  * Generic API Response wrapper
