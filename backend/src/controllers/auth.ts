@@ -257,6 +257,13 @@ export const getPendingStatus = asyncHandler(
       return;
     }
 
+    if (sub.length > 128) {
+      res.status(400).json({
+        error: { message: 'Invalid sub parameter', code: 'INVALID_SUB' },
+      });
+      return;
+    }
+
     const user = await getPendingUserBySub(sub);
 
     if (!user) {

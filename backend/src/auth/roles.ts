@@ -19,9 +19,11 @@ export function extractRole(claims: Record<string, unknown>): DashboardRole {
     ? `urn:zitadel:iam:org:project:id:${projectId}:roles`
     : null;
 
-  // Prefer project-scoped claim; fall back to generic if projectId not configured
+  // When projectId is configured, use ONLY the project-scoped claim — no generic fallback.
+  // Falling back to the generic claim would re-introduce cross-app role bleed:
+  // a user who is SAI_ADMIN in another Zitadel application would inherit that role here.
   const claimKey = projectClaimKey ?? genericClaimKey;
-  const projectRoles = claims[claimKey] ?? (projectClaimKey ? claims[genericClaimKey] : undefined);
+  const projectRoles = claims[claimKey];
 
   if (!projectRoles || typeof projectRoles !== 'object') {
     logger.warn('OIDC: No roles claim found in token', {
