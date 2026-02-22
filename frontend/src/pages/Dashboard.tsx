@@ -53,6 +53,7 @@ export function Dashboard() {
 
   const [batchUpdateTrigger, setBatchUpdateTrigger] = useState(0);
   const galleryPrependRef = useRef<((executions: any[]) => void) | null>(null);
+  const fetchingStage2Ids = useRef<Set<number>>(new Set());
 
   useDailySummary(7);
   const {
@@ -97,6 +98,11 @@ export function Dashboard() {
     });
 
     if (!wasUpdated && galleryPrependRef.current) {
+      if (fetchingStage2Ids.current.has(data.execution_id)) {
+        console.log(`⏭️ Dashboard: Fetch already in progress for execution ${data.execution_id}, skipping`);
+        return;
+      }
+      fetchingStage2Ids.current.add(data.execution_id);
       console.log(`📥 Dashboard: Execution ${data.execution_id} not in gallery, fetching and prepending`);
       try {
         const execution = await executionsApi.getExecutionById(data.execution_id);
@@ -106,6 +112,8 @@ export function Dashboard() {
         }
       } catch (fetchError) {
         console.warn(`Failed to fetch execution ${data.execution_id} after Stage 2 completion`, fetchError);
+      } finally {
+        fetchingStage2Ids.current.delete(data.execution_id);
       }
     }
   }, [updateExecutionStage, galleryPrependRef]);
