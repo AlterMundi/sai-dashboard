@@ -27,6 +27,18 @@ function parseFiltersFromURL(searchParams: URLSearchParams): ExecutionFilters {
   if (sortBy) filters.sortBy = sortBy as ExecutionFilters['sortBy'];
   const sortOrder = searchParams.get('sortOrder');
   if (sortOrder === 'asc' || sortOrder === 'desc') filters.sortOrder = sortOrder;
+  // Date range filters (used by stats drill-down)
+  const startDate = searchParams.get('startDate');
+  if (startDate) filters.startDate = startDate;
+  const endDate = searchParams.get('endDate');
+  if (endDate) filters.endDate = endDate;
+  // Device/camera dimension filters
+  const cameraId = searchParams.get('cameraId');
+  if (cameraId) filters.cameraId = cameraId;
+  const location = searchParams.get('location');
+  if (location) filters.location = location;
+  const nodeId = searchParams.get('nodeId');
+  if (nodeId) filters.nodeId = nodeId;
   return filters;
 }
 
@@ -39,6 +51,11 @@ function filtersToSearchParams(filters: ExecutionFilters): URLSearchParams {
   if (filters.datePreset) params.set('datePreset', filters.datePreset);
   if (filters.sortBy) params.set('sortBy', filters.sortBy);
   if (filters.sortOrder) params.set('sortOrder', filters.sortOrder);
+  if (filters.startDate) params.set('startDate', filters.startDate);
+  if (filters.endDate) params.set('endDate', filters.endDate);
+  if (filters.cameraId) params.set('cameraId', filters.cameraId);
+  if (filters.location) params.set('location', filters.location);
+  if (filters.nodeId) params.set('nodeId', filters.nodeId);
   return params;
 }
 

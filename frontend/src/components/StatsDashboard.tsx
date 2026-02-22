@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Wind, AlertTriangle, AlertOctagon, MessageCircle, AlertCircle, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { useTranslation } from '@/contexts/LanguageContext';
 import { useDailySummary } from '@/hooks/useExecutions';
@@ -29,9 +30,51 @@ function periodLabel(filters: StatsFilters): string {
 
 export function StatsDashboard() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const [filters, setFilters] = useState<StatsFilters>(defaultStatsFilters);
 
   const { summary, isLoading, error } = useDailySummary(filters);
+
+  // Build dimension filter params from active stats dimension
+  const buildDimensionParams = useCallback(() => {
+    const params: Record<string, string> = {};
+    if (filters.dimensionValue && filters.dimensionKey) {
+      switch (filters.dimensionKey) {
+        case 'cameraId': params.cameraId = filters.dimensionValue; break;
+        case 'location': params.location = filters.dimensionValue; break;
+        case 'nodeId': params.nodeId = filters.dimensionValue; break;
+      }
+    }
+    return params;
+  }, [filters.dimensionKey, filters.dimensionValue]);
+
+  // Navigate to gallery with filters for a given date
+  const drillDown = useCallback((date: string, extra: Record<string, string> = {}) => {
+    const params = new URLSearchParams();
+    // Date range: full day in local time
+    params.set('startDate', `${date}T00:00:00.000`);
+    params.set('endDate', `${date}T23:59:59.999`);
+    // Dimension filter
+    const dim = buildDimensionParams();
+    for (const [k, v] of Object.entries(dim)) params.set(k, v);
+    // Extra filters (hasSmoke, alertLevels, etc.)
+    for (const [k, v] of Object.entries(extra)) params.set(k, v);
+    navigate({ pathname: '/', search: params.toString() });
+  }, [navigate, buildDimensionParams]);
+
+  const handleSmokeBarClick = useCallback((date: string) => {
+    drillDown(date, { hasSmoke: 'true' });
+  }, [drillDown]);
+
+  const handleAlertBarClick = useCallback((date: string, seriesKey?: string) => {
+    const extra: Record<string, string> = { hasSmoke: 'true' };
+    if (seriesKey) extra.alertLevels = seriesKey;
+    drillDown(date, extra);
+  }, [drillDown]);
+
+  const handleConfidenceBarClick = useCallback((date: string) => {
+    drillDown(date, { hasSmoke: 'true' });
+  }, [drillDown]);
 
   if (isLoading && summary.length === 0) {
     return (
@@ -185,6 +228,7 @@ export function StatsDashboard() {
           bgClass="bg-slate-400"
           emptyMessage={t('stats.noDetections')}
           granularity={gran}
+          onBarClick={handleSmokeBarClick}
         />
         <StackedBarChart
           title={t('stats.alertsByLevel')}
@@ -196,6 +240,7 @@ export function StatsDashboard() {
           ]}
           emptyMessage={t('stats.noDetections')}
           granularity={gran}
+          onBarClick={handleAlertBarClick}
         />
         <SimpleBarChart
           title={t('stats.avgConfidencePerDay')}
@@ -205,6 +250,7 @@ export function StatsDashboard() {
           unit="%"
           emptyMessage={t('stats.noDetections')}
           granularity={gran}
+          onBarClick={handleConfidenceBarClick}
         />
       </div>
 

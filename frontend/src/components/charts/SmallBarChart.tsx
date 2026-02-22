@@ -17,6 +17,7 @@ interface SimpleBarChartProps {
   emptyMessage?: string;
   className?: string;
   granularity?: 'day' | 'week' | 'month';
+  onBarClick?: (date: string) => void;
 }
 
 interface StackedBarChartProps {
@@ -26,6 +27,7 @@ interface StackedBarChartProps {
   emptyMessage?: string;
   className?: string;
   granularity?: 'day' | 'week' | 'month';
+  onBarClick?: (date: string, seriesKey?: string) => void;
 }
 
 function formatDay(dateStr: string): string {
@@ -64,6 +66,7 @@ export function SimpleBarChart({
   emptyMessage = 'No data',
   className,
   granularity = 'day',
+  onBarClick,
 }: SimpleBarChartProps) {
   const maxValue = useMemo(() => Math.max(...data.map(d => d.value), 1), [data]);
   const hasData = data.some(d => d.value > 0);
@@ -94,7 +97,12 @@ export function SimpleBarChart({
               return (
                 <div
                   key={point.date}
-                  className="flex-1 flex flex-col items-center justify-end group relative h-full"
+                  className={cn(
+                    'flex-1 flex flex-col items-center justify-end group relative h-full',
+                    onBarClick && point.value > 0 && 'cursor-pointer',
+                  )}
+                  role={onBarClick && point.value > 0 ? 'button' : undefined}
+                  onClick={onBarClick && point.value > 0 ? () => onBarClick(point.date) : undefined}
                 >
                   {/* Value label above bar */}
                   {showLabel && (
@@ -149,6 +157,7 @@ export function StackedBarChart({
   emptyMessage = 'No data',
   className,
   granularity = 'day',
+  onBarClick,
 }: StackedBarChartProps) {
   const maxValue = useMemo(
     () => Math.max(...data.map(d => series.reduce((s, { key }) => s + ((d[key] as number) || 0), 0)), 1),
@@ -192,7 +201,12 @@ export function StackedBarChart({
               return (
                 <div
                   key={point.date as string}
-                  className="flex-1 flex flex-col items-center justify-end group relative h-full"
+                  className={cn(
+                    'flex-1 flex flex-col items-center justify-end group relative h-full',
+                    onBarClick && total > 0 && 'cursor-pointer',
+                  )}
+                  role={onBarClick && total > 0 ? 'button' : undefined}
+                  onClick={onBarClick && total > 0 ? () => onBarClick(point.date as string) : undefined}
                 >
                   {total > 0 && (
                     <span
@@ -214,8 +228,12 @@ export function StackedBarChart({
                       return (
                         <div
                           key={key}
-                          className={cn('w-full flex-shrink-0', bgClass)}
+                          className={cn('w-full flex-shrink-0 transition-opacity hover:opacity-70', bgClass)}
                           style={{ height: `${segPct}%`, minHeight: val > 0 ? 1 : 0 }}
+                          onClick={onBarClick && val > 0 ? (e) => {
+                            e.stopPropagation();
+                            onBarClick(point.date as string, key);
+                          } : undefined}
                         />
                       );
                     })}
