@@ -57,9 +57,16 @@ export function buildAuthorizationUrl(params: {
   codeChallenge: string;
 }): URL {
   const client = getOIDCClient();
+  const projectId = appConfig.oidc.projectId;
+
+  // Use project-scoped roles scope to prevent cross-project role bleed
+  // in shared Zitadel instances. Falls back to generic only if projectId is not configured.
+  const rolesScope = projectId
+    ? `urn:zitadel:iam:org:project:id:${projectId}:roles`
+    : 'urn:zitadel:iam:org:project:roles';
 
   const authUrl = client.authorizationUrl({
-    scope: 'openid email profile urn:zitadel:iam:org:project:roles',
+    scope: `openid email profile ${rolesScope}`,
     redirect_uri: appConfig.oidc.redirectUri,
     response_type: 'code',
     state: params.state,
