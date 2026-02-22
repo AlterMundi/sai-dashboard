@@ -16,10 +16,11 @@ const requiredEnvVars = [
   'AUTH_POST_LOGOUT_URI',
 ] as const;
 
-// DB passwords required in production only
+// DB passwords + Zitadel project scope required in production only
 const productionRequiredVars = [
   'N8N_DB_PASSWORD',
   'SAI_DB_PASSWORD',
+  'ZITADEL_PROJECT_ID',
 ] as const;
 
 const missingVars: string[] = [];

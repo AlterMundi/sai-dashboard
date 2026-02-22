@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import {
   apiRateLimit,
+  pendingStatusRateLimit,
   authenticateToken,
   requireAuth,
   requireRole,
@@ -64,8 +65,8 @@ authRouter.get('/login', initiateOIDC);
 // OIDC: callback from Zitadel (exchanges code, issues JWT, redirects frontend)
 authRouter.get('/callback', handleCallback);
 
-// Public: approval status polling (no auth required)
-authRouter.get('/pending/status', getPendingStatus);
+// Public: approval status polling (no auth required, rate-limited)
+authRouter.get('/pending/status', pendingStatusRateLimit, getPendingStatus);
 
 // Protected auth endpoints
 authRouter.post('/logout', authenticateToken, requireAuth, logout);
