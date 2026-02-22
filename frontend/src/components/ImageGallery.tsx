@@ -18,12 +18,14 @@ interface ImageGalleryProps {
   className?: string;
   refreshTrigger?: number;
   onPrependRegister?: (prependFn: (executions: ExecutionWithImageUrls[]) => void) => void;
+  onOpenModalRegister?: (openFn: (executionId: number, opts?: { navMode?: 'camera' | 'gallery' }) => void) => void;
 }
 
-export function ImageGallery({ initialFilters = {}, className, refreshTrigger, onPrependRegister }: ImageGalleryProps) {
+export function ImageGallery({ initialFilters = {}, className, refreshTrigger, onPrependRegister, onOpenModalRegister }: ImageGalleryProps) {
   const { t } = useTranslation();
   const [selectedExecution, setSelectedExecution] = useState<ExecutionWithImageUrls | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalInitialNavMode, setModalInitialNavMode] = useState<'camera' | 'gallery' | undefined>(undefined);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>(() =>
     typeof window !== 'undefined' && window.innerWidth < 640 ? 'list' : 'grid'
   );
@@ -73,6 +75,32 @@ export function ImageGallery({ initialFilters = {}, className, refreshTrigger, o
       onPrependRegister(prependExecutions);
     }
   }, [onPrependRegister, prependExecutions]);
+
+  // Register open-modal callback for external callers (e.g. carousel)
+  const openModalById = useCallback(async (executionId: number, opts?: { navMode?: 'camera' | 'gallery' }) => {
+    setModalInitialNavMode(opts?.navMode);
+    // Check if already loaded in the gallery
+    const found = executions.find(e => e.id === executionId);
+    if (found) {
+      setSelectedExecution(found);
+      setIsModalOpen(true);
+      return;
+    }
+    // Fetch from API
+    try {
+      const execution = await executionsApi.getExecutionById(executionId);
+      if (execution) {
+        setSelectedExecution(execution as ExecutionWithImageUrls);
+        setIsModalOpen(true);
+      }
+    } catch { /* ignore */ }
+  }, [executions]);
+
+  useEffect(() => {
+    if (onOpenModalRegister) {
+      onOpenModalRegister(openModalById);
+    }
+  }, [onOpenModalRegister, openModalById]);
 
   // Memoize serialized filters to avoid unnecessary effect triggers
   const initialFiltersJson = useMemo(() => JSON.stringify(initialFilters), [initialFilters]);
@@ -519,6 +547,7 @@ export function ImageGallery({ initialFilters = {}, className, refreshTrigger, o
         onClose={handleModalClose}
         cameraNav={cameraNav}
         galleryNav={galleryNav}
+        initialNavMode={modalInitialNavMode}
       />
 
       {/* Back to Top Button */}

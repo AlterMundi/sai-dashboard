@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { Wind, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { executionsApi } from '@/services/api';
 import { useSecureImage } from '@/components/ui/SecureImage';
 import { Execution } from '@/types';
@@ -19,64 +19,62 @@ function CarouselThumb({ execution, onClick }: CarouselThumbProps) {
 
   const ts = new Date(execution.executionTimestamp);
   const timeStr = ts.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
-  const dateStr = ts.toLocaleDateString(undefined, { day: '2-digit', month: '2-digit' });
+  const dateStr = ts.toLocaleDateString(undefined, { day: '2-digit', month: 'short' });
 
+  /* Mirror gallery ImageCard DNA: rounded-xl, shadow-sm, hover:shadow-xl, duration-300 */
   return (
-    <button
+    <div
+      role="button"
+      tabIndex={0}
       className={cn(
-        'relative flex-shrink-0 w-36 h-24 rounded-lg overflow-hidden border border-gray-200',
-        'hover:border-gray-400 hover:shadow-md transition-all duration-200 group',
-        execution.alertLevel === 'critical' && 'ring-1 ring-red-500',
-        execution.alertLevel === 'high' && 'ring-1 ring-orange-400',
+        'rounded-xl cursor-pointer group',
+        'bg-white border border-gray-200 shadow-sm',
+        'hover:shadow-xl transition-[box-shadow,border-color] duration-300',
+        'focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 outline-none',
+        execution.alertLevel === 'critical' && 'ring-2 ring-red-500 ring-offset-2',
+        execution.alertLevel === 'high' && 'ring-2 ring-orange-400 ring-offset-1',
       )}
-      onClick={() => onClick(execution)}
+      style={{ position: 'relative', flexShrink: 0, width: 168, height: 110, overflow: 'hidden' }}
+      onClick={(e) => { (e.currentTarget as HTMLElement).blur(); onClick(execution); }}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(execution); } }}
     >
-      {/* Image */}
-      <div className="absolute inset-0 bg-gradient-to-br from-gray-100 to-gray-200">
-        {blobUrl && !loading && (
-          <img
-            src={blobUrl}
-            alt={`#${execution.id}`}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-            loading="lazy"
-            decoding="async"
-          />
-        )}
-      </div>
-
-      {/* Bottom gradient */}
-      <div className="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-black/60 to-transparent" />
-
-      {/* Alert badge */}
-      {execution.alertLevel && execution.alertLevel !== 'none' && (
-        <div
-          className={cn(
-            'absolute top-1 left-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold text-white uppercase tracking-wide',
-            execution.alertLevel === 'critical' && 'bg-red-600',
-            execution.alertLevel === 'high' && 'bg-orange-500',
-            execution.alertLevel === 'medium' && 'bg-amber-500',
-            execution.alertLevel === 'low' && 'bg-blue-500',
-          )}
-        >
-          {execution.alertLevel}
-        </div>
+      {/* Image — matches gallery card aspect-video fill pattern */}
+      {loading && (
+        <div style={{ position: 'absolute', inset: 0 }} className="bg-gradient-to-br from-gray-100 to-gray-200 animate-pulse" />
+      )}
+      {blobUrl && !loading && (
+        <img
+          src={blobUrl}
+          alt={`Detection #${execution.id}`}
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+          className="group-hover:scale-105 transition-transform duration-300"
+          loading="lazy"
+          decoding="async"
+        />
+      )}
+      {!blobUrl && !loading && (
+        <div style={{ position: 'absolute', inset: 0 }} className="bg-gradient-to-br from-gray-100 to-gray-200" />
       )}
 
-      {/* Smoke confidence */}
-      {execution.hasSmoke && (
-        <div className="absolute bottom-1 left-1 flex items-center gap-0.5 text-white text-[10px] font-medium">
-          <Wind className="h-2.5 w-2.5" />
-          {execution.confidenceSmoke != null && (
-            <span className="tabular-nums">{Math.round(execution.confidenceSmoke * 100)}%</span>
-          )}
-        </div>
-      )}
+      {/* Top gradient (matches gallery card) */}
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 28, background: 'linear-gradient(to bottom, rgba(0,0,0,0.08), transparent)', pointerEvents: 'none' }} />
 
-      {/* Timestamp */}
-      <div className="absolute bottom-1 right-1 text-white text-[9px] font-medium tabular-nums opacity-80">
-        {dateStr} {timeStr}
+      {/* Bottom gradient + info strip */}
+      <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 40, background: 'linear-gradient(to top, rgba(0,0,0,0.65), transparent)', pointerEvents: 'none' }} />
+
+      {/* Timestamp — bottom right, same tabular-nums pattern */}
+      <div style={{ position: 'absolute', bottom: 6, right: 6, fontSize: 9, color: 'white', fontWeight: 500, pointerEvents: 'none' }} className="tabular-nums">
+        {dateStr} · {timeStr}
       </div>
-    </button>
+
+      {/* Hover reveal: execution ID — matches gallery card font-mono ID style */}
+      <div
+        style={{ position: 'absolute', top: 5, left: 5, fontSize: 9 }}
+        className="font-mono font-semibold text-white/0 group-hover:text-white/90 transition-colors duration-200 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]"
+      >
+        #{String(execution.id).padStart(6, '0')}
+      </div>
+    </div>
   );
 }
 
@@ -123,31 +121,37 @@ export function LatestDetectionsCarousel({ onSelect, className }: LatestDetectio
   const scroll = useCallback((dir: 'left' | 'right') => {
     const el = scrollRef.current;
     if (!el) return;
-    el.scrollBy({ left: dir === 'left' ? -300 : 300, behavior: 'smooth' });
+    el.scrollBy({ left: dir === 'left' ? -340 : 340, behavior: 'smooth' });
   }, []);
 
   if (detections.length === 0) return null;
 
   return (
-    <div className={cn('relative', className)}>
-      <h3 className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-2">
-        {t('gallery.latestDetections')}
-      </h3>
+    <div className={className}>
+      {/* Section label — matches gallery header style */}
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wide">
+          {t('gallery.latestDetections')}
+        </h3>
+      </div>
 
+      {/* Carousel track */}
       <div className="relative group/carousel">
         {/* Scroll buttons */}
         {canScrollLeft && (
           <button
+            type="button"
             onClick={() => scroll('left')}
-            className="absolute left-0 top-1/2 -translate-y-1/2 z-10 bg-white/90 hover:bg-white shadow-lg rounded-full p-1.5 border border-gray-200 opacity-0 group-hover/carousel:opacity-100 transition-opacity"
+            className="absolute -left-2 top-1/2 -translate-y-1/2 z-20 bg-white hover:bg-gray-50 shadow-lg rounded-full p-1.5 border border-gray-200 opacity-0 group-hover/carousel:opacity-100 transition-opacity duration-200"
           >
             <ChevronLeft className="h-4 w-4 text-gray-600" />
           </button>
         )}
         {canScrollRight && (
           <button
+            type="button"
             onClick={() => scroll('right')}
-            className="absolute right-0 top-1/2 -translate-y-1/2 z-10 bg-white/90 hover:bg-white shadow-lg rounded-full p-1.5 border border-gray-200 opacity-0 group-hover/carousel:opacity-100 transition-opacity"
+            className="absolute -right-2 top-1/2 -translate-y-1/2 z-20 bg-white hover:bg-gray-50 shadow-lg rounded-full p-1.5 border border-gray-200 opacity-0 group-hover/carousel:opacity-100 transition-opacity duration-200"
           >
             <ChevronRight className="h-4 w-4 text-gray-600" />
           </button>
@@ -156,8 +160,8 @@ export function LatestDetectionsCarousel({ onSelect, className }: LatestDetectio
         {/* Scrollable row */}
         <div
           ref={scrollRef}
-          className="flex gap-2 overflow-x-auto scrollbar-none pb-1"
-          style={{ scrollbarWidth: 'none' }}
+          className="flex gap-3 scrollbar-none"
+          style={{ overflowX: 'auto', overflowY: 'visible', scrollbarWidth: 'none', padding: '4px 4px' }}
         >
           {detections.map((exec) => (
             <CarouselThumb key={exec.id} execution={exec} onClick={onSelect} />

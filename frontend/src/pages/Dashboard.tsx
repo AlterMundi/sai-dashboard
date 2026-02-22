@@ -71,6 +71,7 @@ export function Dashboard() {
 
   const [batchUpdateTrigger, setBatchUpdateTrigger] = useState(0);
   const galleryPrependRef = useRef<((executions: any[]) => void) | null>(null);
+  const galleryOpenModalRef = useRef<((executionId: number, opts?: { navMode?: 'camera' | 'gallery' }) => void) | null>(null);
   const fetchingStage2Ids = useRef<Set<number>>(new Set());
 
   useDailySummary(7);
@@ -239,7 +240,7 @@ export function Dashboard() {
     clearAllFilters();
   }, [clearAllFilters]);
 
-  const handleCarouselSelect = useCallback((execution: { executionTimestamp: string }) => {
+  const handleCarouselSelect = useCallback((execution: { id: number; executionTimestamp: string }) => {
     // Filter gallery to show detections around this execution's time
     const ts = new Date(execution.executionTimestamp);
     const dayStart = new Date(ts.getFullYear(), ts.getMonth(), ts.getDate());
@@ -249,11 +250,15 @@ export function Dashboard() {
       startDate: dayStart.toISOString(),
       endDate: dayEnd.toISOString(),
     });
+    // Open the modal for this execution
+    if (galleryOpenModalRef.current) {
+      galleryOpenModalRef.current(execution.id, { navMode: 'camera' });
+    }
   }, [setFilters]);
 
   return (
     <Layout>
-      <div className="space-y-8">
+      <div className="space-y-6">
         {/* Latest Detections Carousel */}
         <LatestDetectionsCarousel onSelect={handleCarouselSelect} />
 
@@ -293,6 +298,7 @@ export function Dashboard() {
           initialFilters={filters}
           refreshTrigger={batchUpdateTrigger}
           onPrependRegister={(prependFn) => { galleryPrependRef.current = prependFn; }}
+          onOpenModalRegister={(openFn) => { galleryOpenModalRef.current = openFn; }}
         />
       </div>
     </Layout>

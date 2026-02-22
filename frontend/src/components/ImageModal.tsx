@@ -45,7 +45,7 @@ const alertColors: Record<string, string> = {
   none: 'bg-gray-200 text-gray-600',
 };
 
-export function ImageModal({ execution, isOpen, onClose, onUpdate, cameraNav, galleryNav }: ImageModalProps) {
+export function ImageModal({ execution, isOpen, onClose, onUpdate, cameraNav, galleryNav, initialNavMode }: ImageModalProps) {
   const { t } = useTranslation();
   const [zoomLevel, setZoomLevel] = useState(1);
   const [downloading, setDownloading] = useState(false);
@@ -56,7 +56,14 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate, cameraNav, ga
   const [sheetExpanded, setSheetExpanded] = useState(false);
 
   // Navigation mode state
-  const [navMode, setNavMode] = useState<'camera' | 'gallery'>(cameraNav ? 'camera' : 'gallery');
+  const [navMode, setNavMode] = useState<'camera' | 'gallery'>(
+    initialNavMode === 'camera' ? 'camera' : cameraNav ? 'camera' : 'gallery'
+  );
+
+  // Honor initialNavMode when modal opens
+  useEffect(() => {
+    if (isOpen && initialNavMode) setNavMode(initialNavMode);
+  }, [isOpen, initialNavMode]);
 
   // Auto-switch if active mode becomes unavailable
   useEffect(() => {

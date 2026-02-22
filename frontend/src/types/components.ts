@@ -36,6 +36,7 @@ export interface ImageModalProps {
   onUpdate?: (execution: ExecutionWithImageUrls) => void;
   cameraNav?: NavContext;   // same nodeId+cameraId, sorted by executionTimestamp ASC
   galleryNav?: NavContext;  // all loaded executions in current gallery order
+  initialNavMode?: 'camera' | 'gallery';
 }
 
 export interface ImageGalleryProps {
