@@ -59,6 +59,7 @@ export function StatsControls({ value, onChange, className }: StatsControlsProps
 
   const [fromDate, setFromDate] = useState(value.startDate);
   const [toDate, setToDate]     = useState(value.endDate);
+  const [lastTouched, setLastTouched] = useState<'from' | 'to'>('to');
   const [dimensionKey, setDimensionKey] = useState<StatsFilters['dimensionKey']>(value.dimensionKey);
   const [dimensionValue, setDimensionValue] = useState(value.dimensionValue ?? '');
 
@@ -87,11 +88,13 @@ export function StatsControls({ value, onChange, className }: StatsControlsProps
 
   const handleFromChange = useCallback((v: string) => {
     setFromDate(v);
+    setLastTouched('from');
     if (v && toDate) emitChange(v, toDate, dimensionKey, dimensionValue);
   }, [toDate, dimensionKey, dimensionValue, emitChange]);
 
   const handleToChange = useCallback((v: string) => {
     setToDate(v);
+    setLastTouched('to');
     if (fromDate && v) emitChange(fromDate, v, dimensionKey, dimensionValue);
   }, [fromDate, dimensionKey, dimensionValue, emitChange]);
 
@@ -111,14 +114,21 @@ export function StatsControls({ value, onChange, className }: StatsControlsProps
     };
 
     let s: string, e: string;
-    if (fromDate) {
+    if (lastTouched === 'from' && fromDate) {
+      // User last touched "from" → extend forward from that date
       const anchor = parseLocal(fromDate);
       s = toDateStr(anchor);
       e = toDateStr(applyOffset(anchor, true));
     } else if (toDate) {
+      // User last touched "to" (or default) → extend backward from that date
       const anchor = parseLocal(toDate);
       s = toDateStr(applyOffset(anchor, false));
       e = toDateStr(anchor);
+    } else if (fromDate) {
+      // "to" not set, fall back to "from"
+      const anchor = parseLocal(fromDate);
+      s = toDateStr(anchor);
+      e = toDateStr(applyOffset(anchor, true));
     } else {
       const today = new Date();
       s = toDateStr(applyOffset(today, false));
