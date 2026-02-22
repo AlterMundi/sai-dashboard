@@ -54,7 +54,8 @@ export class NewExecutionService {
       detectionMode,
       yoloModelVersion,
       detectionClasses,
-      minDetectionConfidence
+      minDetectionConfidence,
+      sortOrder,
     } = filters;
 
     // Handle search/searchQuery alias
@@ -344,7 +345,7 @@ export class NewExecutionService {
       LEFT JOIN execution_images ei ON e.id = ei.execution_id
       LEFT JOIN execution_notifications en ON e.id = en.execution_id
       WHERE ${whereClause}
-      ORDER BY e.execution_timestamp DESC
+      ORDER BY e.execution_timestamp ${sortOrder === 'asc' ? 'ASC' : 'DESC'}
       LIMIT $${paramCount + 1} OFFSET $${paramCount + 2}
     `;
 
