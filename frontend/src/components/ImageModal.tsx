@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { LoadingSpinner } from './ui/LoadingSpinner';
 import { BoundingBoxOverlay, BoundingBoxToggle } from './BoundingBoxOverlay';
 import { usePrefetchBuffer } from '@/hooks/usePrefetchBuffer';
+import { useAuth } from '@/hooks/useAuth';
 import { executionsApi, tokenManager } from '@/services/api';
 import {
   formatDate,
@@ -47,6 +48,8 @@ const alertColors: Record<string, string> = {
 
 export function ImageModal({ execution, isOpen, onClose, onUpdate, cameraNav, galleryNav, initialNavMode }: ImageModalProps) {
   const { t } = useTranslation();
+  const { user } = useAuth();
+  const isViewer = user?.role === 'SAI_VIEWER';
   const [zoomLevel, setZoomLevel] = useState(1);
   const [downloading, setDownloading] = useState(false);
   const [showBoundingBoxes, setShowBoundingBoxes] = useState(true);
@@ -484,40 +487,37 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate, cameraNav, ga
   // ── Sidebar content (shared between desktop sidebar and mobile sheet) ─────
   const SidebarContent = () => (
     <div className="p-4 sm:p-6 space-y-6">
-      {/* Execution Metadata */}
-      <div className="space-y-3">
-        <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
-          {t('modal.executionInfo')}
-        </h3>
-        <div className="grid grid-cols-2 gap-3 text-sm">
-          <div>
-            <p className="text-gray-500">{t('modal.started')}</p>
-            <p className="font-medium mt-1"><DynamicTimeAgo date={execution.executionTimestamp} /></p>
-            <p className="text-xs text-gray-400 mt-0.5">{formatDate(execution.executionTimestamp)}</p>
-          </div>
-          {duration && (
-            <div>
-              <p className="text-gray-500">{t('modal.duration')}</p>
-              <div className="flex items-center mt-1">
-                <Clock className="h-4 w-4 text-gray-400 mr-1" />
-                <span className="font-medium">{formatDuration(duration)}</span>
+      {/* Device & Camera */}
+      {(execution.cameraId || execution.deviceId || execution.location) && (
+        <div className="space-y-3">
+          <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
+            {t('modal.deviceInfo')}
+          </h3>
+          <div className="space-y-2 text-sm">
+            {execution.cameraId && (
+              <div className="flex items-center">
+                <Camera className="h-4 w-4 text-gray-400 mr-2" />
+                <span className="text-gray-500 mr-2">{t('modal.cameraLabel')}</span>
+                <span className="font-mono font-medium">{execution.cameraId}</span>
               </div>
-            </div>
-          )}
-          <div>
-            <p className="text-gray-500">{t('modal.statusLabel')}</p>
-            <div className="flex items-center mt-1">
-              {execution.status === 'success' && <CheckCircle className="h-4 w-4 text-success-600 mr-1" />}
-              {execution.status === 'error'   && <AlertTriangle className="h-4 w-4 text-danger-600 mr-1" />}
-              <span className="font-medium capitalize">{execution.status}</span>
-            </div>
-          </div>
-          <div>
-            <p className="text-gray-500">{t('modal.mode')}</p>
-            <p className="font-medium mt-1 capitalize">{execution.mode}</p>
+            )}
+            {execution.location && (
+              <div className="flex items-center">
+                <MapPin className="h-4 w-4 text-gray-400 mr-2" />
+                <span className="text-gray-500 mr-2">{t('modal.locationLabel')}</span>
+                <span className="font-medium">{execution.location}</span>
+              </div>
+            )}
+            {execution.deviceId && (
+              <div className="flex items-center">
+                <Zap className="h-4 w-4 text-gray-400 mr-2" />
+                <span className="text-gray-500 mr-2">{t('modal.deviceLabel')}</span>
+                <span className="font-mono font-medium text-xs">{execution.deviceId}</span>
+              </div>
+            )}
           </div>
         </div>
-      </div>
+      )}
 
       {/* YOLO Analysis */}
       <div className="space-y-3">
@@ -628,40 +628,45 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate, cameraNav, ga
         )}
       </div>
 
-      {/* Device & Camera */}
-      {(execution.cameraId || execution.deviceId || execution.location) && (
-        <div className="space-y-3">
-          <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
-            {t('modal.deviceInfo')}
-          </h3>
-          <div className="space-y-2 text-sm">
-            {execution.cameraId && (
-              <div className="flex items-center">
-                <Camera className="h-4 w-4 text-gray-400 mr-2" />
-                <span className="text-gray-500 mr-2">{t('modal.cameraLabel')}</span>
-                <span className="font-mono font-medium">{execution.cameraId}</span>
+      {/* Execution Metadata (hidden for SAI_VIEWER) */}
+      {!isViewer && (
+      <div className="space-y-3">
+        <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
+          {t('modal.executionInfo')}
+        </h3>
+        <div className="grid grid-cols-2 gap-3 text-sm">
+          <div>
+            <p className="text-gray-500">{t('modal.started')}</p>
+            <p className="font-medium mt-1"><DynamicTimeAgo date={execution.executionTimestamp} /></p>
+            <p className="text-xs text-gray-400 mt-0.5">{formatDate(execution.executionTimestamp)}</p>
+          </div>
+          {duration && (
+            <div>
+              <p className="text-gray-500">{t('modal.duration')}</p>
+              <div className="flex items-center mt-1">
+                <Clock className="h-4 w-4 text-gray-400 mr-1" />
+                <span className="font-medium">{formatDuration(duration)}</span>
               </div>
-            )}
-            {execution.location && (
-              <div className="flex items-center">
-                <MapPin className="h-4 w-4 text-gray-400 mr-2" />
-                <span className="text-gray-500 mr-2">{t('modal.locationLabel')}</span>
-                <span className="font-medium">{execution.location}</span>
-              </div>
-            )}
-            {execution.deviceId && (
-              <div className="flex items-center">
-                <Zap className="h-4 w-4 text-gray-400 mr-2" />
-                <span className="text-gray-500 mr-2">{t('modal.deviceLabel')}</span>
-                <span className="font-mono font-medium text-xs">{execution.deviceId}</span>
-              </div>
-            )}
+            </div>
+          )}
+          <div>
+            <p className="text-gray-500">{t('modal.statusLabel')}</p>
+            <div className="flex items-center mt-1">
+              {execution.status === 'success' && <CheckCircle className="h-4 w-4 text-success-600 mr-1" />}
+              {execution.status === 'error'   && <AlertTriangle className="h-4 w-4 text-danger-600 mr-1" />}
+              <span className="font-medium capitalize">{execution.status}</span>
+            </div>
+          </div>
+          <div>
+            <p className="text-gray-500">{t('modal.mode')}</p>
+            <p className="font-medium mt-1 capitalize">{execution.mode}</p>
           </div>
         </div>
+      </div>
       )}
 
-      {/* Image Metadata */}
-      {execution.hasImage && (
+      {/* Image Metadata (hidden for SAI_VIEWER) */}
+      {!isViewer && execution.hasImage && (
         <div className="space-y-3">
           <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
             {t('modal.imageInfo')}

@@ -4,9 +4,10 @@ import { PendingUser, DashboardRole } from '@/types';
 import { ShieldCheck, ShieldOff, UserCheck, Clock, RefreshCw, AlertTriangle } from 'lucide-react';
 
 const ROLES: { value: DashboardRole; label: string; color: string }[] = [
-  { value: 'SAI_VIEWER',   label: 'Viewer',   color: 'slate' },
-  { value: 'SAI_OPERATOR', label: 'Operator', color: 'blue'  },
-  { value: 'SAI_ADMIN',    label: 'Admin',    color: 'amber' },
+  { value: 'SAI_VIEWER',     label: 'Viewer',     color: 'slate'   },
+  { value: 'SAI_RESEARCHER', label: 'Researcher', color: 'emerald' },
+  { value: 'SAI_OPERATOR',   label: 'Operator',   color: 'blue'    },
+  { value: 'SAI_ADMIN',      label: 'Admin',      color: 'amber'   },
 ];
 
 function RolePills({
@@ -25,12 +26,14 @@ function RolePills({
         const baseClasses =
           'px-2.5 py-1 rounded text-xs font-semibold tracking-wide transition-all duration-150 select-none cursor-pointer border';
         const colorMap: Record<string, string> = {
-          'slate-active':  'bg-slate-700 border-slate-700 text-white',
-          'slate-idle':    'bg-white border-slate-200 text-slate-500 hover:border-slate-400 hover:text-slate-700',
-          'blue-active':   'bg-blue-600 border-blue-600 text-white',
-          'blue-idle':     'bg-white border-blue-200 text-blue-400 hover:border-blue-400 hover:text-blue-600',
-          'amber-active':  'bg-amber-500 border-amber-500 text-white',
-          'amber-idle':    'bg-white border-amber-200 text-amber-500 hover:border-amber-400 hover:text-amber-600',
+          'slate-active':    'bg-slate-700 border-slate-700 text-white',
+          'slate-idle':      'bg-white border-slate-200 text-slate-500 hover:border-slate-400 hover:text-slate-700',
+          'emerald-active':  'bg-emerald-600 border-emerald-600 text-white',
+          'emerald-idle':    'bg-white border-emerald-200 text-emerald-400 hover:border-emerald-400 hover:text-emerald-600',
+          'blue-active':     'bg-blue-600 border-blue-600 text-white',
+          'blue-idle':       'bg-white border-blue-200 text-blue-400 hover:border-blue-400 hover:text-blue-600',
+          'amber-active':    'bg-amber-500 border-amber-500 text-white',
+          'amber-idle':      'bg-white border-amber-200 text-amber-500 hover:border-amber-400 hover:text-amber-600',
         };
         const key = `${r.color}-${active ? 'active' : 'idle'}`;
         return (
