@@ -539,6 +539,7 @@ const pollAndBroadcastExecutions = async (): Promise<void> => {
     if (latestExecutions.executions.length === 0) return;
 
     const newExecutions = [];
+    const newIds: number[] = [];
     for (const execution of latestExecutions.executions) {
       // Skip already-broadcast executions
       if (broadcastedExecutionIds.has(execution.id)) continue;
@@ -550,14 +551,7 @@ const pollAndBroadcastExecutions = async (): Promise<void> => {
       }
 
       newExecutions.push(execution);
-      broadcastedExecutionIds.add(execution.id);
-    }
-
-    // Trim the set to prevent unbounded memory growth (keep newest MAX_BROADCAST_TRACKED IDs)
-    if (broadcastedExecutionIds.size > MAX_BROADCAST_TRACKED) {
-      const sorted = [...broadcastedExecutionIds].sort((a, b) => a - b);
-      sorted.slice(0, broadcastedExecutionIds.size - MAX_BROADCAST_TRACKED)
-        .forEach(id => broadcastedExecutionIds.delete(id));
+      newIds.push(execution.id);
     }
 
     if (newExecutions.length > 0) {
@@ -577,13 +571,23 @@ const pollAndBroadcastExecutions = async (): Promise<void> => {
       };
 
       const clientCount = sseManager.broadcast(message);
+
+      // Commit IDs to the Set only after successful broadcast
+      newIds.forEach(id => broadcastedExecutionIds.add(id));
+
+      // Trim the set to prevent unbounded memory growth (keep newest MAX_BROADCAST_TRACKED IDs)
+      if (broadcastedExecutionIds.size > MAX_BROADCAST_TRACKED) {
+        const sorted = [...broadcastedExecutionIds].sort((a, b) => a - b);
+        sorted.slice(0, broadcastedExecutionIds.size - MAX_BROADCAST_TRACKED)
+          .forEach(id => broadcastedExecutionIds.delete(id));
+      }
       
       logger.info('New executions broadcasted immediately', {
         executionCount: batchData.count,
         successful: batchData.successful,
         highAlert: batchData.highAlert,
         clientCount,
-        latestIds: newExecutions.map(e => e.id)
+        latestIds: newIds
       });
     }
   } catch (error) {
