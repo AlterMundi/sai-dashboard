@@ -1,0 +1,1 @@
+3 scripts actualizados: validate-production.sh (systemctl is-active/show/journalctl → docker ps/logs), production-verification.sh (test_service_configuration reescrito para Docker, logs y status finales), ssh-tunnel-verification.sh (línea 344: systemctl show → docker inspect restart policy). quick-test.sh sin cambios (solo tiene nginx). Commit: 1745595

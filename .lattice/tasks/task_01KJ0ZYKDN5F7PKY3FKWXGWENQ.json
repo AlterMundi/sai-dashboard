@@ -1,0 +1,45 @@
+{
+  "assigned_to": null,
+  "branch_links": [],
+  "comment_count": 1,
+  "complexity": null,
+  "created_at": "2026-02-21T20:58:38Z",
+  "created_by": "human:fede",
+  "custom_fields": {},
+  "description": "4 archivos: docs/SSE_IMPLEMENTATION.md, database/triggers/README.md, database/migrations/README.md, nginx/sai-altermundi-net.conf. Reemplazar journalctl/systemctl del API. Ver Task 7 del plan.",
+  "done_at": "2026-02-21T21:06:50Z",
+  "evidence_refs": [
+    {
+      "id": "ev_01KJ10DM064P65YZX1KY81EF5F",
+      "role": "review",
+      "source_type": "comment"
+    },
+    {
+      "id": "art_01KJ10DM064P65YZX1KY81EF5E",
+      "role": "review",
+      "source_type": "artifact"
+    }
+  ],
+  "id": "task_01KJ0ZYKDN5F7PKY3FKWXGWENQ",
+  "last_event_id": "ev_01KJ10DM064P65YZX1KY81EF5J",
+  "last_status_changed_at": "2026-02-21T21:06:50Z",
+  "priority": "low",
+  "relationships_out": [
+    {
+      "created_at": "2026-02-21T20:58:44Z",
+      "created_by": "human:fede",
+      "note": null,
+      "target_task_id": "task_01KJ0ZXNKHN23SBNPY4258XY8C",
+      "type": "subtask_of"
+    }
+  ],
+  "reopened_count": 0,
+  "schema_version": 1,
+  "short_id": "PROJ-18",
+  "status": "done",
+  "tags": null,
+  "title": "Actualizar docs restantes con comandos Docker",
+  "type": "chore",
+  "updated_at": "2026-02-21T21:06:50Z",
+  "urgency": null
+}

@@ -1,0 +1,19 @@
+{
+  "created_at": "2026-02-21T21:07:08Z",
+  "created_by": "agent:claude-cli",
+  "custom_fields": {},
+  "id": "art_01KJ10E5ZMKJF3GCR514ADGPMK",
+  "model": null,
+  "payload": {
+    "content_type": "text/markdown",
+    "file": "art_01KJ10E5ZMKJF3GCR514ADGPMK.md",
+    "size_bytes": 232
+  },
+  "schema_version": 1,
+  "sensitive": false,
+  "summary": "scripts/claude-dev-sudoers: removidos systemctl restart/stop/start sai-dashboard-api y journalctl -u sai-dashboard-api. Agregados docker restart/stop/start sai-dashboard y docker logs *. Mantenido sys",
+  "tags": [],
+  "title": "Review findings",
+  "token_usage": null,
+  "type": "note"
+}

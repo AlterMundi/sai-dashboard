@@ -1,0 +1,45 @@
+{
+  "assigned_to": null,
+  "branch_links": [],
+  "comment_count": 1,
+  "complexity": null,
+  "created_at": "2026-02-21T20:58:37Z",
+  "created_by": "human:fede",
+  "custom_fields": {},
+  "description": "Reemplazar journalctl/systemctl del API por 'docker logs/restart sai-dashboard' en README.md. Mantener referencias a nginx y sai-tunnels. Ver Task 3 del plan.",
+  "done_at": "2026-02-21T21:01:34Z",
+  "evidence_refs": [
+    {
+      "id": "ev_01KJ103ZB50HM3QRKC0J8J6C9Q",
+      "role": "review",
+      "source_type": "comment"
+    },
+    {
+      "id": "art_01KJ103ZB50HM3QRKC0J8J6C9P",
+      "role": "review",
+      "source_type": "artifact"
+    }
+  ],
+  "id": "task_01KJ0ZYJW00VQPY5FWT55Q2T2T",
+  "last_event_id": "ev_01KJ103ZB50HM3QRKC0J8J6C9T",
+  "last_status_changed_at": "2026-02-21T21:01:34Z",
+  "priority": "medium",
+  "relationships_out": [
+    {
+      "created_at": "2026-02-21T20:58:44Z",
+      "created_by": "human:fede",
+      "note": null,
+      "target_task_id": "task_01KJ0ZXNKHN23SBNPY4258XY8C",
+      "type": "subtask_of"
+    }
+  ],
+  "reopened_count": 0,
+  "schema_version": 1,
+  "short_id": "PROJ-14",
+  "status": "done",
+  "tags": null,
+  "title": "Actualizar README.md: comandos Docker",
+  "type": "chore",
+  "updated_at": "2026-02-21T21:01:34Z",
+  "urgency": null
+}

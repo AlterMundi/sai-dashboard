@@ -1,0 +1,19 @@
+{
+  "created_at": "2026-02-21T21:02:21Z",
+  "created_by": "agent:claude-cli",
+  "custom_fields": {},
+  "id": "art_01KJ105DP7VG5V90G2MBH5D5Z9",
+  "model": null,
+  "payload": {
+    "content_type": "text/markdown",
+    "file": "art_01KJ105DP7VG5V90G2MBH5D5Z9.md",
+    "size_bytes": 228
+  },
+  "schema_version": 1,
+  "sensitive": false,
+  "summary": "docs/DEPLOYMENT.md: no ten\u00eda referencias a sai-dashboard-api.service (systemd). Actualic\u00e9 docker-compose logs/exec \u2192 docker logs/exec. Todos los systemctl del archivo son para sai-tunnels y nginx (cor",
+  "tags": [],
+  "title": "Review findings",
+  "token_usage": null,
+  "type": "note"
+}

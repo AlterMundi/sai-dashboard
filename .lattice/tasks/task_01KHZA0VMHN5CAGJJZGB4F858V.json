@@ -1,0 +1,37 @@
+{
+  "artifact_refs": [],
+  "assigned_to": null,
+  "branch_links": [],
+  "comment_count": 1,
+  "complexity": "low",
+  "created_at": "2026-02-21T05:16:09Z",
+  "created_by": "agent:claude",
+  "custom_fields": {},
+  "description": "1) ImageCard.tsx l\u00ednea 49: aspect-[4/3] -> aspect-video. 2) img hints: width=400 height=225 (16:9). 3) Agregar decoding=async al img. 4) ImageGallery.tsx l\u00ednea 278: grid 2xl de 5->4 columnas. Verificar visualmente con npm run dev.",
+  "done_at": "2026-02-21T05:54:16Z",
+  "id": "task_01KHZA0VMHN5CAGJJZGB4F858V",
+  "last_event_id": "ev_01KHZC6NR6XV1621E04T1MWKJW",
+  "priority": "high",
+  "relationships_out": [
+    {
+      "created_at": "2026-02-21T05:16:18Z",
+      "created_by": "agent:claude",
+      "note": null,
+      "target_task_id": "task_01KHZA06JYK2JZX95JCCAZN8EG",
+      "type": "subtask_of"
+    }
+  ],
+  "schema_version": 1,
+  "short_id": "PROJ-8",
+  "status": "done",
+  "tags": [
+    "frontend",
+    "layout",
+    "aspect-ratio",
+    "gallery"
+  ],
+  "title": "Frontend: aspect-video cards and grid adjustment",
+  "type": "task",
+  "updated_at": "2026-02-21T05:54:16Z",
+  "urgency": null
+}

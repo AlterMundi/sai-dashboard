@@ -1,0 +1,1 @@
+Verificación final: cero refs a sai-dashboard-api fuera de docs/archive/, docs/plans/ (el plan mismo) y deploy.yml (cleanup de migración). Encontré docs/CONSOLIDATED_DOCUMENTATION.md (14 refs) y CLAUDE.md:424 que se habían pasado por alto — corregidos en el mismo paso. Commit: 2ad831a

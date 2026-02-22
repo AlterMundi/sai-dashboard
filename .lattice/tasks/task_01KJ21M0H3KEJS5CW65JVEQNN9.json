@@ -1,0 +1,33 @@
+{
+  "assigned_to": null,
+  "branch_links": [
+    {
+      "branch": "feat/zitadel-oidc",
+      "linked_at": "2026-02-22T06:57:07Z",
+      "linked_by": "agent:claude",
+      "repo": null
+    }
+  ],
+  "comment_count": 1,
+  "complexity": null,
+  "created_at": "2026-02-22T06:47:02Z",
+  "created_by": "human:fede",
+  "custom_fields": {},
+  "description": null,
+  "done_at": "2026-02-22T07:43:16Z",
+  "evidence_refs": [],
+  "id": "task_01KJ21M0H3KEJS5CW65JVEQNN9",
+  "last_event_id": "ev_01KJ24TYVVJ7E9GN72BRZW1TFR",
+  "last_status_changed_at": "2026-02-22T07:43:16Z",
+  "priority": "medium",
+  "relationships_out": [],
+  "reopened_count": 0,
+  "schema_version": 1,
+  "short_id": "PROJ-21",
+  "status": "done",
+  "tags": null,
+  "title": "fix: SSE real-time update gaps (polling cursor + Stage 2 notify)",
+  "type": "task",
+  "updated_at": "2026-02-22T07:43:16Z",
+  "urgency": null
+}

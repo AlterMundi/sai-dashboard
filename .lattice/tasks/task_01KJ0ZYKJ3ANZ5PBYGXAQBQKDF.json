@@ -1,0 +1,45 @@
+{
+  "assigned_to": null,
+  "branch_links": [],
+  "comment_count": 1,
+  "complexity": null,
+  "created_at": "2026-02-21T20:58:38Z",
+  "created_by": "human:fede",
+  "custom_fields": {},
+  "description": "Reemplazar permisos systemctl para sai-dashboard-api con permisos docker (restart/stop/start/logs). Ver Task 8 del plan.",
+  "done_at": "2026-02-21T21:07:08Z",
+  "evidence_refs": [
+    {
+      "id": "ev_01KJ10E5ZMKJF3GCR514ADGPMM",
+      "role": "review",
+      "source_type": "comment"
+    },
+    {
+      "id": "art_01KJ10E5ZMKJF3GCR514ADGPMK",
+      "role": "review",
+      "source_type": "artifact"
+    }
+  ],
+  "id": "task_01KJ0ZYKJ3ANZ5PBYGXAQBQKDF",
+  "last_event_id": "ev_01KJ10E5ZMKJF3GCR514ADGPMQ",
+  "last_status_changed_at": "2026-02-21T21:07:08Z",
+  "priority": "low",
+  "relationships_out": [
+    {
+      "created_at": "2026-02-21T20:58:44Z",
+      "created_by": "human:fede",
+      "note": null,
+      "target_task_id": "task_01KJ0ZXNKHN23SBNPY4258XY8C",
+      "type": "subtask_of"
+    }
+  ],
+  "reopened_count": 0,
+  "schema_version": 1,
+  "short_id": "PROJ-19",
+  "status": "done",
+  "tags": null,
+  "title": "Actualizar scripts/claude-dev-sudoers para Docker",
+  "type": "chore",
+  "updated_at": "2026-02-21T21:07:08Z",
+  "urgency": null
+}

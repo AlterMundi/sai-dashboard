@@ -1,0 +1,1 @@
+docs/DEPLOYMENT.md: no tenía referencias a sai-dashboard-api.service (systemd). Actualicé docker-compose logs/exec → docker logs/exec. Todos los systemctl del archivo son para sai-tunnels y nginx (correctos). Commit: 05a932e

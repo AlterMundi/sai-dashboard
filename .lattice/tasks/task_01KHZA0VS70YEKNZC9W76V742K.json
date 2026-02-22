@@ -1,0 +1,44 @@
+{
+  "artifact_refs": [],
+  "assigned_to": null,
+  "branch_links": [],
+  "comment_count": 0,
+  "complexity": "medium",
+  "created_at": "2026-02-21T05:16:09Z",
+  "created_by": "agent:claude",
+  "custom_fields": {},
+  "description": "SSH a inference-public. Dry-run primero para contar im\u00e1genes. Luego ejecutar: IMAGE_BASE_PATH=/mnt/raid1/n8n-backup/images npx ts-node backend/scripts/regenerate-thumbnails.ts --concurrency=4. Verificar spot-check de 3-5 thumbnails antes/despu\u00e9s.",
+  "done_at": "2026-02-21T07:13:24Z",
+  "id": "task_01KHZA0VS70YEKNZC9W76V742K",
+  "last_event_id": "ev_01KHZGQJ7R4C3ZVZ77QKKZ751Q",
+  "priority": "critical",
+  "relationships_out": [
+    {
+      "created_at": "2026-02-21T05:16:18Z",
+      "created_by": "agent:claude",
+      "note": null,
+      "target_task_id": "task_01KHZA06JYK2JZX95JCCAZN8EG",
+      "type": "subtask_of"
+    },
+    {
+      "created_at": "2026-02-21T05:16:25Z",
+      "created_by": "agent:claude",
+      "note": "Need the script before running on prod",
+      "target_task_id": "task_01KHZA0VBEDEZ1NQPEJYPKH17X",
+      "type": "depends_on"
+    }
+  ],
+  "schema_version": 1,
+  "short_id": "PROJ-9",
+  "status": "done",
+  "tags": [
+    "production",
+    "migration",
+    "thumbnails",
+    "ssh"
+  ],
+  "title": "Run thumbnail regeneration on production server",
+  "type": "chore",
+  "updated_at": "2026-02-21T07:13:24Z",
+  "urgency": null
+}

@@ -1,0 +1,1 @@
+tests/README.md: 3 líneas actualizadas (systemd→Docker container testing, systemd→docker deps, systemctl/journalctl→docker ps/logs). test-runner.sh: test_service_configuration reescrito para verificar Docker. Commit: b4763e6

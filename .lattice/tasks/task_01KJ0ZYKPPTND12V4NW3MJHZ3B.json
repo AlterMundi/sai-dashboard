@@ -1,0 +1,101 @@
+{
+  "assigned_to": null,
+  "branch_links": [],
+  "comment_count": 1,
+  "complexity": null,
+  "created_at": "2026-02-21T20:58:38Z",
+  "created_by": "human:fede",
+  "custom_fields": {},
+  "description": "Grep en todo el repo buscando sai-dashboard-api|journalctl.*sai-dashboard|systemctl.*sai-dashboard-api. Expected: cero resultados fuera de docs/archive/ y .github/workflows/deploy.yml (cleanup migration). Ver Task 9 del plan.",
+  "done_at": "2026-02-21T21:13:54Z",
+  "evidence_refs": [
+    {
+      "id": "ev_01KJ10TJER1VDHD1CZS1S9X2GK",
+      "role": "review",
+      "source_type": "comment"
+    },
+    {
+      "id": "art_01KJ10TJER1VDHD1CZS1S9X2GJ",
+      "role": "review",
+      "source_type": "artifact"
+    }
+  ],
+  "id": "task_01KJ0ZYKPPTND12V4NW3MJHZ3B",
+  "last_event_id": "ev_01KJ10TJESJNAWKSH2M2XKN0VM",
+  "last_status_changed_at": "2026-02-21T21:13:54Z",
+  "priority": "high",
+  "relationships_out": [
+    {
+      "created_at": "2026-02-21T20:58:45Z",
+      "created_by": "human:fede",
+      "note": null,
+      "target_task_id": "task_01KJ0ZXNKHN23SBNPY4258XY8C",
+      "type": "subtask_of"
+    },
+    {
+      "created_at": "2026-02-21T20:59:16Z",
+      "created_by": "human:fede",
+      "note": null,
+      "target_task_id": "task_01KJ0ZYJJYY7SPMHC4E3ZTEB7E",
+      "type": "depends_on"
+    },
+    {
+      "created_at": "2026-02-21T20:59:16Z",
+      "created_by": "human:fede",
+      "note": null,
+      "target_task_id": "task_01KJ0ZYJQS2EXJRJQV3H3Y32FP",
+      "type": "depends_on"
+    },
+    {
+      "created_at": "2026-02-21T20:59:16Z",
+      "created_by": "human:fede",
+      "note": null,
+      "target_task_id": "task_01KJ0ZYJW00VQPY5FWT55Q2T2T",
+      "type": "depends_on"
+    },
+    {
+      "created_at": "2026-02-21T20:59:17Z",
+      "created_by": "human:fede",
+      "note": null,
+      "target_task_id": "task_01KJ0ZYK0FJ7EF6R8TGHB28B78",
+      "type": "depends_on"
+    },
+    {
+      "created_at": "2026-02-21T20:59:17Z",
+      "created_by": "human:fede",
+      "note": null,
+      "target_task_id": "task_01KJ0ZYK4TQE07GK8B5GE3A0A4",
+      "type": "depends_on"
+    },
+    {
+      "created_at": "2026-02-21T20:59:17Z",
+      "created_by": "human:fede",
+      "note": null,
+      "target_task_id": "task_01KJ0ZYK99SMVFWV9TDRGBCWFG",
+      "type": "depends_on"
+    },
+    {
+      "created_at": "2026-02-21T20:59:17Z",
+      "created_by": "human:fede",
+      "note": null,
+      "target_task_id": "task_01KJ0ZYKDN5F7PKY3FKWXGWENQ",
+      "type": "depends_on"
+    },
+    {
+      "created_at": "2026-02-21T20:59:17Z",
+      "created_by": "human:fede",
+      "note": null,
+      "target_task_id": "task_01KJ0ZYKJ3ANZ5PBYGXAQBQKDF",
+      "type": "depends_on"
+    }
+  ],
+  "reopened_count": 0,
+  "schema_version": 1,
+  "short_id": "PROJ-20",
+  "status": "done",
+  "tags": null,
+  "title": "Verificaci\u00f3n final: cero refs systemd del API",
+  "type": "chore",
+  "updated_at": "2026-02-21T21:13:54Z",
+  "urgency": null
+}

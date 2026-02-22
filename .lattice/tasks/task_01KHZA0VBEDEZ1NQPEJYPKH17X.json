@@ -1,0 +1,37 @@
+{
+  "artifact_refs": [],
+  "assigned_to": null,
+  "branch_links": [],
+  "comment_count": 1,
+  "complexity": "medium",
+  "created_at": "2026-02-21T05:16:08Z",
+  "created_by": "agent:claude",
+  "custom_fields": {},
+  "description": "Crear backend/scripts/regenerate-thumbnails.ts. Conecta a sai_dashboard DB, itera execution_images, regenera cada thumbnail con Sharp (400px ancho, 80% quality, fit inside). Flags: --dry-run, --concurrency=N (default 4). Logging cada 500 imgs. Errores individuales no detienen el batch.",
+  "done_at": "2026-02-21T06:04:36Z",
+  "id": "task_01KHZA0VBEDEZ1NQPEJYPKH17X",
+  "last_event_id": "ev_01KHZCSJNKTB43PJDBSZ9GK6NH",
+  "priority": "high",
+  "relationships_out": [
+    {
+      "created_at": "2026-02-21T05:16:18Z",
+      "created_by": "agent:claude",
+      "note": null,
+      "target_task_id": "task_01KHZA06JYK2JZX95JCCAZN8EG",
+      "type": "subtask_of"
+    }
+  ],
+  "schema_version": 1,
+  "short_id": "PROJ-6",
+  "status": "done",
+  "tags": [
+    "scripts",
+    "sharp",
+    "thumbnails",
+    "batch"
+  ],
+  "title": "Write batch thumbnail regeneration script",
+  "type": "task",
+  "updated_at": "2026-02-21T06:04:36Z",
+  "urgency": null
+}

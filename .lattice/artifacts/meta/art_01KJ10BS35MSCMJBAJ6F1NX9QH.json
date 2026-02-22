@@ -1,0 +1,19 @@
+{
+  "created_at": "2026-02-21T21:05:50Z",
+  "created_by": "agent:claude-cli",
+  "custom_fields": {},
+  "id": "art_01KJ10BS35MSCMJBAJ6F1NX9QH",
+  "model": null,
+  "payload": {
+    "content_type": "text/markdown",
+    "file": "art_01KJ10BS35MSCMJBAJ6F1NX9QH.md",
+    "size_bytes": 231
+  },
+  "schema_version": 1,
+  "sensitive": false,
+  "summary": "tests/README.md: 3 l\u00edneas actualizadas (systemd\u2192Docker container testing, systemd\u2192docker deps, systemctl/journalctl\u2192docker ps/logs). test-runner.sh: test_service_configuration reescrito para verificar",
+  "tags": [],
+  "title": "Review findings",
+  "token_usage": null,
+  "type": "note"
+}

@@ -1,0 +1,19 @@
+{
+  "created_at": "2026-02-21T20:43:27Z",
+  "created_by": "agent:claude-cli",
+  "custom_fields": {},
+  "id": "art_01KJ0Z2SG7K42V8CJMG0KEXG9T",
+  "model": null,
+  "payload": {
+    "content_type": "text/markdown",
+    "file": "art_01KJ0Z2SG7K42V8CJMG0KEXG9T.md",
+    "size_bytes": 568
+  },
+  "schema_version": 1,
+  "sensitive": false,
+  "summary": "Deploy exitoso. Commits: 4ad2f38 (security fixes), 80e9e0b (Dockerfile fix). Problemas resueltos: (1) openid-client no estaba en runner stage del Dockerfile \u2014 se agreg\u00f3 COPY backend/node_modules; (2) ",
+  "tags": [],
+  "title": "Review findings",
+  "token_usage": null,
+  "type": "note"
+}

@@ -1,0 +1,45 @@
+{
+  "assigned_to": null,
+  "branch_links": [],
+  "comment_count": 1,
+  "complexity": null,
+  "created_at": "2026-02-21T20:58:37Z",
+  "created_by": "human:fede",
+  "custom_fields": {},
+  "description": "Reemplazar secciones que explican instalar sai-dashboard-api.service. Agregar secci\u00f3n de CI/CD automatizado. Mantener nginx y tunnel sections. Ver Task 4 del plan.",
+  "done_at": "2026-02-21T21:02:21Z",
+  "evidence_refs": [
+    {
+      "id": "ev_01KJ105DP7VG5V90G2MBH5D5ZA",
+      "role": "review",
+      "source_type": "comment"
+    },
+    {
+      "id": "art_01KJ105DP7VG5V90G2MBH5D5Z9",
+      "role": "review",
+      "source_type": "artifact"
+    }
+  ],
+  "id": "task_01KJ0ZYK0FJ7EF6R8TGHB28B78",
+  "last_event_id": "ev_01KJ105DP84EFF2VE65ZQHYQQ8",
+  "last_status_changed_at": "2026-02-21T21:02:21Z",
+  "priority": "high",
+  "relationships_out": [
+    {
+      "created_at": "2026-02-21T20:58:44Z",
+      "created_by": "human:fede",
+      "note": null,
+      "target_task_id": "task_01KJ0ZXNKHN23SBNPY4258XY8C",
+      "type": "subtask_of"
+    }
+  ],
+  "reopened_count": 0,
+  "schema_version": 1,
+  "short_id": "PROJ-15",
+  "status": "done",
+  "tags": null,
+  "title": "Actualizar docs/DEPLOYMENT.md para Docker/CI-CD",
+  "type": "chore",
+  "updated_at": "2026-02-21T21:02:21Z",
+  "urgency": null
+}

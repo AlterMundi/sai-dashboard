@@ -1,0 +1,83 @@
+{
+  "default_actor": "human:fede",
+  "default_priority": "medium",
+  "default_status": "backlog",
+  "instance_id": "inst_01KHZ96XG6RFXJEHR6YCEH5KQQ",
+  "project_code": "PROJ",
+  "schema_version": 1,
+  "task_types": [
+    "task",
+    "epic",
+    "bug",
+    "spike",
+    "chore"
+  ],
+  "workflow": {
+    "statuses": [
+      "backlog",
+      "in_planning",
+      "planned",
+      "in_progress",
+      "review",
+      "done",
+      "blocked",
+      "needs_human",
+      "cancelled"
+    ],
+    "transitions": {
+      "backlog": [
+        "in_planning",
+        "planned",
+        "cancelled"
+      ],
+      "blocked": [
+        "in_planning",
+        "planned",
+        "in_progress",
+        "cancelled"
+      ],
+      "cancelled": [],
+      "done": [],
+      "in_planning": [
+        "planned",
+        "needs_human",
+        "cancelled"
+      ],
+      "in_progress": [
+        "review",
+        "blocked",
+        "needs_human",
+        "cancelled"
+      ],
+      "needs_human": [
+        "in_planning",
+        "planned",
+        "in_progress",
+        "review",
+        "cancelled"
+      ],
+      "planned": [
+        "in_progress",
+        "review",
+        "blocked",
+        "needs_human",
+        "cancelled"
+      ],
+      "review": [
+        "done",
+        "in_progress",
+        "needs_human",
+        "cancelled"
+      ]
+    },
+    "universal_targets": [
+      "needs_human",
+      "cancelled"
+    ],
+    "wip_limits": {
+      "in_progress": 10,
+      "review": 5
+    }
+  },
+  "workflow_preset": "classic"
+}

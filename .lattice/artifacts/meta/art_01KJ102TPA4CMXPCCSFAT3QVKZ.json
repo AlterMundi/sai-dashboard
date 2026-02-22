@@ -1,0 +1,19 @@
+{
+  "created_at": "2026-02-21T21:00:56Z",
+  "created_by": "agent:claude-cli",
+  "custom_fields": {},
+  "id": "art_01KJ102TPA4CMXPCCSFAT3QVKZ",
+  "model": null,
+  "payload": {
+    "content_type": "text/markdown",
+    "file": "art_01KJ102TPA4CMXPCCSFAT3QVKZ.md",
+    "size_bytes": 259
+  },
+  "schema_version": 1,
+  "sensitive": false,
+  "summary": "Eliminado install-production.sh (1130 l\u00edneas). Actualizado CLAUDE.md: secci\u00f3n 'Production Deployment' ahora documenta CI/CD + docker run de emergencia; secci\u00f3n 'System Operations' usa docker ps/logs/r",
+  "tags": [],
+  "title": "Review findings",
+  "token_usage": null,
+  "type": "note"
+}

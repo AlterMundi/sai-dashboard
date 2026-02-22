@@ -1,0 +1,1 @@
+Eliminado install-production.sh (1130 líneas). Actualizado CLAUDE.md: sección 'Production Deployment' ahora documenta CI/CD + docker run de emergencia; sección 'System Operations' usa docker ps/logs/restart en lugar de systemctl/journalctl. Commit: 56201ab

@@ -1,0 +1,1 @@
+scripts/claude-dev-sudoers: removidos systemctl restart/stop/start sai-dashboard-api y journalctl -u sai-dashboard-api. Agregados docker restart/stop/start sai-dashboard y docker logs *. Mantenido systemctl status *. Commit: 846ffe8

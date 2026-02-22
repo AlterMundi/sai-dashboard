@@ -1,0 +1,1 @@
+Epic completado. 9 tareas ejecutadas: install-production.sh eliminado, tunnel service actualizado, README/CLAUDE.md/DEPLOYMENT.md/CONSOLIDATED_DOCUMENTATION.md/SSE/DB docs/tests/sudoers migrados a Docker. Commits: 56201ab..2ad831a. Cero refs activas a systemd sai-dashboard-api fuera de archive/ y deploy.yml.

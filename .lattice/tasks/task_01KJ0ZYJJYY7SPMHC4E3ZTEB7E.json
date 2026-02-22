@@ -1,0 +1,45 @@
+{
+  "assigned_to": null,
+  "branch_links": [],
+  "comment_count": 1,
+  "complexity": null,
+  "created_at": "2026-02-21T20:58:37Z",
+  "created_by": "human:fede",
+  "custom_fields": {},
+  "description": "Eliminar install-production.sh (1130 l\u00edneas, script de deploy systemd obsoleto). Actualizar secci\u00f3n 'Production Deployment' y 'System Operations' de CLAUDE.md para usar comandos Docker. Ver Task 1 del plan en docs/plans/2026-02-21-remove-systemd-deployment.md",
+  "done_at": "2026-02-21T21:00:56Z",
+  "evidence_refs": [
+    {
+      "id": "ev_01KJ102TPA4CMXPCCSFAT3QVM0",
+      "role": "review",
+      "source_type": "comment"
+    },
+    {
+      "id": "art_01KJ102TPA4CMXPCCSFAT3QVKZ",
+      "role": "review",
+      "source_type": "artifact"
+    }
+  ],
+  "id": "task_01KJ0ZYJJYY7SPMHC4E3ZTEB7E",
+  "last_event_id": "ev_01KJ102TPA4CMXPCCSFAT3QVM3",
+  "last_status_changed_at": "2026-02-21T21:00:56Z",
+  "priority": "high",
+  "relationships_out": [
+    {
+      "created_at": "2026-02-21T20:58:44Z",
+      "created_by": "human:fede",
+      "note": null,
+      "target_task_id": "task_01KJ0ZXNKHN23SBNPY4258XY8C",
+      "type": "subtask_of"
+    }
+  ],
+  "reopened_count": 0,
+  "schema_version": 1,
+  "short_id": "PROJ-12",
+  "status": "done",
+  "tags": null,
+  "title": "Eliminar install-production.sh y actualizar CLAUDE.md",
+  "type": "chore",
+  "updated_at": "2026-02-21T21:00:56Z",
+  "urgency": null
+}

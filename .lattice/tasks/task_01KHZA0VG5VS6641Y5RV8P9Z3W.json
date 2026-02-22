@@ -1,0 +1,37 @@
+{
+  "artifact_refs": [],
+  "assigned_to": null,
+  "branch_links": [],
+  "comment_count": 1,
+  "complexity": "low",
+  "created_at": "2026-02-21T05:16:09Z",
+  "created_by": "agent:claude",
+  "custom_fields": {},
+  "description": "1) backend/src/config/index.ts: THUMBNAIL_SIZE default 200->400, THUMBNAIL_QUALITY default 70->80. 2) stage2-etl-service.ts: cambiar resize() a solo ancho (.resize({ width: cacheConfig.thumbnailSize, withoutEnlargement: true })). 3) executions.ts: agregar Cache-Control: public, max-age=31536000, immutable antes de res.sendFile() en getExecutionThumbnail y getExecutionImage.",
+  "done_at": "2026-02-21T05:54:16Z",
+  "id": "task_01KHZA0VG5VS6641Y5RV8P9Z3W",
+  "last_event_id": "ev_01KHZC6NMV75FBJ1P0H64AMH7F",
+  "priority": "high",
+  "relationships_out": [
+    {
+      "created_at": "2026-02-21T05:16:18Z",
+      "created_by": "agent:claude",
+      "note": null,
+      "target_task_id": "task_01KHZA06JYK2JZX95JCCAZN8EG",
+      "type": "subtask_of"
+    }
+  ],
+  "schema_version": 1,
+  "short_id": "PROJ-7",
+  "status": "done",
+  "tags": [
+    "backend",
+    "config",
+    "cache",
+    "sharp"
+  ],
+  "title": "Update Sharp config defaults and add Cache-Control headers",
+  "type": "task",
+  "updated_at": "2026-02-21T05:54:16Z",
+  "urgency": null
+}

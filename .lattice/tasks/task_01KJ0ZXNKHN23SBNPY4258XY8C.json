@@ -1,0 +1,37 @@
+{
+  "assigned_to": null,
+  "branch_links": [],
+  "comment_count": 1,
+  "complexity": null,
+  "created_at": "2026-02-21T20:58:07Z",
+  "created_by": "human:fede",
+  "custom_fields": {},
+  "description": "Eliminar todas las referencias al deployment via systemd (sai-dashboard-api.service) en favor de Docker + GitHub CI/CD. Ver plan en docs/plans/2026-02-21-remove-systemd-deployment.md. 9 sub-tareas cubren: install-production.sh, tunnel service deps, README, DEPLOYMENT.md, scripts de validaci\u00f3n, tests, docs restantes, sudoers, y verificaci\u00f3n final.",
+  "done_at": "2026-02-21T21:13:59Z",
+  "evidence_refs": [
+    {
+      "id": "ev_01KJ10TQ9QXEZDZY081MJQBBPR",
+      "role": "review",
+      "source_type": "comment"
+    },
+    {
+      "id": "art_01KJ10TQ9QXEZDZY081MJQBBPQ",
+      "role": "review",
+      "source_type": "artifact"
+    }
+  ],
+  "id": "task_01KJ0ZXNKHN23SBNPY4258XY8C",
+  "last_event_id": "ev_01KJ10TQ9QXEZDZY081MJQBBPV",
+  "last_status_changed_at": "2026-02-21T21:13:59Z",
+  "priority": "high",
+  "relationships_out": [],
+  "reopened_count": 0,
+  "schema_version": 1,
+  "short_id": "PROJ-11",
+  "status": "done",
+  "tags": null,
+  "title": "Remove systemd deployment references (Docker migration)",
+  "type": "chore",
+  "updated_at": "2026-02-21T21:13:59Z",
+  "urgency": null
+}

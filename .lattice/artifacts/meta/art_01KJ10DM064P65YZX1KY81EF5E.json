@@ -1,0 +1,19 @@
+{
+  "created_at": "2026-02-21T21:06:50Z",
+  "created_by": "agent:claude-cli",
+  "custom_fields": {},
+  "id": "art_01KJ10DM064P65YZX1KY81EF5E",
+  "model": null,
+  "payload": {
+    "content_type": "text/markdown",
+    "file": "art_01KJ10DM064P65YZX1KY81EF5E.md",
+    "size_bytes": 311
+  },
+  "schema_version": 1,
+  "sensitive": false,
+  "summary": "3 archivos: SSE_IMPLEMENTATION.md (journalctl\u2192docker logs --since), database/triggers/README.md (systemctl status + journalctl\u2192docker ps + docker logs \u00d72), database/migrations/README.md (systemctl res",
+  "tags": [],
+  "title": "Review findings",
+  "token_usage": null,
+  "type": "note"
+}

@@ -1,0 +1,19 @@
+{
+  "created_at": "2026-02-21T21:03:55Z",
+  "created_by": "agent:claude-cli",
+  "custom_fields": {},
+  "id": "art_01KJ10897KRQ7FJ3NE5XC2SDG2",
+  "model": null,
+  "payload": {
+    "content_type": "text/markdown",
+    "file": "art_01KJ10897KRQ7FJ3NE5XC2SDG2.md",
+    "size_bytes": 359
+  },
+  "schema_version": 1,
+  "sensitive": false,
+  "summary": "3 scripts actualizados: validate-production.sh (systemctl is-active/show/journalctl \u2192 docker ps/logs), production-verification.sh (test_service_configuration reescrito para Docker, logs y status final",
+  "tags": [],
+  "title": "Review findings",
+  "token_usage": null,
+  "type": "note"
+}

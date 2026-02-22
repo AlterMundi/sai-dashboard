@@ -234,7 +234,7 @@ const en = {
     statusLabel: 'Status',
     mode: 'Mode',
     // YOLO Analysis
-    yoloAnalysis: 'YOLO Analysis',
+    yoloAnalysis: 'SAINet Analysis',
     alertLevelLabel: 'Alert Level',
     detected: 'Detected',
     clear: 'Clear',

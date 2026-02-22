@@ -1,0 +1,45 @@
+{
+  "assigned_to": null,
+  "branch_links": [],
+  "comment_count": 1,
+  "complexity": null,
+  "created_at": "2026-02-21T20:58:38Z",
+  "created_by": "human:fede",
+  "custom_fields": {},
+  "description": "4 archivos: scripts/validate-production.sh, scripts/quick-test.sh, tests/deployment/production-verification.sh, tests/deployment/ssh-tunnel-verification.sh. Reemplazar systemctl/journalctl del API por docker ps/logs. Ver Task 5 del plan.",
+  "done_at": "2026-02-21T21:03:55Z",
+  "evidence_refs": [
+    {
+      "id": "ev_01KJ10897KRQ7FJ3NE5XC2SDG3",
+      "role": "review",
+      "source_type": "comment"
+    },
+    {
+      "id": "art_01KJ10897KRQ7FJ3NE5XC2SDG2",
+      "role": "review",
+      "source_type": "artifact"
+    }
+  ],
+  "id": "task_01KJ0ZYK4TQE07GK8B5GE3A0A4",
+  "last_event_id": "ev_01KJ10897KRQ7FJ3NE5XC2SDG6",
+  "last_status_changed_at": "2026-02-21T21:03:55Z",
+  "priority": "high",
+  "relationships_out": [
+    {
+      "created_at": "2026-02-21T20:58:44Z",
+      "created_by": "human:fede",
+      "note": null,
+      "target_task_id": "task_01KJ0ZXNKHN23SBNPY4258XY8C",
+      "type": "subtask_of"
+    }
+  ],
+  "reopened_count": 0,
+  "schema_version": 1,
+  "short_id": "PROJ-16",
+  "status": "done",
+  "tags": null,
+  "title": "Actualizar scripts de validaci\u00f3n a Docker",
+  "type": "chore",
+  "updated_at": "2026-02-21T21:03:55Z",
+  "urgency": null
+}

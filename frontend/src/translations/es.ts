@@ -236,7 +236,7 @@ const es: TranslationKeys = {
     statusLabel: 'Estado',
     mode: 'Modo',
     // YOLO Analysis
-    yoloAnalysis: 'An\u00e1lisis YOLO',
+    yoloAnalysis: 'An\u00e1lisis SAINet',
     alertLevelLabel: 'Nivel de Alerta',
     detected: 'Detectado',
     clear: 'Limpio',

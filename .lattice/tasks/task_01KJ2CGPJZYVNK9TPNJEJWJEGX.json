@@ -1,0 +1,33 @@
+{
+  "assigned_to": null,
+  "branch_links": [
+    {
+      "branch": "feat/dataset-manager",
+      "linked_at": "2026-02-22T10:03:13Z",
+      "linked_by": "agent:claude-opus",
+      "repo": null
+    }
+  ],
+  "comment_count": 2,
+  "complexity": null,
+  "created_at": "2026-02-22T09:57:28Z",
+  "created_by": "agent:claude-opus",
+  "custom_fields": {},
+  "description": null,
+  "done_at": null,
+  "evidence_refs": [],
+  "id": "task_01KJ2CGPJZYVNK9TPNJEJWJEGX",
+  "last_event_id": "ev_01KJ2EF82HNGVS83PN878T4T2F",
+  "last_status_changed_at": "2026-02-22T10:04:22Z",
+  "priority": "medium",
+  "relationships_out": [],
+  "reopened_count": 0,
+  "schema_version": 1,
+  "short_id": "PROJ-22",
+  "status": "in_progress",
+  "tags": null,
+  "title": "Dataset Manager epic",
+  "type": "task",
+  "updated_at": "2026-02-22T10:31:38Z",
+  "urgency": null
+}

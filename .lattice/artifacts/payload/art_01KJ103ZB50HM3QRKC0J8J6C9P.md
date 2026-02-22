@@ -1,0 +1,1 @@
+README.md: journalctl → docker logs -f sai-dashboard, systemctl restart → docker restart sai-dashboard. systemctl status sai-tunnels sin cambios (nginx/tunnels siguen siendo systemd). Commit: 5ca06f3

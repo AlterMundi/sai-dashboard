@@ -1,0 +1,1 @@
+3 archivos: SSE_IMPLEMENTATION.md (journalctl→docker logs --since), database/triggers/README.md (systemctl status + journalctl→docker ps + docker logs ×2), database/migrations/README.md (systemctl restart→docker restart). nginx/sai-altermundi-net.conf sin cambios (no tenía refs al API). Commit: 4e4282d

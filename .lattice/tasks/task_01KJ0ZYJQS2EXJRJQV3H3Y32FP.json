@@ -1,0 +1,45 @@
+{
+  "assigned_to": null,
+  "branch_links": [],
+  "comment_count": 1,
+  "complexity": null,
+  "created_at": "2026-02-21T20:58:37Z",
+  "created_by": "human:fede",
+  "custom_fields": {},
+  "description": "Cambiar After= y Wants= en systemd/sai-dashboard-tunnel.service: reemplazar sai-dashboard-api.service por docker.service (el API ya corre en Docker). Ver Task 2 del plan.",
+  "done_at": "2026-02-21T21:01:17Z",
+  "evidence_refs": [
+    {
+      "id": "ev_01KJ103EFQXDQ114EMKJPNR47G",
+      "role": "review",
+      "source_type": "comment"
+    },
+    {
+      "id": "art_01KJ103EFQXDQ114EMKJPNR47F",
+      "role": "review",
+      "source_type": "artifact"
+    }
+  ],
+  "id": "task_01KJ0ZYJQS2EXJRJQV3H3Y32FP",
+  "last_event_id": "ev_01KJ103EFQXDQ114EMKJPNR47K",
+  "last_status_changed_at": "2026-02-21T21:01:17Z",
+  "priority": "medium",
+  "relationships_out": [
+    {
+      "created_at": "2026-02-21T20:58:44Z",
+      "created_by": "human:fede",
+      "note": null,
+      "target_task_id": "task_01KJ0ZXNKHN23SBNPY4258XY8C",
+      "type": "subtask_of"
+    }
+  ],
+  "reopened_count": 0,
+  "schema_version": 1,
+  "short_id": "PROJ-13",
+  "status": "done",
+  "tags": null,
+  "title": "Actualizar dependencias en sai-dashboard-tunnel.service",
+  "type": "chore",
+  "updated_at": "2026-02-21T21:01:17Z",
+  "urgency": null
+}
