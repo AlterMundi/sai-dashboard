@@ -131,16 +131,26 @@ jobs:
             docker stop sai-dashboard 2>/dev/null || true
             docker rm sai-dashboard 2>/dev/null || true
 
-            # Pre-flight: ensure bind-mount dirs are owned by node (uid 1000)
+            # Pre-flight: ensure bind-mount dirs are owned by container uid
             CONTAINER_UID=$(docker run --rm ghcr.io/altermundi/sai-dashboard:latest id -u)
             echo "Container runs as uid=$CONTAINER_UID"
 
-            DATASETS_OWNER=$(stat -c '%u' /mnt/raid1/datasets)
-            if [ "$DATASETS_OWNER" != "$CONTAINER_UID" ]; then
-              echo "FAIL: /mnt/raid1/datasets owned by uid=$DATASETS_OWNER, container expects uid=$CONTAINER_UID"
-              chown -R "$CONTAINER_UID:$CONTAINER_UID" /mnt/raid1/datasets
-              echo "Fixed: chown $CONTAINER_UID /mnt/raid1/datasets"
-            fi
+            for DIR in /mnt/raid1/datasets \
+                       /mnt/raid1/n8n-backup/images \
+                       /mnt/raid1/n8n-backup/images/original \
+                       /mnt/raid1/n8n-backup/images/thumb \
+                       /mnt/raid1/n8n-backup/images/webp \
+                       /mnt/raid1/n8n-backup/images/by-execution; do
+              OWNER=$(stat -c '%u' "$DIR" 2>/dev/null || echo "missing")
+              if [ "$OWNER" = "missing" ]; then
+                mkdir -p "$DIR"
+                chown "$CONTAINER_UID:$CONTAINER_UID" "$DIR"
+                echo "Created $DIR with uid=$CONTAINER_UID"
+              elif [ "$OWNER" != "$CONTAINER_UID" ]; then
+                chown -R "$CONTAINER_UID:$CONTAINER_UID" "$DIR"
+                echo "Fixed $DIR: uid=$OWNER -> uid=$CONTAINER_UID"
+              fi
+            done
 
             # Start new container
             docker run -d \
