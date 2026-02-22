@@ -154,6 +154,35 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate, cameraNav, ga
   useEffect(() => { zoomRef.current = zoomLevel; }, [zoomLevel]);
   useEffect(() => { translateRef.current = translate; }, [translate]);
 
+  // Stable ref for activeNav so interval callbacks read current state
+  const activeNavRef = useRef(activeNav);
+  useEffect(() => { activeNavRef.current = activeNav; }, [activeNav]);
+
+  // ── Hold-to-navigate for prev/next buttons (touch + mouse) ─────────────
+  const holdIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const stopHoldNav = useCallback(() => {
+    if (holdIntervalRef.current !== null) {
+      clearInterval(holdIntervalRef.current);
+      holdIntervalRef.current = null;
+    }
+  }, []);
+
+  const startHoldNav = useCallback((dir: 'prev' | 'next') => {
+    stopHoldNav();
+    const step = () => {
+      const nav = activeNavRef.current;
+      if (!nav) return;
+      if (dir === 'prev' && nav.hasPrev) { setPressedBtn('prev'); nav.onPrev(); }
+      if (dir === 'next' && nav.hasNext) { setPressedBtn('next'); nav.onNext(); }
+    };
+    step(); // fire immediately
+    holdIntervalRef.current = setInterval(step, navIntervalRef.current);
+  }, [stopHoldNav]);
+
+  // Clean up interval on unmount or modal close
+  useEffect(() => { if (!isOpen) stopHoldNav(); return stopHoldNav; }, [isOpen, stopHoldNav]);
+
   // Prevent mouse-emulation events from double-firing on touch devices
   const isTouching = useRef(false);
 
@@ -824,11 +853,14 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate, cameraNav, ga
                 </div>
               )}
 
-              {/* ← Prev navigation button */}
+              {/* ← Prev navigation button (hold to repeat at selected FPS) */}
               {activeNav && activeNav.total > 1 && (
                 <button
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => { if (activeNav.hasPrev) { setPressedBtn('prev'); activeNav.onPrev(); } }}
+                  onPointerDown={(e) => { e.preventDefault(); startHoldNav('prev'); }}
+                  onPointerUp={stopHoldNav}
+                  onPointerLeave={stopHoldNav}
+                  onPointerCancel={stopHoldNav}
+                  onContextMenu={(e) => e.preventDefault()}
                   disabled={!activeNav.hasPrev}
                   className={cn(
                     'absolute left-2 top-1/2 -translate-y-1/2 flex items-center justify-center w-10 h-10 bg-black/50 hover:bg-black/70 active:bg-white/20 text-white rounded-full transition-all duration-150 disabled:opacity-20 disabled:cursor-not-allowed z-10 focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:outline-none',
@@ -841,11 +873,14 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate, cameraNav, ga
                 </button>
               )}
 
-              {/* → Next navigation button */}
+              {/* → Next navigation button (hold to repeat at selected FPS) */}
               {activeNav && activeNav.total > 1 && (
                 <button
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => { if (activeNav.hasNext) { setPressedBtn('next'); activeNav.onNext(); } }}
+                  onPointerDown={(e) => { e.preventDefault(); startHoldNav('next'); }}
+                  onPointerUp={stopHoldNav}
+                  onPointerLeave={stopHoldNav}
+                  onPointerCancel={stopHoldNav}
+                  onContextMenu={(e) => e.preventDefault()}
                   disabled={!activeNav.hasNext}
                   className={cn(
                     'absolute right-2 top-1/2 -translate-y-1/2 flex items-center justify-center w-10 h-10 bg-black/50 hover:bg-black/70 active:bg-white/20 text-white rounded-full transition-all duration-150 disabled:opacity-20 disabled:cursor-not-allowed z-10 focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:outline-none',
