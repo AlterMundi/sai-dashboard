@@ -442,6 +442,24 @@ export class Stage2ETLService extends EventEmitter {
         extracted
       });
 
+      // Notify SSE clients that Stage 2 is complete for this execution
+      try {
+        const { notifyStage2Complete } = await import('@/controllers/sse');
+        await notifyStage2Complete(
+          executionId,
+          {
+            has_smoke: extracted.has_smoke,
+            alert_level: extracted.alert_level,
+            detection_count: extracted.detection_count,
+          },
+          !!imageResult,
+          processingTime
+        );
+      } catch (sseError) {
+        // SSE notify failure must never crash the ETL pipeline
+        logger.warn('Failed to send Stage 2 SSE notification', { executionId, sseError });
+      }
+
     } catch (error) {
       const processingTime = Date.now() - startTime;
       logger.error(`❌ Stage 2: Failed to process execution ${executionId}:`, error);
@@ -452,6 +470,18 @@ export class Stage2ETLService extends EventEmitter {
       );
 
       this.metrics.failed++;
+
+      // Notify SSE clients of Stage 2 failure
+      try {
+        const { notifyStage2Failed } = await import('@/controllers/sse');
+        await notifyStage2Failed(
+          executionId,
+          error instanceof Error ? error.message : 'Unknown error',
+          0  // retry_count: 0 for the current attempt
+        );
+      } catch (sseError) {
+        logger.warn('Failed to send Stage 2 failure SSE notification', { executionId, sseError });
+      }
     }
   }
 
