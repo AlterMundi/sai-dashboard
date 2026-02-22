@@ -21,6 +21,7 @@ const en = {
   nav: {
     gallery: 'Gallery',
     statistics: 'Statistics',
+    datasets: 'Datasets',
     signOut: 'Sign out',
     updated: 'Updated',
     connected: 'Connected',

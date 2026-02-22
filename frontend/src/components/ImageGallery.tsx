@@ -12,6 +12,9 @@ import { ExecutionWithImageUrls, ExecutionFilters, NavContext } from '@/types';
 import { cn } from '@/utils';
 import { useTranslation } from '@/contexts/LanguageContext';
 import { Grid, List, RefreshCw, ArrowUp, ArrowDownNarrowWide, ArrowUpNarrowWide } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
+import { useDatasets } from '@/hooks/useDatasets';
+import { AddToDatasetModal } from './datasets/AddToDatasetModal';
 
 interface ImageGalleryProps {
   initialFilters?: ExecutionFilters;
@@ -29,7 +32,11 @@ export function ImageGallery({ initialFilters = {}, className, refreshTrigger, o
   );
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [showAddToDataset, setShowAddToDataset] = useState(false);
   const galleryRef = useRef<HTMLDivElement>(null);
+  const { user } = useAuth();
+  const { datasets } = useDatasets();
+  const canAddToDataset = user?.role === 'SAI_RESEARCHER' || user?.role === 'SAI_ADMIN';
   
   const {
     executions,
@@ -509,6 +516,17 @@ export function ImageGallery({ initialFilters = {}, className, refreshTrigger, o
           onExportCsv={handleExportCsv}
           onDownloadImages={handleDownloadImages}
           onClearSelection={clearSelection}
+          onAddToDataset={canAddToDataset ? () => setShowAddToDataset(true) : undefined}
+        />
+      )}
+
+      {/* Add to Dataset Modal */}
+      {showAddToDataset && (
+        <AddToDatasetModal
+          executionIds={Array.from(selectedIds)}
+          datasets={datasets}
+          onClose={() => setShowAddToDataset(false)}
+          onJobStarted={() => setShowAddToDataset(false)}
         />
       )}
 

@@ -23,6 +23,7 @@ const es: TranslationKeys = {
   nav: {
     gallery: 'Galer\u00eda',
     statistics: 'Estad\u00edsticas',
+    datasets: 'Datasets',
     signOut: 'Cerrar sesi\u00f3n',
     updated: 'Actualizado',
     connected: 'Conectado',

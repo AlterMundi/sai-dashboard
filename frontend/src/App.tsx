@@ -11,6 +11,7 @@ import { Login } from '@/pages/Login';
 import { AuthCallback } from '@/pages/AuthCallback';
 import { PendingApproval } from '@/pages/PendingApproval';
 import { Stats } from '@/pages/Stats';
+import { Datasets } from '@/pages/Datasets';
 import './index.css';
 
 // Protected Route Component
@@ -66,6 +67,8 @@ function RouteTitleManager() {
       pageTitle = t('login.title');
     } else if (pathname === '/stats') {
       pageTitle = t('stats.title');
+    } else if (pathname === '/datasets') {
+      pageTitle = t('nav.datasets');
     } else if (pathname === '/pending-approval') {
       pageTitle = 'Acceso pendiente';
     } else if (pathname === '/auth/callback') {
@@ -105,6 +108,7 @@ function App() {
             >
               <Route path="/" element={<Dashboard />} />
               <Route path="/stats" element={<Stats />} />
+              <Route path="/datasets" element={<Datasets />} />
             </Route>
 
             {/* Legacy dashboard route redirect */}
