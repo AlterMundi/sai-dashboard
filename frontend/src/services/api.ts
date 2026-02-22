@@ -158,6 +158,15 @@ export const authApi = {
       throw handleApiError(error);
     }
   },
+
+  async getPendingStatus(sub: string): Promise<{ status: 'pending' | 'approved' | 'rejected' | 'not_found' }> {
+    try {
+      const response = await api.get<ApiResponse<{ status: string }>>(`/auth/pending/status?sub=${encodeURIComponent(sub)}`);
+      return response.data.data as { status: 'pending' | 'approved' | 'rejected' | 'not_found' };
+    } catch {
+      return { status: 'pending' }; // fail-safe: keep polling on network errors
+    }
+  },
 };
 
 // Admin API
