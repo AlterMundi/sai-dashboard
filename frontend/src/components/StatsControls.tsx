@@ -96,17 +96,35 @@ export function StatsControls({ value, onChange, className }: StatsControlsProps
   }, [fromDate, dimensionKey, dimensionValue, emitChange]);
 
   const handlePreset = useCallback((preset: typeof PRESETS[0]) => {
-    const today = new Date();
-    const start = new Date(today);
-    if (preset.applyDays) start.setDate(today.getDate() - preset.applyDays);
-    else if (preset.applyMonths) start.setMonth(today.getMonth() - preset.applyMonths!);
-    else if (preset.applyYears) start.setFullYear(today.getFullYear() - preset.applyYears!);
-    const s = toDateStr(start);
-    const e = toDateStr(today);
+    const applyOffset = (anchor: Date, forward: boolean): Date => {
+      const d = new Date(anchor);
+      if (preset.applyDays)   forward ? d.setDate(d.getDate() + preset.applyDays!)         : d.setDate(d.getDate() - preset.applyDays!);
+      else if (preset.applyMonths) forward ? d.setMonth(d.getMonth() + preset.applyMonths!) : d.setMonth(d.getMonth() - preset.applyMonths!);
+      else if (preset.applyYears)  forward ? d.setFullYear(d.getFullYear() + preset.applyYears!) : d.setFullYear(d.getFullYear() - preset.applyYears!);
+      return d;
+    };
+
+    let s: string, e: string;
+    if (fromDate) {
+      // Anchor on "from": extend forward
+      const anchor = new Date(fromDate);
+      s = toDateStr(anchor);
+      e = toDateStr(applyOffset(anchor, true));
+    } else if (toDate) {
+      // Anchor on "to": extend backward
+      const anchor = new Date(toDate);
+      s = toDateStr(applyOffset(anchor, false));
+      e = toDateStr(anchor);
+    } else {
+      // No anchor: N days back from today
+      const today = new Date();
+      s = toDateStr(applyOffset(today, false));
+      e = toDateStr(today);
+    }
     setFromDate(s);
     setToDate(e);
     emitChange(s, e, dimensionKey, dimensionValue);
-  }, [dimensionKey, dimensionValue, emitChange]);
+  }, [fromDate, toDate, dimensionKey, dimensionValue, emitChange]);
 
   const handleClear = useCallback(() => {
     const def = defaultFilters();
