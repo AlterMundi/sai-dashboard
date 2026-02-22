@@ -352,6 +352,7 @@ const en = {
   notifications: {
     // notifyNewExecution
     highRiskTitle: 'High Risk Detection',
+    alertDetectedTitle: 'Alert detected #{id}',
     analysisCompleteTitle: 'Analysis Complete #{id}',
     highRiskBody: 'Alert: {alertLevel} ({confidence}% confidence)',
     alertBody: 'Alert: {alertLevel}',

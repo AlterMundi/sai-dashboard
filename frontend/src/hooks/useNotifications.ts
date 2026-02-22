@@ -11,6 +11,7 @@ interface CreateNotificationOptions {
   actions?: NotificationAction[];
   duration?: number;
   persistent?: boolean;
+  severity?: NotificationData['severity'];
   data?: unknown;
 }
 
@@ -52,24 +53,30 @@ export function useNotifications() {
 
   // Smart notification creators for different event types
   const notifyNewExecution = useCallback((executionData: { execution: { id: number; analysis?: { alertLevel?: string; confidenceSmoke?: number } } }) => {
-    const alertLevel = executionData.execution.analysis?.alertLevel;
+    const alertLevel = executionData.execution.analysis?.alertLevel as 'none' | 'low' | 'medium' | 'high' | 'critical' | undefined;
+    const hasAlert = alertLevel && alertLevel !== 'none';
     const isHighRisk = alertLevel === 'critical' || alertLevel === 'high';
     const confidence = executionData.execution.analysis?.confidenceSmoke ?? 0;
     const executionId = String(executionData.execution.id).slice(-6);
 
     return createNotification({
       type: 'execution:new',
-      icon: isHighRisk ? '🚨' : '🔍',
+      severity: alertLevel ?? 'none',
+      icon: isHighRisk ? '🚨' : hasAlert ? '🔥' : '🔍',
       title: isHighRisk
         ? t('notifications.highRiskTitle')
+        : hasAlert
+        ? t('notifications.alertDetectedTitle', { id: executionId })
         : t('notifications.analysisCompleteTitle', { id: executionId }),
       body: isHighRisk
         ? t('notifications.highRiskBody', { alertLevel: alertLevel!, confidence: (confidence * 100).toFixed(0) })
-        : t('notifications.alertBody', { alertLevel: alertLevel || 'none' }),
+        : hasAlert
+        ? t('notifications.alertBody', { alertLevel: alertLevel! })
+        : t('notifications.alertBody', { alertLevel: 'none' }),
       actions: [
-        { label: t('notifications.viewDetails'), action: 'view', priority: isHighRisk ? 'high' : 'medium' },
+        { label: t('notifications.viewDetails'), action: 'view', priority: isHighRisk ? 'high' : hasAlert ? 'medium' : 'low' },
       ],
-      duration: isHighRisk ? 10000 : 6000,
+      duration: isHighRisk ? 10000 : hasAlert ? 8000 : 5000,
       persistent: isHighRisk,
       data: executionData
     });

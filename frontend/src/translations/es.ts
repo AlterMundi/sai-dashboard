@@ -354,6 +354,7 @@ const es: TranslationKeys = {
   notifications: {
     // notifyNewExecution
     highRiskTitle: 'Detección de Alto Riesgo',
+    alertDetectedTitle: 'Alerta detectada #{id}',
     analysisCompleteTitle: 'Análisis Completo #{id}',
     highRiskBody: 'Alerta: {alertLevel} ({confidence}% confianza)',
     alertBody: 'Alerta: {alertLevel}',

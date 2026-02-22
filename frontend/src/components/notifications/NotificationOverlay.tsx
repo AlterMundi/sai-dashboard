@@ -19,6 +19,7 @@ export interface NotificationData {
   actions?: NotificationAction[];
   duration?: number;
   persistent?: boolean;
+  severity?: 'none' | 'low' | 'medium' | 'high' | 'critical';
   data?: any;
   timestamp: Date;
 }
@@ -69,19 +70,21 @@ function NotificationCard({
   };
 
   const getTypeStyles = () => {
+    if (notification.type === 'execution:new') {
+      switch (notification.severity) {
+        case 'critical': return 'border-l-4 border-l-red-600 bg-red-50';
+        case 'high':     return 'border-l-4 border-l-red-500 bg-red-50';
+        case 'medium':   return 'border-l-4 border-l-orange-500 bg-orange-50';
+        case 'low':      return 'border-l-4 border-l-amber-400 bg-amber-50';
+        default:         return 'border-l-4 border-l-emerald-500 bg-emerald-50';
+      }
+    }
     switch (notification.type) {
-      case 'execution:new':
-        return 'border-l-4 border-l-blue-500 bg-blue-50';
-      case 'execution:error':
-        return 'border-l-4 border-l-red-500 bg-red-50';
-      case 'execution:batch':
-        return 'border-l-4 border-l-green-500 bg-green-50';
-      case 'system:health':
-        return 'border-l-4 border-l-yellow-500 bg-yellow-50';
-      case 'system:stats':
-        return 'border-l-4 border-l-purple-500 bg-purple-50';
-      default:
-        return 'border-l-4 border-l-gray-500 bg-gray-50';
+      case 'execution:error':  return 'border-l-4 border-l-red-500 bg-red-50';
+      case 'execution:batch':  return 'border-l-4 border-l-green-500 bg-green-50';
+      case 'system:health':    return 'border-l-4 border-l-yellow-500 bg-yellow-50';
+      case 'system:stats':     return 'border-l-4 border-l-purple-500 bg-purple-50';
+      default:                 return 'border-l-4 border-l-gray-500 bg-gray-50';
     }
   };
 
