@@ -65,6 +65,12 @@ export function buildAuthorizationUrl(params: {
     ? `urn:zitadel:iam:org:project:id:${projectId}:roles`
     : 'urn:zitadel:iam:org:project:roles';
 
+  if (!projectId) {
+    logger.warn('OIDC: ZITADEL_PROJECT_ID not configured — using generic roles scope (cross-project role bleed possible)');
+  } else {
+    logger.debug('OIDC: Using project-scoped roles scope', { projectId });
+  }
+
   const authUrl = client.authorizationUrl({
     scope: `openid email profile ${rolesScope}`,
     redirect_uri: appConfig.oidc.redirectUri,
