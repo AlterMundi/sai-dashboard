@@ -50,82 +50,10 @@ jobs:
           envs: GHCR_TOKEN,SESSION_SECRET,N8N_DB_PASSWORD,SAI_DB_PASSWORD,AUTH_ZITADEL_ID,ZITADEL_PROJECT_ID,ZITADEL_MGMT_KEY_JSON
           script: |
             set -e
-            mkdir -p /opt/sai-dashboard
-            cd /opt/sai-dashboard
-
-            # Write .env: non-sensitive config + secrets, one printf per line
-            {
-            printf 'NODE_ENV=production\n'
-            printf 'API_PORT=3001\n'
-            printf 'API_BASE_PATH=/dashboard/api\n'
-            printf 'VITE_BASE_PATH=/dashboard/\n'
-            printf 'VITE_API_URL=/dashboard/api\n'
-            printf 'CORS_ORIGIN=https://sai.altermundi.net\n'
-            printf 'CORS_CREDENTIALS=true\n'
-            printf 'N8N_DB_HOST=localhost\n'
-            printf 'N8N_DB_PORT=5432\n'
-            printf 'N8N_DB_NAME=n8n\n'
-            printf 'N8N_DB_USER=n8n_user\n'
-            printf 'SAI_DB_HOST=localhost\n'
-            printf 'SAI_DB_PORT=5432\n'
-            printf 'SAI_DB_NAME=sai_dashboard\n'
-            printf 'SAI_DB_USER=n8n_user\n'
-            printf 'DB_MAX_CONNECTIONS=5\n'
-            printf 'DB_IDLE_TIMEOUT=30000\n'
-            printf 'DB_CONNECTION_TIMEOUT=2000\n'
-            printf 'SAI_WORKFLOW_ID=yDbfhooKemfhMIkC\n'
-            printf 'DEFAULT_PAGE_SIZE=50\n'
-            printf 'MAX_PAGE_SIZE=200\n'
-            printf 'MAX_DAYS_LOOKBACK=365\n'
-            printf 'CACHE_PATH=/mnt/raid1/n8n-backup/images\n'
-            printf 'IMAGE_BASE_PATH=/mnt/raid1/n8n-backup/images\n'
-            printf 'N8N_BINARY_DATA_PATH=/mnt/n8n-data/.n8n/binaryData\n'
-            printf 'ENABLE_THUMBNAIL_GENERATION=true\n'
-            printf 'THUMBNAIL_SIZE=200\n'
-            printf 'THUMBNAIL_QUALITY=70\n'
-            printf 'MAX_IMAGE_SIZE=5242880\n'
-            printf 'SUPPORTED_IMAGE_FORMATS=jpeg,png,webp\n'
-            printf 'IMAGE_CACHE_TTL=86400\n'
-            printf 'AUTH_ZITADEL_ISSUER=https://auth.altermundi.net\n'
-            printf 'AUTH_ZITADEL_SECRET=\n'
-            printf 'AUTH_REDIRECT_URI=https://sai.altermundi.net/dashboard/api/auth/callback\n'
-            printf 'AUTH_POST_LOGOUT_URI=https://sai.altermundi.net/dashboard/\n'
-            printf 'SESSION_DURATION=86400\n'
-            printf 'TRUST_PROXY=true\n'
-            printf 'ENFORCE_HTTPS=true\n'
-            printf 'RATE_LIMIT_WINDOW_MS=60000\n'
-            printf 'RATE_LIMIT_MAX_REQUESTS=10000\n'
-            printf 'LOGIN_RATE_LIMIT_WINDOW=900000\n'
-            printf 'LOGIN_RATE_LIMIT_MAX=5\n'
-            printf 'LOG_LEVEL=info\n'
-            printf 'LOG_FORMAT=simple\n'
-            printf 'LOG_FILE_PATH=\n'
-            printf 'LOG_DATABASE_QUERIES=false\n'
-            printf 'SSE_HEARTBEAT_INTERVAL=30000\n'
-            printf 'SSE_MAX_CLIENTS=100\n'
-            printf 'SSE_TIMEOUT=300000\n'
-            printf 'SSE_DEBUG=false\n'
-            printf 'HEALTH_CHECK_TIMEOUT=5000\n'
-            printf 'ENABLE_SYSTEM_METRICS=true\n'
-            printf 'FEATURE_REAL_TIME_UPDATES=true\n'
-            printf 'ENABLE_ETL_SERVICE=true\n'
-            printf 'USE_TWO_STAGE_ETL=true\n'
-            printf 'SESSION_SECRET=%s\n' "$SESSION_SECRET"
-            printf 'N8N_DB_PASSWORD=%s\n' "$N8N_DB_PASSWORD"
-            printf 'SAI_DB_PASSWORD=%s\n' "$SAI_DB_PASSWORD"
-            printf 'AUTH_ZITADEL_ID=%s\n' "$AUTH_ZITADEL_ID"
-            printf 'ZITADEL_PROJECT_ID=%s\n' "$ZITADEL_PROJECT_ID"
-            printf 'ZITADEL_MGMT_KEY_JSON=%s\n' "$ZITADEL_MGMT_KEY_JSON"
-            } > .env
-            chmod 600 .env
 
             # Authenticate and pull
             echo "$GHCR_TOKEN" | docker login ghcr.io -u github-actions --password-stdin
             docker pull ghcr.io/altermundi/sai-dashboard:latest
-
-            # Stop legacy systemd service if present
-            systemctl stop sai-dashboard-api 2>/dev/null || true
-            systemctl disable sai-dashboard-api 2>/dev/null || true
 
             # Stop old container if running
             docker stop sai-dashboard 2>/dev/null || true
@@ -135,8 +63,7 @@ jobs:
             CONTAINER_UID=$(docker run --rm ghcr.io/altermundi/sai-dashboard:latest id -u)
             echo "Container runs as uid=$CONTAINER_UID"
 
-            for DIR in /mnt/raid1/datasets \
-                       /mnt/raid1/n8n-backup/images \
+            for DIR in /mnt/raid1/n8n-backup/images \
                        /mnt/raid1/n8n-backup/images/original \
                        /mnt/raid1/n8n-backup/images/thumb \
                        /mnt/raid1/n8n-backup/images/webp \
@@ -153,13 +80,20 @@ jobs:
             done
 
             # Start new container
+            # Static config: /etc/sai-dashboard/production.env (managed on server)
+            # Secrets: injected via -e from GitHub Secrets
             docker run -d \
               --name sai-dashboard \
               --network host \
               --restart unless-stopped \
-              --env-file .env \
+              --env-file /etc/sai-dashboard/production.env \
+              -e "SESSION_SECRET=$SESSION_SECRET" \
+              -e "N8N_DB_PASSWORD=$N8N_DB_PASSWORD" \
+              -e "SAI_DB_PASSWORD=$SAI_DB_PASSWORD" \
+              -e "AUTH_ZITADEL_ID=$AUTH_ZITADEL_ID" \
+              -e "ZITADEL_PROJECT_ID=$ZITADEL_PROJECT_ID" \
+              -e "ZITADEL_MGMT_KEY_JSON=$ZITADEL_MGMT_KEY_JSON" \
               -v /mnt/raid1/n8n-backup/images:/mnt/raid1/n8n-backup/images \
-              -v /mnt/raid1/datasets:/mnt/raid1/datasets \
               -v /mnt/n8n-data/.n8n/binaryData:/mnt/n8n-data/.n8n/binaryData:ro \
               --health-cmd="curl -f http://localhost:3001/dashboard/api/health || exit 1" \
               --health-interval=30s \
