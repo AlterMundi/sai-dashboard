@@ -1,4 +1,5 @@
 import { ExecutionWithImageUrls } from '@/types';
+import { getDisplayTimestamp } from './timestamp';
 
 /**
  * Export executions to CSV format
@@ -12,6 +13,7 @@ export function exportToCSV(executions: ExecutionWithImageUrls[], filename = 'sa
   const headers = [
     'ID',
     'Timestamp',
+    'Timestamp Source',
     'Status',
     'Alert Level',
     'Has Smoke',
@@ -26,9 +28,12 @@ export function exportToCSV(executions: ExecutionWithImageUrls[], filename = 'sa
     'Has Image',
   ];
 
-  const rows = executions.map(exec => [
+  const rows = executions.map(exec => {
+    const _ts = getDisplayTimestamp(exec);
+    return [
     exec.id,
-    exec.executionTimestamp,
+    _ts.timestamp,
+    _ts.isFallback ? 'server' : 'capture',
     exec.status,
     exec.alertLevel || 'none',
     exec.hasSmoke ? 'Yes' : 'No',
@@ -41,7 +46,8 @@ export function exportToCSV(executions: ExecutionWithImageUrls[], filename = 'sa
     exec.durationMs || '',
     exec.telegramSent ? 'Yes' : 'No',
     exec.hasImage ? 'Yes' : 'No',
-  ]);
+  ];
+  });
 
   const csvContent = [
     headers.join(','),
@@ -61,9 +67,12 @@ export function exportToJSON(executions: ExecutionWithImageUrls[], filename = 's
   }
 
   // Clean up the data for export (remove internal fields, format dates)
-  const cleanedData = executions.map(exec => ({
+  const cleanedData = executions.map(exec => {
+    const _ts = getDisplayTimestamp(exec);
+    return {
     id: exec.id,
-    timestamp: exec.executionTimestamp,
+    timestamp: _ts.timestamp,
+    timestamp_source: _ts.isFallback ? 'server' : 'capture',
     status: exec.status,
     duration_ms: exec.durationMs,
 
@@ -89,7 +98,8 @@ export function exportToJSON(executions: ExecutionWithImageUrls[], filename = 's
     image_dimensions: exec.imageWidth && exec.imageHeight
       ? { width: exec.imageWidth, height: exec.imageHeight }
       : null,
-  }));
+  };
+  });
 
   const jsonContent = JSON.stringify({
     exported_at: new Date().toISOString(),
@@ -140,10 +150,10 @@ export function exportSummary(executions: ExecutionWithImageUrls[], filename = '
 
     time_range: {
       earliest: executions.length > 0
-        ? executions.reduce((min, e) => e.executionTimestamp < min ? e.executionTimestamp : min, executions[0].executionTimestamp)
+        ? executions.reduce((min, e) => { const t = getDisplayTimestamp(e).timestamp; return t < min ? t : min; }, getDisplayTimestamp(executions[0]).timestamp)
         : null,
       latest: executions.length > 0
-        ? executions.reduce((max, e) => e.executionTimestamp > max ? e.executionTimestamp : max, executions[0].executionTimestamp)
+        ? executions.reduce((max, e) => { const t = getDisplayTimestamp(e).timestamp; return t > max ? t : max; }, getDisplayTimestamp(executions[0]).timestamp)
         : null,
     },
   };

@@ -11,6 +11,7 @@ import { executionsApi, detectionsApi, DetectionFilterCriteria } from '@/service
 import { useSSEHandler } from '@/contexts/SSEContext';
 import { ExecutionFilters, ExecutionWithImageUrls, SSEStage2CompletionEvent, SSEStage2FailureEvent } from '@/types';
 import toast from 'react-hot-toast';
+import { getDisplayTimestamp } from '@/utils';
 
 function parseFiltersFromURL(searchParams: URLSearchParams): ExecutionFilters {
   const filters: ExecutionFilters = {};
@@ -240,9 +241,9 @@ export function Dashboard() {
     clearAllFilters();
   }, [clearAllFilters]);
 
-  const handleCarouselSelect = useCallback((execution: { id: number; executionTimestamp: string }) => {
+  const handleCarouselSelect = useCallback((execution: { id: number; executionTimestamp: string; captureTimestamp?: string | null }) => {
     // Filter gallery to show detections around this execution's time
-    const ts = new Date(execution.executionTimestamp);
+    const ts = new Date(getDisplayTimestamp(execution).timestamp);
     const dayStart = new Date(ts.getFullYear(), ts.getMonth(), ts.getDate());
     const dayEnd = new Date(ts.getFullYear(), ts.getMonth(), ts.getDate(), 23, 59, 59, 999);
     setFilters({

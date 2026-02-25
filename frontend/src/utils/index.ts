@@ -300,5 +300,8 @@ export async function copyToClipboard(text: string): Promise<boolean> {
   }
 }
 
+// Timestamp display helpers
+export { getDisplayTimestamp } from './timestamp';
+
 // Export utilities
 export { exportToCSV, exportToJSON, exportSummary } from './export';

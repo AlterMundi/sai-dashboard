@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import { LoadingSpinner } from './ui/LoadingSpinner';
-import { cn } from '@/utils';
+import { cn, getDisplayTimestamp } from '@/utils';
 import { ImageCardProps } from '@/types';
 import { useImageCard } from '@/hooks/useImageCard';
 import { useTranslation } from '@/contexts/LanguageContext';
@@ -17,6 +17,8 @@ export const ImageCard = memo(function ImageCard({ execution, onClick, loading =
     handleImageLoad,
     handleImageError,
   } = useImageCard(execution);
+
+  const _ts = getDisplayTimestamp(execution);
 
   const handleCardClick = () => {
     if (!loading) {
@@ -167,8 +169,9 @@ export const ImageCard = memo(function ImageCard({ execution, onClick, loading =
           <span className="font-mono text-sm font-semibold text-gray-800">
             #{String(execution.id).padStart(6, '0')}
           </span>
-          <span className="text-xs text-gray-500 tabular-nums">
-            {new Date(execution.executionTimestamp).toLocaleString('en-GB', {
+          <span className={cn('text-xs tabular-nums', _ts.isFallback ? 'text-amber-500' : 'text-gray-500')} title={_ts.isFallback ? 'Server time (no capture metadata)' : 'Camera capture time'}>
+            {_ts.isFallback && '~ '}
+            {new Date(_ts.timestamp).toLocaleString('en-GB', {
               day: '2-digit', month: '2-digit',
               hour: '2-digit', minute: '2-digit',
               hour12: false

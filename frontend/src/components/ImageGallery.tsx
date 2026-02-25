@@ -9,7 +9,7 @@ import { LoadingSpinner, LoadingState } from './ui/LoadingSpinner';
 import { useExecutions, useCameraExecutions } from '@/hooks/useExecutions';
 import { executionsApi, tokenManager } from '@/services/api';
 import { ExecutionWithImageUrls, ExecutionFilters, NavContext } from '@/types';
-import { cn } from '@/utils';
+import { cn, getDisplayTimestamp } from '@/utils';
 import { useTranslation } from '@/contexts/LanguageContext';
 import { Grid, List, RefreshCw, ArrowUp, ArrowDownNarrowWide, ArrowUpNarrowWide } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
@@ -168,10 +168,13 @@ export function ImageGallery({ initialFilters = {}, className, refreshTrigger, o
 
   const handleExportCsv = useCallback(() => {
     const selected = executions.filter(e => selectedIds.has(e.id));
-    const headers = ['id', 'timestamp', 'camera', 'location', 'alertLevel', 'hasSmoke', 'detectionCount', 'confidenceSmoke', 'isFalsePositive'];
-    const rows = selected.map(e => [
+    const headers = ['id', 'timestamp', 'timestamp_source', 'camera', 'location', 'alertLevel', 'hasSmoke', 'detectionCount', 'confidenceSmoke', 'isFalsePositive'];
+    const rows = selected.map(e => {
+      const _ts = getDisplayTimestamp(e);
+      return [
       e.id,
-      e.executionTimestamp,
+      _ts.timestamp,
+      _ts.isFallback ? 'server' : 'capture',
       e.cameraId ?? '',
       e.location ?? '',
       e.alertLevel ?? '',
@@ -179,7 +182,8 @@ export function ImageGallery({ initialFilters = {}, className, refreshTrigger, o
       e.detectionCount ?? 0,
       e.confidenceSmoke ?? '',
       e.isFalsePositive ?? false,
-    ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(','));
+    ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(',');
+    });
 
     const csv = [headers.join(','), ...rows].join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -250,7 +254,7 @@ export function ImageGallery({ initialFilters = {}, className, refreshTrigger, o
       return {
         nodeId:    selectedExecution.nodeId!,
         cameraId:  selectedExecution.cameraId!,
-        timestamp: selectedExecution.executionTimestamp,
+        timestamp: getDisplayTimestamp(selectedExecution).timestamp,
       };
     });
   }, [selectedExecution?.nodeId, selectedExecution?.cameraId, selectedExecution?.executionTimestamp]);
@@ -283,7 +287,7 @@ export function ImageGallery({ initialFilters = {}, className, refreshTrigger, o
       ? cameraExecutions
       : executions
           .filter(e => e.nodeId === selectedExecution.nodeId && e.cameraId === selectedExecution.cameraId)
-          .sort((a, b) => new Date(a.executionTimestamp).getTime() - new Date(b.executionTimestamp).getTime());
+          .sort((a, b) => new Date(getDisplayTimestamp(a).timestamp).getTime() - new Date(getDisplayTimestamp(b).timestamp).getTime());
     const idx = siblings.findIndex(e => e.id === selectedExecution.id);
     if (idx === -1) return undefined;
     return {

@@ -3,7 +3,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { executionsApi } from '@/services/api';
 import { useSecureImage } from '@/components/ui/SecureImage';
 import { Execution } from '@/types';
-import { cn } from '@/utils';
+import { cn, getDisplayTimestamp } from '@/utils';
 import { useTranslation } from '@/contexts/LanguageContext';
 
 interface CarouselThumbProps {
@@ -17,7 +17,8 @@ function CarouselThumb({ execution, onClick }: CarouselThumbProps) {
     : undefined;
   const { blobUrl, loading } = useSecureImage(secureUrl);
 
-  const ts = new Date(execution.executionTimestamp);
+  const _ts = getDisplayTimestamp(execution);
+  const ts = new Date(_ts.timestamp);
   const timeStr = ts.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
   const dateStr = ts.toLocaleDateString(undefined, { day: '2-digit', month: 'short' });
 
@@ -63,8 +64,8 @@ function CarouselThumb({ execution, onClick }: CarouselThumbProps) {
       <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 40, background: 'linear-gradient(to top, rgba(0,0,0,0.65), transparent)', pointerEvents: 'none' }} />
 
       {/* Timestamp — bottom right, same tabular-nums pattern */}
-      <div style={{ position: 'absolute', bottom: 6, right: 6, fontSize: 9, color: 'white', fontWeight: 500, pointerEvents: 'none' }} className="tabular-nums">
-        {dateStr} · {timeStr}
+      <div style={{ position: 'absolute', bottom: 6, right: 6, fontSize: 9, color: _ts.isFallback ? '#fbbf24' : 'white', fontWeight: 500, pointerEvents: 'none' }} className="tabular-nums" title={_ts.isFallback ? 'Server time (no capture metadata)' : 'Camera capture time'}>
+        {_ts.isFallback && '~ '}{dateStr} · {timeStr}
       </div>
 
       {/* Hover reveal: execution ID — matches gallery card font-mono ID style */}

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { executionsApi } from '@/services/api';
 import { ExecutionWithImageUrls, ExecutionFilters, UseExecutionsReturn, ExecutionStats, DailySummary, StatsFilters, StatsRanking, ProcessingStage } from '@/types';
+import { getDisplayTimestamp } from '@/utils';
 
 export function useExecutions(
   initialFilters: ExecutionFilters = {},
@@ -334,7 +335,7 @@ export function useCameraExecutions(
         const seen = new Set<number>();
         const merged = [...before.executions, ...after.executions]
           .filter(e => { if (seen.has(e.id)) return false; seen.add(e.id); return true; })
-          .sort((a, b) => new Date(a.executionTimestamp).getTime() - new Date(b.executionTimestamp).getTime());
+          .sort((a, b) => new Date(getDisplayTimestamp(a).timestamp).getTime() - new Date(getDisplayTimestamp(b).timestamp).getTime());
         setExecutions(merged);
       })
       .catch(() => { if (!cancelled) setExecutions([]); })
