@@ -696,15 +696,27 @@ export class Stage2ETLService extends EventEmitter {
       ? Math.max(...detections.map(d => d.confidence))
       : null;
 
+    // Derive alert_level from detections if not provided by inference service
+    // (removed from SIA inference response circa 2026-02-24)
+    const detectionCount = yoloData?.detection_count ?? 0;
+    const alertLevel = yoloData?.alert_level
+      || (detectionCount > 0 ? 'high' : 'none');
+
+    // Derive active_classes from detections if not provided
+    const activeClasses = yoloData?.active_classes
+      || (detections && detections.length > 0
+        ? [...new Set(detections.map(d => d.class))]
+        : null);
+
     return {
       // YOLO inference results
       request_id: yoloData?.request_id || null,
       yolo_model_version: yoloData?.version || null,
-      detection_count: yoloData?.detection_count ?? 0,
+      detection_count: detectionCount,
       has_smoke: yoloData?.has_smoke ?? false,
-      alert_level: yoloData?.alert_level || null,
-      detection_mode: yoloData?.detection_mode || null,
-      active_classes: yoloData?.active_classes || null,
+      alert_level: alertLevel,
+      detection_mode: yoloData?.detection_mode || 'smoke-only',
+      active_classes: activeClasses,
       detections: detections,
 
       // Confidence scores
