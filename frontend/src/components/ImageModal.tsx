@@ -430,6 +430,7 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate, cameraNav, ga
 
   if (!isOpen || !execution) return null;
 
+  const _ts = getDisplayTimestamp(execution);
   const duration = execution.durationMs ? Math.round(execution.durationMs / 1000) : null;
 
   const handleCopyId = async () => {
@@ -605,24 +606,19 @@ export function ImageModal({ execution, isOpen, onClose, onUpdate, cameraNav, ga
         <div className="grid grid-cols-2 gap-3 text-sm">
           <div>
             <p className="text-gray-500">{t('modal.started')}</p>
-            {(() => {
-              const _ts = getDisplayTimestamp(execution);
-              return (
-                <>
-                  <p className={cn('font-medium mt-1', _ts.isFallback && 'text-amber-600')}>
-                    {_ts.isFallback && '~ '}
-                    <DynamicTimeAgo date={_ts.timestamp} />
-                  </p>
-                  <p className={cn('text-xs mt-0.5', _ts.isFallback ? 'text-amber-400' : 'text-gray-400')}>
-                    {_ts.isFallback && '~ '}
-                    {formatDate(_ts.timestamp)}
-                  </p>
-                  {_ts.isFallback && (
-                    <p className="text-xs text-amber-500 mt-0.5">Server time (no capture metadata)</p>
-                  )}
-                </>
-              );
-            })()}
+            <>
+              <p className={cn('font-medium mt-1', _ts.isFallback && 'text-amber-600')}>
+                {_ts.isFallback && '~ '}
+                <DynamicTimeAgo date={_ts.timestamp} />
+              </p>
+              <p className={cn('text-xs mt-0.5', _ts.isFallback ? 'text-amber-400' : 'text-gray-400')}>
+                {_ts.isFallback && '~ '}
+                {formatDate(_ts.timestamp)}
+              </p>
+              {_ts.isFallback && (
+                <p className="text-xs text-amber-500 mt-0.5">Server time (no capture metadata)</p>
+              )}
+            </>
           </div>
           {duration && (
             <div>

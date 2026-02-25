@@ -257,7 +257,7 @@ export function ImageGallery({ initialFilters = {}, className, refreshTrigger, o
         timestamp: getDisplayTimestamp(selectedExecution).timestamp,
       };
     });
-  }, [selectedExecution?.nodeId, selectedExecution?.cameraId, selectedExecution?.executionTimestamp]);
+  }, [selectedExecution?.nodeId, selectedExecution?.cameraId, selectedExecution?.executionTimestamp, selectedExecution?.captureTimestamp]);
 
   // Unfiltered camera feed — independent of any gallery filters.
   const { executions: cameraExecutions } = useCameraExecutions(
@@ -287,7 +287,7 @@ export function ImageGallery({ initialFilters = {}, className, refreshTrigger, o
       ? cameraExecutions
       : executions
           .filter(e => e.nodeId === selectedExecution.nodeId && e.cameraId === selectedExecution.cameraId)
-          .sort((a, b) => new Date(getDisplayTimestamp(a).timestamp).getTime() - new Date(getDisplayTimestamp(b).timestamp).getTime());
+          .sort((a, b) => new Date(a.executionTimestamp).getTime() - new Date(b.executionTimestamp).getTime());
     const idx = siblings.findIndex(e => e.id === selectedExecution.id);
     if (idx === -1) return undefined;
     return {
